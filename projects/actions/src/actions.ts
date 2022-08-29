@@ -143,7 +143,6 @@ export class Dispatcher {
   }
 
   error(error: unknown) {
-    handleError(error, this.errorHandler, this.context)
     this.changeDetector.markForCheck()
     this.dispatcher.next({
       name: this.action,
@@ -315,18 +314,18 @@ export function Store() {
           dispatcher.dispatch(this, action.key, args, result)
           return result
         } catch (e) {
-          handleError(e, injector.get(ErrorHandler), this)
+          handleError(e, injector.get(ErrorHandler), prototype, this)
         }
       })
     }
   }
 }
 
-function handleError(error: unknown, defaultHandler: ErrorHandler, thisArg: any) {
-  const errorHandlers = Array.from(getMetaKeys(Caught, Object.getPrototypeOf(thisArg)).values()) as ActionMeta[]
+function handleError(error: unknown, defaultHandler: ErrorHandler, prototype: any, instance: any) {
+  const errorHandlers = Array.from(getMetaKeys(Caught, prototype).values()) as ActionMeta[]
   for (const handler of errorHandlers) {
     try {
-      return handler.method.call(thisArg, error)
+      return handler.method.call(instance, error)
     } catch(e) {
       error = e
     }
@@ -410,6 +409,7 @@ interface Observer<This, Value> {
 export function createDispatch<T>(token: Type<T>) {
   return function dispatch<U>(source: Observable<U>, observer?: Partial<Observer<T, U>>): Observable<U> {
     const instance = inject(token)
+    const errorHandler = inject(ErrorHandler)
     return new Observable(subscriber => {
       return source.subscribe({
         next(value) {
@@ -421,15 +421,17 @@ export function createDispatch<T>(token: Type<T>) {
           subscriber.next(value)
         },
         error(error: unknown) {
-          if (observer?.error) {
-            try {
-              observer?.error?.call(instance, error)
-            } catch (e) {
-              subscriber.error(e)
+          try {
+            if (observer?.error) {
+              observer.error.call(instance, error)
+            } else {
+              handleError(error, errorHandler, token.prototype, instance)
             }
-          } else {
-            subscriber.error(error)
+          } catch (e) {
+            error = e
+            handleError(e, errorHandler, token.prototype, instance)
           }
+          subscriber.error(error)
         },
         complete() {
           try {
