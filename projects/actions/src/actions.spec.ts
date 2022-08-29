@@ -1,21 +1,35 @@
 import {
   Component,
-  createEnvironmentInjector, ElementRef, EnvironmentInjector, inject, Injectable,
-  INJECTOR, Type,
+  createEnvironmentInjector,
+  ElementRef,
+  EnvironmentInjector,
+  inject,
+  Injectable,
+  InjectionToken,
+  INJECTOR,
+  Type,
   ɵɵdirectiveInject as directiveInject
 } from "@angular/core";
-import createSpy = jasmine.createSpy;
 import {fakeAsync, TestBed, tick} from "@angular/core/testing";
 import {createProxy, runInContext} from "./proxy";
 import {
+  catchError,
+  EMPTY,
   filter,
+  isObservable,
+  map,
   mergeAll,
   MonoTypeOperatorFunction,
-  Observable, ObservableInput, of, OperatorFunction, PartialObserver,
+  Observable,
+  ObservableInput,
+  OperatorFunction,
+  PartialObserver,
   Subject,
   Subscription,
+  tap,
   timer
 } from "rxjs";
+import createSpy = jasmine.createSpy;
 
 const meta = new WeakMap()
 
@@ -50,6 +64,7 @@ type SelectMeta = { key: PropertyKey, descriptor: PropertyDescriptor, config: Ac
 function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: any, ...args: any[]) => any) {
   const originalFunction = target[key] ?? Function
   Object.defineProperty(target, key, {
+    configurable: true,
     value: function (this: unknown, ...args: any[]) {
       return fn.call(this, originalFunction, ...args)
     }
@@ -100,9 +115,6 @@ class Effect {
       this.destination = new Subject()
       const subscription = this.destination.subscribe(observer)
       this.subscription = this.source.pipe(this.operator).subscribe(this.destination)
-      this.subscription.add(() => {
-        this.connected = false
-      })
       return subscription
     }
   }
@@ -113,7 +125,7 @@ class Effect {
 }
 
 enum ActionType {
-  Action,
+  Dispatch,
   Next,
   Error,
   Complete
@@ -125,10 +137,15 @@ class Dispatcher {
   action!: PropertyKey
   tries = 1
   subscription = Subscription.EMPTY
+  dispatcher = inject(DISPATCHER)
+  source: Observable<any> = EMPTY
+  connected = true
+  dirty = false
+  payload = []
 
   next(value: any) {
     this.tries = 1
-    globalDispatcher.next({
+    this.dispatcher.next({
       name: this.action,
       context: this.context,
       value,
@@ -137,7 +154,7 @@ class Dispatcher {
   }
 
   error(error: unknown) {
-    globalDispatcher.next({
+    this.dispatcher.next({
       name: this.action,
       context: this.context,
       error,
@@ -148,26 +165,47 @@ class Dispatcher {
 
   complete() {
     this.tries = 1
-    globalDispatcher.next({
+    this.dispatcher.next({
       name: this.action,
       context: this.context,
       type: ActionType.Complete
     })
   }
 
+  connect() {
+    if (!this.connected) {
+      this.connected = true
+      this.subscription.unsubscribe()
+      this.subscription = this.source.subscribe(this)
+    }
+  }
+
+  flush() {
+    if (this.dirty) {
+      this.dirty = false
+      this.dispatcher.next({
+        name: this.action,
+        context: this.context,
+        value: this.payload,
+        type: ActionType.Dispatch
+      })
+    }
+  }
+
   dispatch(context: object, action: PropertyKey, payload: any, effect: any) {
+    this.dirty = true
     this.action = action
     this.context = context
-    globalDispatcher.next({
-      name: action,
-      context,
-      value: payload,
-      type: ActionType.Action
-    })
-    if (effect) {
-      this.subscription.unsubscribe()
-      this.subscription = effect.subscribe(this)
+    this.payload = payload
+
+    if (isObservable(effect)) {
+      this.connected = false
+      this.source = effect
     }
+  }
+
+  ngOnDestroy() {
+    this.subscription.unsubscribe()
   }
 }
 
@@ -228,6 +266,16 @@ function State() {
       }
     }
 
+    wrap(prototype, "ngAfterViewChecked", function (fn) {
+      for (const action of actions) {
+        (getMeta(INJECTOR, this, action.key) as EnvironmentInjector).get(Dispatcher).connect()
+      }
+      for (const action of actions) {
+        (getMeta(INJECTOR, this, action.key) as EnvironmentInjector).get(Dispatcher).flush()
+      }
+      fn.apply(this)
+    })
+
     for (const action of actions) {
       wrap(prototype, action.key, function (fn, ...args) {
         const deps = new Map()
@@ -248,11 +296,11 @@ const defaultConfig = {
   immediate: true
 }
 
-interface ActionEvent<K = PropertyKey, T = unknown> {
+interface DispatchEvent<K = PropertyKey, T = unknown> {
   readonly name: K
   readonly context: object
   readonly value: T
-  readonly type: ActionType.Action
+  readonly type: ActionType.Dispatch
 }
 
 interface NextEvent<K = PropertyKey, T = unknown> {
@@ -277,12 +325,16 @@ interface CompleteEvent<K = PropertyKey> {
 }
 
 type EventType<ActionKey = PropertyKey, ActionType = unknown, EffectType = unknown> =
-  | ActionEvent<ActionKey, ActionType>
+  | DispatchEvent<ActionKey, ActionType>
   | NextEvent<ActionKey, EffectType>
   | ErrorEvent<ActionKey>
   | CompleteEvent<ActionKey>
 
-const globalDispatcher = new Subject<EventType>()
+const DISPATCHER = new InjectionToken("Dispatcher", {
+  factory() {
+    return new Subject<EventType>()
+  }
+})
 
 function Action(config: ActionConfig = defaultConfig) {
   return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
@@ -332,7 +384,17 @@ function createEffect<T>(source: Observable<T>, operator: OperatorFunction<Obser
   effect.operator = operator
   return new Observable(subscriber => {
     const subscription = effect.subscribe(subscriber)
-    effect.next(source)
+    effect.next(source.pipe(
+      catchError((error) => {
+        subscriber.error(error)
+        return EMPTY
+      }),
+      tap({
+        complete() {
+          subscriber.complete()
+        }
+      })
+    ))
     return subscription
   })
 }
@@ -341,15 +403,16 @@ type ExtractEvents<T, U extends PropertyKey> = {
   [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => Observable<infer R> ? EventType<key, P, R> : never : never
 }[U]
 
-type MapKeys<T> = {
+type BooleanKeys<T> = {
   [key in keyof T]?: boolean
 }
 
-function fromAction<T extends object, U extends MapKeys<T>>(token: Type<T>, keys: U): Observable<ExtractEvents<T, keyof U>> {
+function fromAction<T extends object>(token: Type<T>): Observable<ExtractEvents<T, keyof T>> {
   const context = inject(token)
-  return globalDispatcher.pipe(
-    filter(event => event.context === context && (keys as any)[event.name])
-  ) as any
+  const dispatcher = inject(DISPATCHER)
+  return dispatcher.pipe(
+    filter(event => event.context === context)
+  ) as Observable<ExtractEvents<T, keyof T>>
 }
 
 describe("Library", () => {
@@ -678,21 +741,12 @@ describe("Library", () => {
   })
 
   describe("fromAction", () => {
-    it("should create", () => {
+    it("should create", fakeAsync(() => {
 
       @State()
       @Component({template: ``})
       class Test {
         count = 0
-
-        @Action() otherAction() {
-          return dispatch(createEffect(of("hello"), mergeAll()), {
-            next() {
-              this.count += 1
-            }
-          })
-        }
-
 
         @Action() action() {
           return dispatch(createEffect(timer(2000), mergeAll()), {
@@ -702,31 +756,127 @@ describe("Library", () => {
           })
         }
 
-        @Action() saga(): Observable<unknown> {
-          const effect = fromAction(Test, { action: true, otherAction: true, saga: true })
-
-          return dispatch(effect, {
-            next(event) {
-              switch (event.name) {
-                case "action": {
-                  switch (event.type) {
-                    case ActionType.Next: {
-                      console.log(event.value)
-                      break
-                    }
-                    case ActionType.Action: {
-                      console.log(event.value)
-                    }
-                  }
-                }
-              }
+        @Action() actionWithArgs(...args: any[]) {
+          return dispatch(createEffect(timer(2000), mergeAll()), {
+            next() {
+              this.count += 1
             }
           })
+        }
+
+        @Action() saga(): Observable<unknown> {
+          const effect = fromAction(Test).pipe(
+            filter(event => ["actionWithArgs", "action"].includes(event.name)),
+            map(event => `${event.name}.${ActionType[event.type].toLowerCase()}`)
+          )
+
+          return dispatch(effect)
         }
       }
       const dispatch = createDispatch(Test)
       const fixture = TestBed.configureTestingModule({declarations: [Test]}).createComponent(Test)
+      const dispatcher = TestBed.inject(DISPATCHER)
+      const spy = createSpy()
 
-    })
+      dispatcher.subscribe(spy)
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "action",
+        context: fixture.componentInstance,
+        type: ActionType.Dispatch,
+        value: []
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Dispatch,
+        value: []
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "action.dispatch"
+      })
+
+      expect(spy).toHaveBeenCalledTimes(5)
+
+      fixture.componentInstance.actionWithArgs(10, 20, 30)
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "actionWithArgs",
+        context: fixture.componentInstance,
+        type: ActionType.Dispatch,
+        value: [10, 20, 30]
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "actionWithArgs.dispatch"
+      })
+
+      tick(2000)
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "action",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: 0
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "action.next"
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "action",
+        context: fixture.componentInstance,
+        type: ActionType.Complete,
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "action.complete"
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "actionWithArgs",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: 0
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "actionWithArgs.next"
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "actionWithArgs",
+        context: fixture.componentInstance,
+        type: ActionType.Complete,
+      })
+
+      expect(spy).toHaveBeenCalledWith(<EventType>{
+        name: "saga",
+        context: fixture.componentInstance,
+        type: ActionType.Next,
+        value: "actionWithArgs.complete"
+      })
+
+    }))
   })
 })
