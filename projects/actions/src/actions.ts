@@ -296,6 +296,14 @@ export function Store() {
       fn.apply(this)
     })
 
+    wrap(prototype, "ngOnDestroy", function (fn) {
+      const injector = getMetaKeys(INJECTOR, this) as Map<any, EnvironmentInjector>
+      for (const meta of injector.values()) {
+        meta.destroy()
+      }
+      fn.apply(this)
+    })
+
     for (const action of actions) {
       wrap(prototype, action.key, function (fn, ...args) {
         const deps = new Map()
