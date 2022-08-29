@@ -21,12 +21,12 @@ import {
   mergeAll,
   MonoTypeOperatorFunction,
   Observable,
-  ObservableInput,
+  ObservableInput, of,
   OperatorFunction,
   PartialObserver,
   Subject,
   Subscription,
-  tap,
+  tap, throwError,
   timer
 } from "rxjs";
 import createSpy = jasmine.createSpy;
@@ -214,6 +214,7 @@ function State() {
     const { prototype } = target
     const selectors = Array.from(getMetaKeys(Select, prototype).values()) as SelectMeta[]
     const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
+    const errorHandlers = Array.from(getMetaKeys(Caught, prototype).values()) as ActionMeta[]
     const checkActions = actions.filter((action) => action.config.check)
     const contentActions = actions.filter((action) => action.config.content)
     const viewActions = actions.filter((action) => action.config.view)
@@ -259,7 +260,35 @@ function State() {
             }
           })
         } else if (typeof value === "function") {
-
+          Object.defineProperty(prototype, selector.key, {
+            value: function (...args: any[]) {
+              const deps = getMeta("deps", this, selector.key) as Map<any, any>
+              const argKey = JSON.stringify(args)
+              let changed = !deps
+              if (deps) {
+                outer: for (const [object, keyValue] of deps) {
+                  for (const [key, value] of keyValue) {
+                    if (object[key] !== value) {
+                      changed = true
+                      break outer
+                    }
+                  }
+                }
+              }
+              const cache = getMeta("cache", this, selector.key) as Map<any, any> ?? new Map()
+              if (changed) {
+                const deps = new Map()
+                const result = runInContext(deps, () => value.apply(selector.config.track ? createProxy(this) : this, args))
+                cache.set(argKey, result)
+                setMeta("deps", deps, this, selector.key)
+              } else if (!cache.has(argKey)) {
+                const result = value.apply(this, args)
+                cache.set(argKey, result)
+              }
+              setMeta("cache", cache, this, selector.key)
+              return cache.get(argKey)
+            }
+          })
         } else {
           throw new Error("Selector must be a getter or method")
         }
@@ -345,6 +374,12 @@ function Action(config: ActionConfig = defaultConfig) {
 function Select(config: ActionConfig = defaultConfig) {
   return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
     setMeta(Select, { descriptor, key, config: { ...defaultConfig, ...config }}, target, key)
+  }
+}
+
+function Caught() {
+  return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
+    setMeta(Caught, { method: descriptor.value, key, config: {}}, target, key)
   }
 }
 
@@ -678,13 +713,96 @@ describe("Library", () => {
     })
 
     it("should memoize function arguments and dependencies", () => {
+      const spy = createSpy("double")
+      @State()
+      @Component({ template: `` })
+      class Test {
+        list = [1, 2, 3]
 
+        @Select() select(value: number) {
+          spy()
+          return this.list.filter((item) => item === value)
+        }
+      }
+      const fixture = TestBed.configureTestingModule({declarations: [Test]}).createComponent(Test)
+
+      fixture.componentInstance.select(1)
+      fixture.componentInstance.select(1)
+      const result = fixture.componentInstance.select(1)
+
+      expect(result).toEqual([1])
+      expect(spy).toHaveBeenCalledTimes(1)
+
+      const result2 = fixture.componentInstance.select(2)
+
+      fixture.componentInstance.select(1)
+      fixture.componentInstance.select(2)
+
+      expect(result2).toEqual([2])
+      expect(spy).toHaveBeenCalledTimes(2)
+
+      fixture.componentInstance.list = [4, 5, 6]
+      const result3 = fixture.componentInstance.select(4)
+      const result4 = fixture.componentInstance.select(5)
+
+      fixture.componentInstance.select(4)
+      fixture.componentInstance.select(5)
+
+      expect(result3).toEqual([4])
+      expect(result4).toEqual([5])
+      expect(spy).toHaveBeenCalledTimes(4)
     })
   })
 
   describe("Caught decorator", () => {
     it("should create", () => {
+      const spy = createSpy()
+      @State()
+      @Component({template: ``})
+      class Test {
+        @Action() actionError() {
+          throw new Error("actionError")
+        }
 
+        @Action() effectError() {
+          return dispatch(throwError(() => new Error("effectError")))
+        }
+
+        @Action() dispatchError() {
+          return dispatch(of(1), {
+            next() {
+              throw new Error("dispatchError")
+            }
+          })
+        }
+
+        @Action() rethrowActionError() {
+          return dispatch(of(1), {
+            error(error: unknown) {
+              throw error
+            }
+          })
+        }
+
+        @Action() actionWithHandledError() {
+          return dispatch(throwError(() => new Error("actionWithHandledError")), {
+            error(error: unknown) {
+              spy(error)
+            }
+          })
+        }
+
+        @Caught() rethrowError(error: unknown) {
+          throw error
+        }
+
+        @Caught() caughtError(error: unknown) {
+          spy(error)
+        }
+      }
+
+      const dispatch = createDispatch(Test)
+      const fixture = TestBed.configureTestingModule({declarations: [Test]}).createComponent(Test)
     })
   })
 
