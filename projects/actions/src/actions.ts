@@ -128,7 +128,6 @@ export class Dispatcher {
   connected = true
   dirty = false
   payload = []
-  errorHandler = inject(ErrorHandler)
   changeDetector = inject(ChangeDetectorRef)
 
   next(value: any) {
@@ -334,9 +333,7 @@ function handleError(error: unknown, defaultHandler: ErrorHandler, prototype: an
 }
 
 const defaultConfig = {
-  track: true,
   check: true,
-  immediate: true
 }
 
 export interface DispatchEvent<K = PropertyKey, T = unknown> {
@@ -386,20 +383,20 @@ export function Action(config: ActionConfig = defaultConfig) {
 }
 
 export function Invoke(config?: ActionConfig) {
-  return Action({ immediate: false, track: false, ...config })
+  return Action({ immediate: true, track: true, ...config })
 }
 
 export function Before(config?: ActionConfig) {
-  return Action({ check: false, content: true, ...config })
+  return Invoke({ check: false, content: true, ...config })
 }
 
 export function Layout(config?: ActionConfig) {
-  return Action({ check: false, view: true, ...config })
+  return Invoke({ check: false, view: true, ...config })
 }
 
 export function Select(config: ActionConfig = defaultConfig) {
   return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
-    setMeta(Select, { descriptor, key, config: { ...defaultConfig, ...config }}, target, key)
+    setMeta(Select, { descriptor, key, config: { ...defaultConfig, track: true, ...config }}, target, key)
   }
 }
 

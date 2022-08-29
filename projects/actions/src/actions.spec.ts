@@ -3,14 +3,14 @@ import {fakeAsync, TestBed, tick} from "@angular/core/testing";
 import {filter, map, mergeAll, Observable, of, throwError, timer} from "rxjs";
 import {
   Action,
-  ActionType,
+  ActionType, Before,
   Caught,
   createDispatch,
   createEffect,
   Dispatcher,
   DISPATCHER,
   EventType,
-  fromAction,
+  fromAction, Invoke, Layout,
   Select,
   Store
 } from "./actions";
@@ -48,7 +48,7 @@ describe("Library", () => {
       @Store()
       @Component({ template: `` })
       class Test {
-        @Action() action() { spy() }
+        @Invoke() action() { spy() }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -62,7 +62,7 @@ describe("Library", () => {
       @Store()
       @Component({ template: `` })
       class Test {
-        @Action() action(arg: any) { spy(arg) }
+        @Invoke() action(arg: any) { spy(arg) }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -78,7 +78,7 @@ describe("Library", () => {
       @Store()
       @Component({ template: `` })
       class Test {
-        @Action() action(arg = 1337) { spy(arg) }
+        @Invoke() action(arg = 1337) { spy(arg) }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -93,7 +93,7 @@ describe("Library", () => {
       @Component({ template: `` })
       class Test {
         count = 0
-        @Action() action() { spy(this.count) }
+        @Invoke() action() { spy(this.count) }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -110,7 +110,7 @@ describe("Library", () => {
       @Component({ template: `` })
       class Test {
         count = 0
-        @Action() action() { spy(this.count) }
+        @Invoke() action() { spy(this.count) }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -131,7 +131,7 @@ describe("Library", () => {
       @Component({ template: `` })
       class Test {
         count = 0
-        @Action({ track: false }) action() { spy(this.count) }
+        @Invoke({ track: false }) action() { spy(this.count) }
       }
       const fixture = TestBed.configureTestingModule({ declarations: [Test] }).createComponent(Test)
 
@@ -156,7 +156,7 @@ describe("Library", () => {
       @Component({ template: `` })
       class Test {
         count = 0
-        @Action({ check: false, content: true }) action() {
+        @Before() action() {
           spy(this.count)
         }
 
@@ -182,7 +182,7 @@ describe("Library", () => {
       @Component({ template: `` })
       class Test {
         count = 0
-        @Action({ check: false, view: true }) action() {
+        @Layout() action() {
           spy(this.count)
         }
 
@@ -429,7 +429,7 @@ describe("Library", () => {
       class Test {
         count = 0
 
-        @Action() action() {
+        @Action({ immediate: true }) action() {
           return dispatch(timer(2000), {
             next() {
               this.count += 1
@@ -455,7 +455,7 @@ describe("Library", () => {
       class Test {
         count = 0
 
-        @Action() action() {
+        @Action({ immediate: true }) action() {
           return dispatch(createEffect(timer(2000), mergeAll()), {
             next() {
               this.count += 1
@@ -482,7 +482,7 @@ describe("Library", () => {
       class Test {
         count = 0
 
-        @Action() action() {
+        @Action({ immediate: true }) action() {
           return dispatch(createEffect(timer(2000), mergeAll()), {
             next() {
               this.count += 1
@@ -490,7 +490,7 @@ describe("Library", () => {
           })
         }
 
-        @Action() actionWithArgs(...args: any[]) {
+        @Action({ immediate: true }) actionWithArgs(...args: any[]) {
           return dispatch(createEffect(timer(2000), mergeAll()), {
             next() {
               this.count += 1
@@ -498,7 +498,7 @@ describe("Library", () => {
           })
         }
 
-        @Action() saga(): Observable<unknown> {
+        @Action({ immediate: true }) saga(): Observable<unknown> {
           const effect = fromAction(Test).pipe(
             filter(event => ["actionWithArgs", "action"].includes(event.name)),
             map(event => `${event.name}.${ActionType[event.type].toLowerCase()}`)
