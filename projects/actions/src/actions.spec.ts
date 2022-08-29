@@ -2,7 +2,7 @@ import {
   Component,
   createEnvironmentInjector,
   ElementRef,
-  EnvironmentInjector,
+  EnvironmentInjector, ErrorHandler,
   inject,
   Injectable,
   InjectionToken,
@@ -142,6 +142,7 @@ class Dispatcher {
   connected = true
   dirty = false
   payload = []
+  errorHandler = inject(ErrorHandler)
 
   next(value: any) {
     this.tries = 1
@@ -154,6 +155,7 @@ class Dispatcher {
   }
 
   error(error: unknown) {
+    handleError(error, this.errorHandler, this.context)
     this.dispatcher.next({
       name: this.action,
       context: this.context,
@@ -214,7 +216,6 @@ function State() {
     const { prototype } = target
     const selectors = Array.from(getMetaKeys(Select, prototype).values()) as SelectMeta[]
     const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
-    const errorHandlers = Array.from(getMetaKeys(Caught, prototype).values()) as ActionMeta[]
     const checkActions = actions.filter((action) => action.config.check)
     const contentActions = actions.filter((action) => action.config.content)
     const viewActions = actions.filter((action) => action.config.view)
@@ -310,13 +311,29 @@ function State() {
         const deps = new Map()
         const injector = getMeta(INJECTOR, this, action.key) as EnvironmentInjector
         const dispatcher = injector.get(Dispatcher)
-        const result = injector.runInContext(() => runInContext(deps, fn, action.config.track ? createProxy(this, deps) : this, ...args))
-        setMeta("deps", deps, this, action.key)
-        dispatcher.dispatch(this, action.key, args, result)
-        return result
+        try {
+          const result = injector.runInContext(() => runInContext(deps, fn, action.config.track ? createProxy(this, deps) : this, ...args))
+          setMeta("deps", deps, this, action.key)
+          dispatcher.dispatch(this, action.key, args, result)
+          return result
+        } catch (e) {
+          handleError(e, injector.get(ErrorHandler), this)
+        }
       })
     }
   }
+}
+
+function handleError(error: unknown, defaultHandler: ErrorHandler, thisArg: any) {
+  const errorHandlers = Array.from(getMetaKeys(Caught, Object.getPrototypeOf(thisArg)).values()) as ActionMeta[]
+  for (const handler of errorHandlers) {
+    try {
+      return handler.method.call(thisArg, error)
+    } catch(e) {
+      error = e
+    }
+  }
+  defaultHandler.handleError(error)
 }
 
 const defaultConfig = {
@@ -398,16 +415,31 @@ function createDispatch<T>(token: Type<T>) {
     return new Observable(subscriber => {
       return source.subscribe({
         next(value) {
-          observer?.next?.call(instance, value)
+          try {
+            observer?.next?.call(instance, value)
+          } catch (e) {
+            this.error?.(e)
+          }
           subscriber.next(value)
         },
         error(error: unknown) {
-          observer?.error?.call(instance, error)
-          subscriber.error(error)
+          if (observer?.error) {
+            try {
+              observer?.error?.call(instance, error)
+            } catch (e) {
+              subscriber.error(e)
+            }
+          } else {
+            subscriber.error(error)
+          }
         },
         complete() {
-          observer?.complete?.call(instance)
-          subscriber.complete()
+          try {
+            observer?.complete?.call(instance)
+            subscriber.complete()
+          } catch (e) {
+            this.error?.(e)
+          }
         }
       })
     })
@@ -760,15 +792,15 @@ describe("Library", () => {
       @State()
       @Component({template: ``})
       class Test {
-        @Action() actionError() {
+        @Action({ track: false, immediate: false }) actionError() {
           throw new Error("actionError")
         }
 
-        @Action() effectError() {
+        @Action({ track: false, immediate: false }) effectError() {
           return dispatch(throwError(() => new Error("effectError")))
         }
 
-        @Action() dispatchError() {
+        @Action({ track: false, immediate: false }) dispatchError() {
           return dispatch(of(1), {
             next() {
               throw new Error("dispatchError")
@@ -776,20 +808,24 @@ describe("Library", () => {
           })
         }
 
-        @Action() rethrowActionError() {
-          return dispatch(of(1), {
+        @Action({ track: false, immediate: false }) rethrowActionError() {
+          return dispatch(throwError(() => new Error()), {
             error(error: unknown) {
-              throw error
+              throw "rethrowActionError"
             }
           })
         }
 
-        @Action() actionWithHandledError() {
+        @Action({ track: false, immediate: false }) actionWithHandledError() {
           return dispatch(throwError(() => new Error("actionWithHandledError")), {
             error(error: unknown) {
-              spy(error)
+              spy('handled!')
             }
           })
+        }
+
+        @Action({ track: false, immediate: false }) throwLast() {
+          throw "throwLast"
         }
 
         @Caught() rethrowError(error: unknown) {
@@ -797,12 +833,58 @@ describe("Library", () => {
         }
 
         @Caught() caughtError(error: unknown) {
+          if (error === "throwLast") {
+            throw error
+          }
           spy(error)
         }
       }
 
       const dispatch = createDispatch(Test)
       const fixture = TestBed.configureTestingModule({declarations: [Test]}).createComponent(Test)
+      const errorHandler = TestBed.inject(ErrorHandler)
+      spyOn(errorHandler, "handleError")
+
+      fixture.detectChanges()
+
+      expect(() => fixture.componentInstance.actionError()).not.toThrow()
+      expect(spy).toHaveBeenCalledOnceWith(new Error("actionError"))
+      expect(errorHandler.handleError).not.toHaveBeenCalled()
+      spy.calls.reset()
+
+      fixture.componentInstance.effectError()
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledOnceWith(new Error("effectError"))
+      expect(errorHandler.handleError).not.toHaveBeenCalled()
+      spy.calls.reset()
+
+      fixture.componentInstance.dispatchError()
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledOnceWith(new Error("dispatchError"))
+      expect(errorHandler.handleError).not.toHaveBeenCalled()
+      spy.calls.reset()
+
+      fixture.componentInstance.rethrowActionError()
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledOnceWith("rethrowActionError")
+      expect(errorHandler.handleError).not.toHaveBeenCalled()
+      spy.calls.reset()
+
+      fixture.componentInstance.actionWithHandledError()
+      fixture.detectChanges()
+
+      expect(spy).toHaveBeenCalledOnceWith('handled!')
+      expect(errorHandler.handleError).not.toHaveBeenCalled()
+      spy.calls.reset()
+
+      fixture.componentInstance.throwLast()
+      fixture.detectChanges()
+
+      expect(spy).not.toHaveBeenCalled()
+      expect(errorHandler.handleError).toHaveBeenCalledOnceWith("throwLast")
     })
   })
 
