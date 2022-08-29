@@ -1,4 +1,5 @@
 import {
+  ChangeDetectorRef,
   createEnvironmentInjector, EnvironmentInjector,
   ErrorHandler,
   inject,
@@ -128,9 +129,11 @@ export class Dispatcher {
   dirty = false
   payload = []
   errorHandler = inject(ErrorHandler)
+  changeDetector = inject(ChangeDetectorRef)
 
   next(value: any) {
     this.tries = 1
+    this.changeDetector.markForCheck()
     this.dispatcher.next({
       name: this.action,
       context: this.context,
@@ -141,6 +144,7 @@ export class Dispatcher {
 
   error(error: unknown) {
     handleError(error, this.errorHandler, this.context)
+    this.changeDetector.markForCheck()
     this.dispatcher.next({
       name: this.action,
       context: this.context,
@@ -152,6 +156,7 @@ export class Dispatcher {
 
   complete() {
     this.tries = 1
+    this.changeDetector.markForCheck()
     this.dispatcher.next({
       name: this.action,
       context: this.context,
