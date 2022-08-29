@@ -385,6 +385,18 @@ export function Action(config: ActionConfig = defaultConfig) {
   }
 }
 
+export function Invoke(config?: ActionConfig) {
+  return Action({ immediate: false, track: false, ...config })
+}
+
+export function Before(config?: ActionConfig) {
+  return Action({ check: false, content: true, ...config })
+}
+
+export function Layout(config?: ActionConfig) {
+  return Action({ check: false, view: true, ...config })
+}
+
 export function Select(config: ActionConfig = defaultConfig) {
   return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
     setMeta(Select, { descriptor, key, config: { ...defaultConfig, ...config }}, target, key)
