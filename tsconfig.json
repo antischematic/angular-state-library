@@ -3,7 +3,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "actions": [
+      "@mmuscat/angular-state-library": [
         "dist/actions"
       ]
     },
