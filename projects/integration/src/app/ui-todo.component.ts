@@ -9,9 +9,9 @@ import {TestDirective} from "./test.directive";
    changeDetection: ChangeDetectionStrategy.OnPush,
    template: `
       <input type="checkbox" [disabled]="!value.id" [checked]="value.completed"
-         (change)="toggleComplete($any($event.target).checked)"/>
+         (change)="toggleComplete(checkbox.checked)" #checkbox />
       <input type="text" [disabled]="value.completed" [value]="value.title"
-         (keydown.enter)="updateText($any($event.target).value)"/>
+         (keydown.enter)="updateText(text.value); text.value = ''" #text />
    `,
    styles: [`
       :host {
@@ -39,9 +39,6 @@ export class UITodo {
 
    handleChange(change: Todo) {
       this.save.emit(change)
-      if (!this.value.id) {
-         this.value = UITodo.defaultValue
-      }
    }
 
    static defaultValue = {

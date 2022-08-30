@@ -1,5 +1,5 @@
 <div appTest>
-   UserId: <input type="number"  [value]="userId" (keydown.enter)="userId = $any($event.target).value" />
+   UserId: <input type="number"  [value]="userId" (keydown.enter)="userId = input.value" (change)="userId = input.value" #input />
 </div>
 
 <ui-todos [userId]="userId"></ui-todos>

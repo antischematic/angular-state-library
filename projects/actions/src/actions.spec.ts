@@ -1,4 +1,4 @@
-import {Component, ElementRef, ErrorHandler, inject} from "@angular/core";
+import {ChangeDetectorRef, Component, ElementRef, ErrorHandler, inject} from "@angular/core";
 import {fakeAsync, TestBed, tick} from "@angular/core/testing";
 import {filter, map, mergeAll, Observable, of, tap, throwError, timer} from "rxjs";
 import {
@@ -478,7 +478,7 @@ describe("Library", () => {
     it("should create", fakeAsync(() => {
 
       @Store()
-      @Component({template: `{{ count }}`})
+      @Component({template: ``})
       class Test {
         count = 0
 
@@ -498,6 +498,10 @@ describe("Library", () => {
           )
 
           return dispatch(effect)
+        }
+
+        constructor(cdr: ChangeDetectorRef) {
+           cdr.detach()
         }
       }
       const dispatch = createDispatch(Test)
@@ -606,7 +610,7 @@ describe("Library", () => {
 
       expect(spy).toHaveBeenCalledTimes(13)
 
-      expect(fixture.nativeElement.textContent).toBe('13')
+      expect(fixture.componentInstance.count).toBe(13)
     }))
   })
 })

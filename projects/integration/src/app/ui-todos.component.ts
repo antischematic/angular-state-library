@@ -7,7 +7,7 @@ import {
    Store
 } from "@mmuscat/angular-state-library";
 import {UITodo} from "./ui-todo.component";
-import {exhaustAll, mergeAll, Observable} from "rxjs";
+import {exhaustAll, mergeAll, Observable, of, tap} from "rxjs";
 import {HttpClient} from "@angular/common/http";
 import {ChangeDetectionStrategy, Component, inject, Input} from "@angular/core";
 import {Todo} from "./interfaces";
@@ -58,13 +58,13 @@ export class UITodos {
    }
 
    @Action() createTodo(todo: Todo) {
-      return dispatch(createTodo(todo.title), {
+      return dispatch(createTodo(this.userId, todo.title), {
          next: this.loadTodos
       })
    }
 
    @Action() updateTodo(todo: Todo) {
-      return dispatch(updateTodo(todo), {
+      return dispatch(updateTodo(this.userId, todo), {
          next: this.loadTodos
       })
    }
@@ -72,20 +72,40 @@ export class UITodos {
 
 const dispatch = createDispatch(UITodos)
 
+// fake api
+let id = 100
+const users = new Map<string, Todo[]>()
+
 function loadTodos(userId: string): Observable<Todo[]> {
-   return inject(HttpClient).get<Todo[]>(`https://jsonplaceholder.typicode.com/todos?userId=${userId}`)
+   // fake api
+   if (users.has(userId)) {
+      return of(users.get(userId)!)
+   }
+   return inject(HttpClient).get<Todo[]>(`https://jsonplaceholder.typicode.com/todos?userId=${userId}`).pipe(
+      tap((todos) => users.set(userId, todos))
+   )
 }
 
-function createTodo(text: string): Observable<Todo> {
+
+function createTodo(userId: string, title: string): Observable<Todo> {
+   // fake api
+   users.set(userId, users.get(userId)!.concat({
+      id: (id++).toString(),
+      userId,
+      title,
+      completed: false
+   }))
    return createEffect(
-      inject(HttpClient).post<Todo>('https://jsonplaceholder.typicode.com/todos', {text}),
+      inject(HttpClient).post<Todo>('https://jsonplaceholder.typicode.com/todos', {title}),
       mergeAll()
    )
 }
 
-function updateTodo(todo: Todo): Observable<Todo> {
+function updateTodo(userId: string, todo: Todo): Observable<Todo> {
+   // fake api
+   users.set(userId, users.get(userId)!.map((existing) => existing.id === todo.id ? todo : existing))
    return createEffect(
       inject(HttpClient).put<Todo>(`https://jsonplaceholder.typicode.com/todos/${todo.id}`, todo),
-      exhaustAll()
+      mergeAll()
    )
 }
