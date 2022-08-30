@@ -424,8 +424,8 @@ export function createDispatch<T>(token: Type<T>) {
           }
           dispatcher.dispatch(ActionType.Next, { value })
           subscriber.next(value)
-          changeDetector.markForCheck()
           events.flush()
+          changeDetector.detectChanges()
         },
         error(error: unknown) {
           try {
@@ -441,8 +441,8 @@ export function createDispatch<T>(token: Type<T>) {
           dispatcher.dispatch(ActionType.Error, { error })
           observer?.finalize?.call(context)
           subscriber.error(error)
-          changeDetector.markForCheck()
           events.flush()
+          changeDetector.detectChanges()
         },
         complete() {
           try {
@@ -450,8 +450,8 @@ export function createDispatch<T>(token: Type<T>) {
             observer?.finalize?.call(context)
             subscriber.complete()
             dispatcher.dispatch(ActionType.Complete)
-            changeDetector.markForCheck()
             events.flush()
+            changeDetector.detectChanges()
           } catch (e) {
             this.error?.(e)
           }

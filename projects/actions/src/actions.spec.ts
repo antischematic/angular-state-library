@@ -1,6 +1,6 @@
 import {Component, ElementRef, ErrorHandler, inject} from "@angular/core";
 import {fakeAsync, TestBed, tick} from "@angular/core/testing";
-import {filter, map, mergeAll, Observable, of, throwError, timer} from "rxjs";
+import {delay, filter, map, mergeAll, Observable, of, tap, throwError, timer} from "rxjs";
 import {
   Action,
   ActionType, Before,
@@ -478,28 +478,21 @@ describe("Library", () => {
     it("should create", fakeAsync(() => {
 
       @Store()
-      @Component({template: ``})
+      @Component({template: `{{ count }}`})
       class Test {
         count = 0
 
         @Action({ immediate: true }) action() {
-          return dispatch(createEffect(timer(2000), mergeAll()), {
-            next() {
-              this.count += 1
-            }
-          })
+          return dispatch(createEffect(timer(2000), mergeAll()))
         }
 
-        @Action({ immediate: true }) actionWithArgs(...args: any[]) {
-          return dispatch(createEffect(timer(2000), mergeAll()), {
-            next() {
-              this.count += 1
-            }
-          })
+        @Action() actionWithArgs(...args: any[]) {
+          return dispatch(createEffect(timer(2000), mergeAll()))
         }
 
         @Action({ immediate: true }) saga(): Observable<unknown> {
           const effect = fromAction(Test).pipe(
+            tap(() => this.count += 1),
             filter(event => ["actionWithArgs", "action"].includes(event.name)),
             map(event => `${event.name}.${ActionType[event.type].toLowerCase()}`)
           )
@@ -536,7 +529,7 @@ describe("Library", () => {
         value: "action.dispatch"
       })
 
-      expect(spy).toHaveBeenCalledTimes(5)
+      expect(spy).toHaveBeenCalledTimes(3)
 
       fixture.componentInstance.actionWithArgs(10, 20, 30)
       fixture.detectChanges()
@@ -610,6 +603,10 @@ describe("Library", () => {
         type: ActionType.Next,
         value: "actionWithArgs.complete"
       })
+
+      expect(spy).toHaveBeenCalledTimes(13)
+
+      expect(fixture.nativeElement.textContent).toBe('13')
     }))
   })
 })
