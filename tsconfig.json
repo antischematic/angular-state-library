@@ -4,7 +4,7 @@
   "compilerOptions": {
     "paths": {
       "@mmuscat/angular-state-library": [
-        "dist/actions"
+        "dist/angular-state-library"
       ]
     },
     "baseUrl": "./",

@@ -7,7 +7,7 @@ import {
    Store
 } from "@mmuscat/angular-state-library";
 import {UITodo} from "./ui-todo.component";
-import {exhaustAll, mergeAll, Observable, of, tap} from "rxjs";
+import {mergeAll, Observable, of, tap} from "rxjs";
 import {HttpClient} from "@angular/common/http";
 import {ChangeDetectionStrategy, Component, inject, Input} from "@angular/core";
 import {Todo} from "./interfaces";
