@@ -1,6 +1,6 @@
 import {Component, ElementRef, ErrorHandler, inject} from "@angular/core";
 import {fakeAsync, TestBed, tick} from "@angular/core/testing";
-import {delay, filter, map, mergeAll, Observable, of, tap, throwError, timer} from "rxjs";
+import {filter, map, mergeAll, Observable, of, tap, throwError, timer} from "rxjs";
 import {
   Action,
   ActionType, Before,

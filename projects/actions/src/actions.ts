@@ -296,7 +296,7 @@ export function Store() {
         const dispatcher = injector.get(Dispatcher)
         try {
           dispatcher.dispatch(ActionType.Dispatch, { value: args })
-          const result = injector.runInContext(() => runInContext(deps, fn, action.config.track ? createProxy(this, deps) : this, ...args))
+          const result = injector.runInContext(() => runInContext(deps, () => fn.apply(action.config.track ? createProxy(this) : this, args)))
           setMeta("deps", deps, this, action.key)
           dispatcher.next(result)
           return result
