@@ -3,7 +3,7 @@ import {
   createEnvironmentInjector, EnvironmentInjector,
   ErrorHandler,
   inject,
-  Injectable, InjectionToken, INJECTOR, Type,
+  Injectable, InjectionToken, INJECTOR, NgZone, Type,
   ɵɵdirectiveInject as directiveInject
 } from "@angular/core";
 import {
@@ -18,6 +18,8 @@ import {
 import {createProxy, runInContext} from "./proxy";
 
 const meta = new WeakMap()
+
+const noop = () => {}
 
 function ensureKey(target: WeakMap<any, any>, key: any) {
   return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
@@ -48,7 +50,7 @@ type ActionMeta = { key: PropertyKey, method: Function, config: ActionConfig }
 type SelectMeta = { key: PropertyKey, descriptor: PropertyDescriptor, config: ActionConfig }
 
 function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: any, ...args: any[]) => any) {
-  const originalFunction = target[key] ?? Function
+  const originalFunction = target[key] ?? noop
   Object.defineProperty(target, key, {
     configurable: true,
     value: function (this: unknown, ...args: any[]) {
@@ -62,16 +64,21 @@ function decorateLifecycleHook(prototype: object, key: string, actions: ActionMe
     wrap(prototype, key, function (fn) {
       for (const action of actions) {
         const deps = getMeta("deps", this, action.key) as Map<any, any>
+        let changed = false
         if (deps) {
-          outer: for (const [object, keyValue] of deps) {
-            for (const [key, value] of keyValue) {
-              if (object[key] !== value) {
-                this[action.key].call(this)
-                break outer
+          for (const [object, keyValue] of deps) {
+            for (const [key, previous] of keyValue) {
+              const current = object[key]
+              if (current !== previous) {
+                // update deps in case of error, so it doesn't automatically run until the value
+                // changes again
+                keyValue.set(key, current)
+                changed = true
               }
             }
           }
-        } else if (action.config.immediate && action.method.length === 0) {
+        }
+        if (!deps && action.config.immediate && action.method.length === 0 || changed) {
           this[action.key].call(this)
         }
       }
@@ -119,83 +126,55 @@ export enum ActionType {
 
 @Injectable()
 export class Dispatcher {
+  name!: PropertyKey
   context!: object
-  action!: PropertyKey
   tries = 1
+  events = inject(Events)
   subscription = Subscription.EMPTY
-  dispatcher = inject(DISPATCHER)
-  source: Observable<any> = EMPTY
-  connected = true
-  dirty = false
-  payload = []
-  changeDetector = inject(ChangeDetectorRef)
+  effect: Observable<any> | null = null
 
-  next(value: any) {
-    this.tries = 1
-    this.changeDetector.markForCheck()
-    this.dispatcher.next({
-      name: this.action,
-      context: this.context,
-      value,
-      type: ActionType.Next
-    })
-  }
-
-  error(error: unknown) {
-    this.changeDetector.markForCheck()
-    this.dispatcher.next({
-      name: this.action,
-      context: this.context,
-      error,
-      tries: this.tries++,
-      type: ActionType.Error
-    })
-  }
-
-  complete() {
-    this.tries = 1
-    this.changeDetector.markForCheck()
-    this.dispatcher.next({
-      name: this.action,
-      context: this.context,
-      type: ActionType.Complete
+  dispatch(type: ActionType, value?: any) {
+    const { events, context, name } = this
+    events.push({
+      name,
+      context,
+      type,
+      ...value
     })
   }
 
   connect() {
-    if (!this.connected) {
-      this.connected = true
+    const { effect } = this
+    if (effect) {
+      this.effect = null
       this.subscription.unsubscribe()
-      this.subscription = this.source.subscribe(this)
+      this.subscription = effect.subscribe()
     }
   }
 
-  flush() {
-    if (this.dirty) {
-      this.dirty = false
-      this.dispatcher.next({
-        name: this.action,
-        context: this.context,
-        value: this.payload,
-        type: ActionType.Dispatch
-      })
-    }
-  }
-
-  dispatch(context: object, action: PropertyKey, payload: any, effect: any) {
-    this.dirty = true
-    this.action = action
-    this.context = context
-    this.payload = payload
-
-    if (isObservable(effect)) {
-      this.connected = false
-      this.source = effect
-    }
+  next(result: any) {
+    this.effect = result
   }
 
   ngOnDestroy() {
     this.subscription.unsubscribe()
+  }
+}
+
+@Injectable()
+class Events {
+  events = [] as EventType[]
+  dispatcher = inject(DISPATCHER)
+
+  push(event: EventType) {
+    this.events.push(event)
+  }
+
+  flush() {
+    let event
+    while (event = this.events.shift()) {
+      this.dispatcher.next(event)
+    }
   }
 }
 
@@ -214,8 +193,18 @@ export function Store() {
 
     wrap(prototype, "ngOnInit", function (fn) {
       const parent = directiveInject(INJECTOR)
+      const rootInjector = createEnvironmentInjector([Events], parent as EnvironmentInjector)
+      setMeta(INJECTOR, rootInjector, this)
       for (const action of actions) {
-        const injector = createEnvironmentInjector([Dispatcher, Effect], parent as EnvironmentInjector)
+        const injector = createEnvironmentInjector([{
+          provide: Dispatcher,
+          useFactory: () => {
+            const dispatcher = new Dispatcher()
+            dispatcher.name = action.key
+            dispatcher.context = this
+            return dispatcher
+          }
+        }, Effect], rootInjector)
         setMeta(INJECTOR, injector, this, action.key)
       }
       fn.apply(this)
@@ -288,9 +277,7 @@ export function Store() {
       for (const action of actions) {
         (getMeta(INJECTOR, this, action.key) as EnvironmentInjector).get(Dispatcher).connect()
       }
-      for (const action of actions) {
-        (getMeta(INJECTOR, this, action.key) as EnvironmentInjector).get(Dispatcher).flush()
-      }
+      (getMeta(INJECTOR, this) as EnvironmentInjector).get(Events).flush()
       fn.apply(this)
     })
 
@@ -308,9 +295,10 @@ export function Store() {
         const injector = getMeta(INJECTOR, this, action.key) as EnvironmentInjector
         const dispatcher = injector.get(Dispatcher)
         try {
+          dispatcher.dispatch(ActionType.Dispatch, { value: args })
           const result = injector.runInContext(() => runInContext(deps, fn, action.config.track ? createProxy(this, deps) : this, ...args))
           setMeta("deps", deps, this, action.key)
-          dispatcher.dispatch(this, action.key, args, result)
+          dispatcher.next(result)
           return result
         } catch (e) {
           handleError(e, injector.get(ErrorHandler), prototype, this)
@@ -410,29 +398,39 @@ interface Observer<This, Value> {
   next(this: This, value: Value): void
   error(this: This, error: unknown): void
   complete(this: This): void
-  subscribe(this: This): void
-  unsubscribe(this: This): void
   finalize(this: This): void
+}
+
+function isPlainObject(obj: object) {
+  const proto = Object.getPrototypeOf(obj)
+  return proto === null || proto === Object.prototype
 }
 
 export function createDispatch<T>(token: Type<T>) {
   return function dispatch<U>(source: Observable<U>, observer?: Partial<Observer<T, U>>): Observable<U> {
     const instance = inject(token)
+    const context = observer && isPlainObject(observer) ? instance : observer as any
     const errorHandler = inject(ErrorHandler)
+    const dispatcher = inject(Dispatcher)
+    const changeDetector = inject(ChangeDetectorRef)
+    const events = inject(Events)
     return new Observable(subscriber => {
       return source.subscribe({
         next(value) {
           try {
-            observer?.next?.call(instance, value)
+            observer?.next?.call(context, value)
           } catch (e) {
             this.error?.(e)
           }
+          dispatcher.dispatch(ActionType.Next, { value })
           subscriber.next(value)
+          changeDetector.markForCheck()
+          events.flush()
         },
         error(error: unknown) {
           try {
             if (observer?.error) {
-              observer.error.call(instance, error)
+              observer.error.call(context, error)
             } else {
               handleError(error, errorHandler, token.prototype, instance)
             }
@@ -440,12 +438,20 @@ export function createDispatch<T>(token: Type<T>) {
             error = e
             handleError(e, errorHandler, token.prototype, instance)
           }
+          dispatcher.dispatch(ActionType.Error, { error })
+          observer?.finalize?.call(context)
           subscriber.error(error)
+          changeDetector.markForCheck()
+          events.flush()
         },
         complete() {
           try {
-            observer?.complete?.call(instance)
+            observer?.complete?.call(context)
+            observer?.finalize?.call(context)
             subscriber.complete()
+            dispatcher.dispatch(ActionType.Complete)
+            changeDetector.markForCheck()
+            events.flush()
           } catch (e) {
             this.error?.(e)
           }

@@ -610,7 +610,6 @@ describe("Library", () => {
         type: ActionType.Next,
         value: "actionWithArgs.complete"
       })
-
     }))
   })
 })
