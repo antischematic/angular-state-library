@@ -94,6 +94,7 @@ export class Effect {
    source = new Subject<Observable<any>>()
    destination = new Subject()
    subscription = Subscription.EMPTY
+   observer = Subscription.EMPTY
    connected = false
 
    next(source: Observable<any>) {
@@ -101,19 +102,20 @@ export class Effect {
    }
 
    subscribe(observer: PartialObserver<any>) {
-      if (this.connected) {
-         return this.destination.subscribe(observer)
-      } else {
+      this.observer.unsubscribe()
+      this.observer = this.destination.subscribe(observer)
+      if (!this.connected) {
          this.connected = true
          this.source = new Subject()
          this.destination = new Subject()
-         const subscription = this.destination.subscribe(observer)
+         this.observer = this.destination.subscribe(observer)
          this.subscription = this.source.pipe(this.operator).subscribe(this.destination)
-         return subscription
       }
+      return Subscription.EMPTY
    }
 
    ngOnDestroy() {
+      this.observer.unsubscribe()
       this.subscription.unsubscribe()
    }
 }
@@ -131,6 +133,7 @@ export class Dispatcher {
    context!: object
    tries = 1
    events = inject(Events)
+   errorHandler = inject(ErrorHandler)
    subscription = Subscription.EMPTY
    effect: Observable<any> | null = null
 
@@ -157,7 +160,11 @@ export class Dispatcher {
       if (effect) {
          this.effect = null
          this.subscription.unsubscribe()
-         this.subscription = effect.subscribe()
+         this.subscription = effect.subscribe({
+            error: (error) => {
+               handleError(error, this.errorHandler, Object.getPrototypeOf(this.context), this.context)
+            }
+         })
       }
    }
 
@@ -439,9 +446,8 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
          } catch (error) {
             onError(error)
          }
-         subscriber[type](value)
-         if (type === ActionType.Error && !observer?.error) {
-            onError(value)
+         if (type !== ActionType.Error || !observer?.error) {
+            subscriber[type](value)
          }
          if (type !== ActionType.Next) {
             observer?.finalize?.call(context, value)
@@ -476,10 +482,10 @@ export function createDispatch<T>(token: Type<T>) {
                      next(notification.value)
                      break
                   case "E":
-                     error(notification.value)
+                     error(notification.error)
                      break
                   case "C":
-                     complete(notification.value)
+                     complete()
                      break
                }
             })

@@ -1,5 +1,5 @@
 import {
-   Action,
+   Action, Caught,
    createDispatch,
    createEffect,
    Invoke,
@@ -55,8 +55,13 @@ export class UITodos {
 
    @Action() updateTodo(todo: Todo) {
       return dispatch(updateTodo(todo), {
-         finalize: this.loadTodos,
+         finalize: this.loadTodos
       });
+   }
+
+   @Caught() handleError(error: unknown) {
+      console.log('error caught, rethrowing')
+      throw error
    }
 
    trackById(_: number, value: Todo) {
