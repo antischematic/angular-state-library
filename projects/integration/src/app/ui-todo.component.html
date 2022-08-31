@@ -1,0 +1,23 @@
+<style>
+   :host {
+      display: block
+   }
+</style>
+
+<input
+   type="checkbox"
+   [hidden]="!value.id"
+   [checked]="value.completed"
+   (change)="toggleComplete(checkbox.checked)"
+   #checkbox
+/>
+<input
+   type="text"
+   [disabled]="value.completed"
+   [value]="value.title"
+   (keydown.enter)="updateText(text.value)"
+   #text
+/>
+<button *ngIf="!value.id" (click)="updateText(text.value); text.value = ''">
+   Create
+</button>

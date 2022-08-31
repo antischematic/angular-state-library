@@ -494,7 +494,7 @@ describe("Library", () => {
           const effect = fromAction(Test).pipe(
             tap(() => this.count += 1),
             filter(event => ["actionWithArgs", "action"].includes(event.name)),
-            map(event => `${event.name}.${ActionType[event.type].toLowerCase()}`)
+            map(event => `${event.name}.${event.type}`)
           )
 
           return dispatch(effect)

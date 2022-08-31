@@ -7,10 +7,10 @@ import {
 
 } from "@angular/core";
 import {
-   catchError,
-   EMPTY, filter,
+   catchError, dematerialize,
+   EMPTY, filter, materialize,
    MonoTypeOperatorFunction,
-   Observable, ObservableInput, OperatorFunction,
+   Observable, ObservableInput, ObservableNotification, OperatorFunction,
    PartialObserver,
    Subject,
    Subscription, tap
@@ -91,7 +91,7 @@ function decorateLifecycleHook(prototype: object, key: string, actions: ActionMe
 @Injectable()
 export class Effect {
    operator!: MonoTypeOperatorFunction<any>
-   source = new Subject()
+   source = new Subject<Observable<any>>()
    destination = new Subject()
    subscription = Subscription.EMPTY
    connected = false
@@ -119,10 +119,10 @@ export class Effect {
 }
 
 export enum ActionType {
-   Dispatch,
-   Next,
-   Error,
-   Complete
+   Dispatch = "dispatch",
+   Next = "next",
+   Error = "error",
+   Complete = "complete"
 }
 
 @Injectable()
@@ -136,12 +136,20 @@ export class Dispatcher {
 
    dispatch(type: ActionType, value?: any) {
       const {events, context, name} = this
-      events.push({
+      const event = {
          name,
          context,
          type,
-         ...value
-      })
+      } as any
+      switch (type) {
+         case ActionType.Dispatch:
+         case ActionType.Next:
+            event.value = value
+            break
+         case ActionType.Error:
+            event.error = value
+      }
+      events.push(event)
    }
 
    connect() {
@@ -151,10 +159,6 @@ export class Dispatcher {
          this.subscription.unsubscribe()
          this.subscription = effect.subscribe()
       }
-   }
-
-   next(result: any) {
-      this.effect = result
    }
 
    ngOnDestroy() {
@@ -302,10 +306,10 @@ export function Store() {
             const injector = getMeta(INJECTOR, this, action.key) as EnvironmentInjector
             const dispatcher = injector.get(Dispatcher)
             try {
-               dispatcher.dispatch(ActionType.Dispatch, {value: args})
+               dispatcher.dispatch(ActionType.Dispatch, args)
                const result = injector.runInContext(() => runInContext(deps, () => fn.apply(action.config.track ? createProxy(this) : this, args)))
                setMeta("deps", deps, this, action.key)
-               dispatcher.next(result)
+               dispatcher.effect = result
                return result
             } catch (e) {
                handleError(e, injector.get(ErrorHandler), prototype, this)
@@ -424,78 +428,81 @@ function isPlainObject(obj: object) {
    return proto === null || proto === Object.prototype
 }
 
+function createObserver(observer: any, context: any, onError: (error: unknown) => void) {
+   const dispatcher = inject(Dispatcher)
+   const changeDetector = inject(ChangeDetectorRef)
+   const events = inject(Events)
+   return function (type: string, subscriber: any) {
+      return function (value?: any) {
+         try {
+            observer?.[type]?.call(context, value)
+         } catch (error) {
+            onError(error)
+         }
+         subscriber[type](value)
+         if (type === ActionType.Error && !observer?.error) {
+            onError(value)
+         }
+         if (type !== ActionType.Next) {
+            observer?.finalize?.call(context, value)
+         }
+         dispatcher.dispatch(type as ActionType, value)
+         events.flush()
+         changeDetector.detectChanges()
+      }
+   }
+}
+
 export function createDispatch<T>(token: Type<T>) {
    return function dispatch<U>(source: Observable<U>, observer?: Partial<Observer<T, U>>): Observable<U> {
       const instance = inject(token)
       const context = observer && isPlainObject(observer) ? instance : observer as any
       const errorHandler = inject(ErrorHandler)
-      const dispatcher = inject(Dispatcher)
       const changeDetector = inject(ChangeDetectorRef)
-      const events = inject(Events)
+      const isEffect = source instanceof EffectObservable
+      const onError = (error: unknown) => handleError(error, errorHandler, token.prototype, instance)
+      const observe = createObserver(observer, context, onError)
+
       changeDetector.markForCheck()
+
       return new Observable(subscriber => {
-         return source.subscribe({
-            next(value) {
-               try {
-                  observer?.next?.call(context, value)
-               } catch (e) {
-                  this.error?.(e)
+         const next = observe(ActionType.Next, subscriber)
+         const error = observe(ActionType.Error, subscriber)
+         const complete = observe(ActionType.Complete, subscriber)
+         if (isEffect) {
+            source.subscribe((notification: any) => {
+               switch (notification.kind) {
+                  case "N":
+                     next(notification.value)
+                     break
+                  case "E":
+                     error(notification.value)
+                     break
+                  case "C":
+                     complete(notification.value)
+                     break
                }
-               dispatcher.dispatch(ActionType.Next, {value})
-               subscriber.next(value)
-               events.flush()
-               changeDetector.detectChanges()
-            },
-            error(error: unknown) {
-               try {
-                  if (observer?.error) {
-                     observer.error.call(context, error)
-                  } else {
-                     handleError(error, errorHandler, token.prototype, instance)
-                  }
-               } catch (e) {
-                  error = e
-                  handleError(e, errorHandler, token.prototype, instance)
-               }
-               dispatcher.dispatch(ActionType.Error, {error})
-               observer?.finalize?.call(context)
-               subscriber.error(error)
-               events.flush()
-               changeDetector.detectChanges()
-            },
-            complete() {
-               try {
-                  observer?.complete?.call(context)
-                  observer?.finalize?.call(context)
-                  subscriber.complete()
-                  dispatcher.dispatch(ActionType.Complete)
-                  events.flush()
-                  changeDetector.detectChanges()
-               } catch (e) {
-                  this.error?.(e)
-               }
-            }
-         })
+            })
+            return
+         } else {
+            return source.subscribe({
+               next,
+               error,
+               complete
+            })
+         }
       })
    }
 }
 
+class EffectObservable extends Observable<any> {}
+
 export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>): Observable<T> {
    const effect = inject(Effect)
    effect.operator = operator
-   return new Observable(subscriber => {
+   return new EffectObservable(subscriber => {
       const subscription = effect.subscribe(subscriber)
-      effect.next(source.pipe(
-         catchError((error) => {
-            subscriber.error(error)
-            return EMPTY
-         }),
-         tap({
-            complete() {
-               subscriber.complete()
-            }
-         })
-      ))
+      effect.next(source.pipe(materialize()))
       return subscription
    })
 }

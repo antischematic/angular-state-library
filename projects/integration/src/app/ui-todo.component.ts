@@ -1,49 +1,41 @@
-import {ChangeDetectionStrategy, Component, EventEmitter, Input, Output} from "@angular/core";
-import {Todo} from "./interfaces";
-import {TestDirective} from "./test.directive";
+import { CommonModule } from '@angular/common';
+import {
+   ChangeDetectionStrategy,
+   Component,
+   EventEmitter,
+   Input,
+   Output,
+} from '@angular/core';
+import { Todo } from './interfaces';
 
 @Component({
-   imports: [TestDirective],
+   imports: [CommonModule],
    selector: 'ui-todo',
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
-   template: `
-      <input type="checkbox" [disabled]="!value.id" [checked]="value.completed"
-         (change)="toggleComplete(checkbox.checked)" #checkbox />
-      <input type="text" [disabled]="value.completed" [value]="value.title"
-         (keydown.enter)="updateText(text.value); text.value = ''" #text />
-   `,
-   styles: [`
-      :host {
-         display: block
-      }
-   `]
+   templateUrl: './ui-todo.component.html',
 })
 export class UITodo {
-   @Input() value: Todo = UITodo.defaultValue
-   @Output() save = new EventEmitter<Todo>()
+   @Input() value: Todo = UITodo.defaultValue;
+   @Output() save = new EventEmitter<Todo>();
 
    toggleComplete(completed: boolean) {
-      this.handleChange({
+      this.save.emit({
          ...this.value,
-         completed
-      })
+         completed,
+      });
    }
 
    updateText(title: string) {
-      this.handleChange({
+      this.save.emit({
          ...this.value,
-         title
-      })
-   }
-
-   handleChange(change: Todo) {
-      this.save.emit(change)
+         title,
+      });
    }
 
    static defaultValue = {
       id: undefined,
-      title: "",
-      completed: false
-   }
+      title: '',
+      completed: false,
+   };
 }
