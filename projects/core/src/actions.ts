@@ -199,17 +199,9 @@ export function setup(context: any, prototype: object) {
    const count = new Subject<number>()
    const rootInjector = createEnvironmentInjector([Events, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
-   const queues = Array.from(getMetaKeys(Queue, prototype).values()) as QueueMeta[]
-   const changeDetector = inject(ChangeDetectorRef)
-   const rootQueues = queues.filter(q => q.action === undefined)
 
-   count.subscribe((value) => {
-      for (const queue of rootQueues) {
-         context[queue.key] = typeof context[queue.key] === "number" ? value : value > 0
-      }
-      changeDetector.detectChanges()
-   })
 
+   transitions.set(context, new Set())
    setMeta(INJECTOR, rootInjector, context)
    for (const action of actions) {
       const injector = createEnvironmentInjector([{
@@ -227,6 +219,8 @@ export function setup(context: any, prototype: object) {
 
 const TransitionZone = new InjectionToken<Function>("TransitionZone")
 
+const transitions = new WeakMap()
+
 export function Store() {
    return function (target: any) {
       const {prototype} = target
@@ -235,6 +229,8 @@ export function Store() {
       const checkActions = actions.filter((action) => action.config.check)
       const contentActions = actions.filter((action) => action.config.content)
       const viewActions = actions.filter((action) => action.config.view)
+      const queues = Array.from(getMetaKeys(Queue, prototype).values()) as QueueMeta[]
+      const rootQueues = queues.filter(q => q.action === undefined)
 
       decorateLifecycleHook(prototype, "ngDoCheck", checkActions)
       decorateLifecycleHook(prototype, "ngAfterContentChecked", contentActions)
@@ -330,15 +326,49 @@ export function Store() {
             const deps = new Map()
             const injector = getMeta(INJECTOR, this, action.key) as EnvironmentInjector
             const dispatcher = injector.get(Dispatcher)
-            const startTransition = injector.get(TransitionZone)
+            const count = new Subject<number>()
+            const startTransition = createTransitionZone(action.key, count)
+            const changeDetector = injector.get(ChangeDetectorRef)
+            let current: Zone
+            const transition = transitions.get(this)! as Set<any>
+
+            // todo: find a better way to coalesce transitions
+            // probably causes a bunch of memory leaks
+            count.subscribe((value) => {
+               if (value) {
+                  transition.add(count)
+               } else {
+                  if (transition.has(count)) {
+                     count.complete()
+                  }
+                  transition.delete(count)
+               }
+               for (const queue of rootQueues) {
+                  this[queue.key] = transition.size
+               }
+               Zone.root.run(() => {
+                  Promise.resolve().then(() => {
+                     changeDetector.detectChanges()
+                  })
+               })
+            })
 
             try {
                dispatcher.dispatch(ActionType.Dispatch, args)
-               const result: any = injector.runInContext(() => runInContext(deps, () => startTransition(() => fn.apply(action.config.track ? createProxy(this) : this, args))))
+               const result: any = injector.runInContext(() => runInContext(deps, () => {
+                  return startTransition(() => {
+                     current = Zone.current
+                     return fn.apply(action.config.track ? createProxy(this) : this, args)
+                  })
+               }))
                setMeta("deps", deps, this, action.key)
-               if (result) {
-                  dispatcher.effect = (observer: any) => startTransition(() => result.subscribe(observer))
-               }
+               dispatcher.effect = (observer: any) => current.run(() => {
+                  let subscription = Subscription.EMPTY
+                  if (result) {
+                     subscription = result.subscribe(observer)
+                  }
+                  return subscription
+               })
                return result
             } catch (e) {
                handleError(e, injector.get(ErrorHandler), prototype, this)

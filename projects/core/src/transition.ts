@@ -1,10 +1,10 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
-import {BehaviorSubject, Subject} from "rxjs";
+import {Subject} from "rxjs";
 
 export function createTransitionZone(name: PropertyKey, count: Subject<number>) {
-   const zone = Zone.current.fork(new TransitionZoneSpec(name.toString(), count))
    function startTransition(fn: Function): any {
+      const zone = Zone.current.fork(new TransitionZoneSpec(name.toString(), count))
       return zone.run(fn)
    }
    return startTransition
@@ -22,30 +22,42 @@ export class TransitionZoneSpec implements ZoneSpec {
    }
 
    onScheduleTask(delegate: ZoneDelegate, current: Zone, target: Zone, task: Task): Task {
-      if (!this.properties.closed) {
-         // this.done.next(++this.properties.count)
+      if (task.type !== "eventTask") {
+         this.properties.count++
       }
       return delegate.scheduleTask(target, task)
    }
 
    onCancelTask(delegate: ZoneDelegate, currentZone: Zone, target: Zone, task: Task) {
-      if (!this.properties.closed) {
-         // this.done.next(--this.properties.count)
+      if (task.type !== "eventTask") {
+         this.properties.count--
       }
       return delegate.cancelTask(target, task)
    }
 
    onInvokeTask(delegate: ZoneDelegate, current: Zone, target: Zone, task: Task, applyThis: any, applyArgs: any[] | undefined) {
-      if (!this.properties.closed) {
-         // this.done.next(--this.properties.count)
+      if (task.type !== "eventTask") {
+         this.properties.count--
       }
       return delegate.invokeTask(target, task, applyThis, applyArgs)
    }
 
+   onFork(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, zoneSpec: ZoneSpec) {
+      return parentZoneDelegate.fork(targetZone, zoneSpec)
+   }
+
+   onInvoke(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, delegate: Function, applyThis: any, applyArgs?: any[], source?: string) {
+      return parentZoneDelegate.invoke(targetZone, delegate, applyThis, applyArgs, source)
+   }
+
+   onIntercept(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, delegate: Function, source: string) {
+      return parentZoneDelegate.intercept(targetZone, delegate, source)
+   }
+
    onHasTask() {
-      // no more macrotasks or microtasks left in the queue
+      // todo: figure out how to count tasks properly and account for errors and forked zones
+      this.properties.count = Math.max(this.properties.count, 0)
       this.done.next(this.properties.count)
-      this.properties.count = this.properties.count ? 0 : 1
    }
 
    constructor(public name: string, private done: Subject<number>) {

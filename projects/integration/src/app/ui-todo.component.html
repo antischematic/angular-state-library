@@ -1,6 +1,7 @@
 <style>
    :host {
-      display: block
+      display: flex;
+      margin: 0.2em 0;
    }
 </style>
 
@@ -18,6 +19,6 @@
    (keydown.enter)="updateText(text.value)"
    #text
 />
-<button *ngIf="!value.id" (click)="updateText(text.value); text.value = ''">
-   Create
-</button>
+<button *ngIf="!value.id" (click)="updateText(text.value)">Create</button>
+
+<ui-spinner *ngIf="pending"></ui-spinner>

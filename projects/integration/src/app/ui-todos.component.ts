@@ -7,7 +7,7 @@ import {
    Store,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
-import { mergeAll, Observable, switchAll } from 'rxjs';
+import {delay, mergeAll, Observable, switchAll} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
@@ -72,9 +72,12 @@ export class UITodos {
 }
 
 function loadTodos(userId: string): Observable<Todo[]> {
-   return inject(HttpClient).get<Todo[]>(
-      `https://jsonplaceholder.typicode.com/todos`,
-      { params: { userId } }
+   return createEffect(
+      inject(HttpClient).get<Todo[]>(
+         `https://jsonplaceholder.typicode.com/todos`,
+         { params: { userId } }
+      ).pipe(delay(2000)),
+      mergeAll(),
    )
 }
 
