@@ -1,12 +1,13 @@
 import {
    ChangeDetectorRef,
    createEnvironmentInjector, EnvironmentInjector,
-   ErrorHandler,
+   ErrorHandler, EventEmitter,
    inject,
-   Injectable, InjectionToken, INJECTOR, Type,
+   Injectable, InjectionToken, INJECTOR, NgZone, Type,
 
 } from "@angular/core";
 import {
+   BehaviorSubject,
    catchError, dematerialize,
    EMPTY, filter, materialize,
    MonoTypeOperatorFunction,
@@ -16,6 +17,7 @@ import {
    Subscription, tap
 } from "rxjs";
 import {createProxy, runInContext} from "./proxy";
+import {createTransitionZone} from "./transition";
 
 const meta = new WeakMap()
 
@@ -49,6 +51,8 @@ export interface ActionConfig {
 type ActionMeta = { key: PropertyKey, method: Function, config: ActionConfig }
 
 type SelectMeta = { key: PropertyKey, descriptor: PropertyDescriptor, config: ActionConfig }
+
+type QueueMeta = { key: PropertyKey, descriptor: PropertyDescriptor, action?: string, config: {} }
 
 function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: any, ...args: any[]) => any) {
    const originalFunction = target[key] ?? noop
@@ -135,7 +139,7 @@ export class Dispatcher {
    events = inject(Events)
    errorHandler = inject(ErrorHandler)
    subscription = Subscription.EMPTY
-   effect: Observable<any> | null = null
+   effect: Function | null = null
 
    dispatch(type: ActionType, value?: any) {
       const {events, context, name} = this
@@ -160,8 +164,8 @@ export class Dispatcher {
       if (effect) {
          this.effect = null
          this.subscription.unsubscribe()
-         this.subscription = effect.subscribe({
-            error: (error) => {
+         this.subscription = effect({
+            error: (error: any) => {
                handleError(error, this.errorHandler, Object.getPrototypeOf(this.context), this.context)
             }
          })
@@ -190,10 +194,22 @@ class Events {
    }
 }
 
-export function setup(context: object, prototype: object) {
+export function setup(context: any, prototype: object) {
    const parent = inject(INJECTOR)
-   const rootInjector = createEnvironmentInjector([Events], parent as EnvironmentInjector)
+   const count = new Subject<number>()
+   const rootInjector = createEnvironmentInjector([Events, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
+   const queues = Array.from(getMetaKeys(Queue, prototype).values()) as QueueMeta[]
+   const changeDetector = inject(ChangeDetectorRef)
+   const rootQueues = queues.filter(q => q.action === undefined)
+
+   count.subscribe((value) => {
+      for (const queue of rootQueues) {
+         context[queue.key] = typeof context[queue.key] === "number" ? value : value > 0
+      }
+      changeDetector.detectChanges()
+   })
+
    setMeta(INJECTOR, rootInjector, context)
    for (const action of actions) {
       const injector = createEnvironmentInjector([{
@@ -208,6 +224,8 @@ export function setup(context: object, prototype: object) {
       setMeta(INJECTOR, injector, context, action.key)
    }
 }
+
+const TransitionZone = new InjectionToken<Function>("TransitionZone")
 
 export function Store() {
    return function (target: any) {
@@ -312,11 +330,15 @@ export function Store() {
             const deps = new Map()
             const injector = getMeta(INJECTOR, this, action.key) as EnvironmentInjector
             const dispatcher = injector.get(Dispatcher)
+            const startTransition = injector.get(TransitionZone)
+
             try {
                dispatcher.dispatch(ActionType.Dispatch, args)
-               const result = injector.runInContext(() => runInContext(deps, () => fn.apply(action.config.track ? createProxy(this) : this, args)))
+               const result: any = injector.runInContext(() => runInContext(deps, () => startTransition(() => fn.apply(action.config.track ? createProxy(this) : this, args))))
                setMeta("deps", deps, this, action.key)
-               dispatcher.effect = result
+               if (result) {
+                  dispatcher.effect = (observer: any) => startTransition(() => result.subscribe(observer))
+               }
                return result
             } catch (e) {
                handleError(e, injector.get(ErrorHandler), prototype, this)
@@ -417,6 +439,12 @@ export function Select(config: ActionConfig = defaultConfig) {
 export function Caught() {
    return function (target: object, key: PropertyKey, descriptor: PropertyDescriptor) {
       setMeta(Caught, {method: descriptor.value, key, config: {}}, target, key)
+   }
+}
+
+export function Queue(action?: PropertyKey, config = {}) {
+   return function (target: object, key: PropertyKey) {
+      setMeta(Queue, {key, action, config}, target, key)
    }
 }
 

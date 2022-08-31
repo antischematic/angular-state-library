@@ -56,7 +56,8 @@
             "styles": [
               "projects/integration/src/styles.css"
             ],
-            "scripts": []
+            "scripts": [],
+             "inlineStyleLanguage": "scss"
           },
           "configurations": {
             "production": {

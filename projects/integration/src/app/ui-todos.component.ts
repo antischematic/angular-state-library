@@ -2,7 +2,7 @@ import {
    Action, Caught,
    createDispatch,
    createEffect,
-   Invoke,
+   Invoke, Queue,
    Select,
    Store,
 } from '@mmuscat/angular-state-library';
@@ -28,6 +28,8 @@ import { CommonModule } from '@angular/common';
 })
 export class UITodos {
    @Input() userId!: string;
+
+   @Queue() pending = false;
 
    todos: Todo[] = [];
 
