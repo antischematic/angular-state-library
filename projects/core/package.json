@@ -1,6 +1,6 @@
 {
   "name": "@mmuscat/angular-state-library",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "peerDependencies": {
     "@angular/common": "^14.1.0",
     "@angular/core": "^14.1.0"
