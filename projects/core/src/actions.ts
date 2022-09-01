@@ -1,20 +1,25 @@
 import {
    ChangeDetectorRef,
-   createEnvironmentInjector, EnvironmentInjector,
-   ErrorHandler, EventEmitter,
+   createEnvironmentInjector,
+   EnvironmentInjector,
+   ErrorHandler,
    inject,
-   Injectable, InjectionToken, INJECTOR, NgZone, Type,
-
+   Injectable,
+   InjectionToken,
+   INJECTOR,
+   NgZone,
+   Type,
 } from "@angular/core";
 import {
-   BehaviorSubject,
-   catchError, dematerialize,
-   EMPTY, filter, materialize,
+   filter,
+   materialize,
    MonoTypeOperatorFunction,
-   Observable, ObservableInput, ObservableNotification, OperatorFunction,
+   Observable,
+   ObservableInput,
+   OperatorFunction,
    PartialObserver,
    Subject,
-   Subscription, tap
+   Subscription
 } from "rxjs";
 import {createProxy, runInContext} from "./proxy";
 import {createTransitionZone} from "./transition";
@@ -177,6 +182,8 @@ export class Dispatcher {
    }
 }
 
+const tick = Promise.resolve()
+
 @Injectable()
 class Events {
    events = [] as EventType[]
@@ -329,6 +336,7 @@ export function Store() {
             const count = new Subject<number>()
             const startTransition = createTransitionZone(action.key, count)
             const changeDetector = injector.get(ChangeDetectorRef)
+            const ngZone = injector.get(NgZone)
             let current: Zone
             const transition = transitions.get(this)! as Set<any>
 
@@ -347,8 +355,10 @@ export function Store() {
                   this[queue.key] = transition.size
                }
                Zone.root.run(() => {
-                  Promise.resolve().then(() => {
-                     changeDetector.detectChanges()
+                  tick.then(() => {
+                     ngZone.run(() => {
+                        changeDetector.markForCheck()
+                     })
                   })
                })
             })
@@ -499,6 +509,7 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
    const events = inject(Events)
    return function (type: string, subscriber: any) {
       return function (value?: any) {
+         dispatcher.dispatch(type as ActionType, value)
          try {
             observer?.[type]?.call(context, value)
          } catch (error) {
@@ -510,9 +521,8 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
          if (type !== ActionType.Next) {
             observer?.finalize?.call(context, value)
          }
-         dispatcher.dispatch(type as ActionType, value)
          events.flush()
-         changeDetector.detectChanges()
+         changeDetector.markForCheck()
       }
    }
 }

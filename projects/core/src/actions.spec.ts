@@ -1,5 +1,5 @@
 import {ChangeDetectorRef, Component, ElementRef, ErrorHandler, inject} from "@angular/core";
-import {fakeAsync, TestBed, tick} from "@angular/core/testing";
+import {fakeAsync, flushMicrotasks, TestBed, tick} from "@angular/core/testing";
 import {filter, map, mergeAll, Observable, of, tap, throwError, timer} from "rxjs";
 import {
   Action,
@@ -321,7 +321,7 @@ describe("Library", () => {
   })
 
   describe("Caught decorator", () => {
-    it("should create", () => {
+    it("should create", fakeAsync(() => {
       const spy = createSpy()
       @Store()
       @Component({template: ``})
@@ -380,6 +380,7 @@ describe("Library", () => {
       spyOn(errorHandler, "handleError")
 
       fixture.detectChanges()
+       flushMicrotasks()
 
       expect(() => fixture.componentInstance.actionError()).not.toThrow()
       expect(spy).toHaveBeenCalledOnceWith(new Error("actionError"))
@@ -388,6 +389,7 @@ describe("Library", () => {
 
       fixture.componentInstance.effectError()
       fixture.detectChanges()
+      flushMicrotasks()
 
       expect(spy).toHaveBeenCalledOnceWith(new Error("effectError"))
       expect(errorHandler.handleError).not.toHaveBeenCalled()
@@ -395,6 +397,7 @@ describe("Library", () => {
 
       fixture.componentInstance.dispatchError()
       fixture.detectChanges()
+      flushMicrotasks()
 
       expect(spy).toHaveBeenCalledOnceWith(new Error("dispatchError"))
       expect(errorHandler.handleError).not.toHaveBeenCalled()
@@ -402,6 +405,7 @@ describe("Library", () => {
 
       fixture.componentInstance.rethrowActionError()
       fixture.detectChanges()
+       flushMicrotasks()
 
       expect(spy).toHaveBeenCalledOnceWith("rethrowActionError")
       expect(errorHandler.handleError).not.toHaveBeenCalled()
@@ -409,6 +413,7 @@ describe("Library", () => {
 
       fixture.componentInstance.actionWithHandledError()
       fixture.detectChanges()
+       flushMicrotasks()
 
       expect(spy).toHaveBeenCalledOnceWith('handled!')
       expect(errorHandler.handleError).not.toHaveBeenCalled()
@@ -416,10 +421,11 @@ describe("Library", () => {
 
       fixture.componentInstance.throwLast()
       fixture.detectChanges()
+       flushMicrotasks()
 
       expect(spy).not.toHaveBeenCalled()
       expect(errorHandler.handleError).toHaveBeenCalledOnceWith("throwLast")
-    })
+    }))
   })
 
   describe("createDispatch", () => {
@@ -511,6 +517,7 @@ describe("Library", () => {
 
       dispatcher.subscribe(spy)
       fixture.detectChanges()
+      flushMicrotasks()
 
       expect(spy).toHaveBeenCalledWith(<EventType>{
         name: "action",
@@ -537,6 +544,7 @@ describe("Library", () => {
 
       fixture.componentInstance.actionWithArgs(10, 20, 30)
       fixture.detectChanges()
+      flushMicrotasks()
 
       expect(spy).toHaveBeenCalledWith(<EventType>{
         name: "actionWithArgs",

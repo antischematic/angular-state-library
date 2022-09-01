@@ -1,19 +1,20 @@
 import {
+   $,
    Action, Caught,
    createDispatch,
    createEffect,
-   Invoke, Queue,
+   Invoke, Layout, Queue,
    Select,
    Store,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
-import {delay, mergeAll, Observable, switchAll} from 'rxjs';
+import {delay, mergeAll, Observable} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
    Component,
    inject,
-   Input,
+   Input, QueryList, ViewChildren,
 } from '@angular/core';
 import { Todo } from './interfaces';
 import { CommonModule } from '@angular/common';
@@ -31,6 +32,9 @@ export class UITodos {
 
    @Queue() pending = false;
 
+   @ViewChildren(UITodo)
+   uiTodos!: QueryList<UITodos>
+
    todos: Todo[] = [];
 
    @Select() get remaining() {
@@ -47,6 +51,11 @@ export class UITodos {
             this.todos = todos;
          },
       });
+   }
+
+   @Layout() logTodos() {
+      const { length } = $(this.uiTodos)
+      console.log(`There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${length === 1 ? '' : 's'} on the page`)
    }
 
    @Action() createTodo(todo: Todo) {
