@@ -11,6 +11,7 @@ import {
    Type,
 } from "@angular/core";
 import {
+   dematerialize,
    filter,
    materialize,
    MonoTypeOperatorFunction,
@@ -19,7 +20,8 @@ import {
    OperatorFunction,
    PartialObserver,
    Subject,
-   Subscription
+   Subscription,
+   ObservableNotification, share, tap, switchAll
 } from "rxjs";
 import {createProxy, runInContext} from "./proxy";
 import {createTransitionZone} from "./transition";
@@ -97,34 +99,41 @@ function decorateLifecycleHook(prototype: object, key: string, actions: ActionMe
    }
 }
 
+
 @Injectable()
 export class Effect {
    operator!: MonoTypeOperatorFunction<any>
-   source = new Subject<Observable<any>>()
-   destination = new Subject()
+   source = new Subject
+   destination = new Subject<ObservableNotification<any>>()
    subscription = Subscription.EMPTY
-   observer = Subscription.EMPTY
    connected = false
+   observer: any
 
-   next(source: Observable<any>) {
+   next(source: any) {
       this.source.next(source)
    }
 
-   subscribe(observer: PartialObserver<any>) {
-      this.observer.unsubscribe()
-      this.observer = this.destination.subscribe(observer)
+   setOperator(operator: any) {
+      this.operator = operator
+      return this
+   }
+
+   connect() {
       if (!this.connected) {
          this.connected = true
-         this.source = new Subject()
-         this.destination = new Subject()
-         this.observer = this.destination.subscribe(observer)
          this.subscription = this.source.pipe(this.operator).subscribe(this.destination)
       }
-      return Subscription.EMPTY
+   }
+
+   subscribe(observer?: any) {
+      try {
+         return this.destination.subscribe(observer)
+      } finally {
+         this.connect()
+      }
    }
 
    ngOnDestroy() {
-      this.observer.unsubscribe()
       this.subscription.unsubscribe()
    }
 }
@@ -170,9 +179,7 @@ export class Dispatcher {
          this.effect = null
          this.subscription.unsubscribe()
          this.subscription = effect({
-            error: (error: any) => {
-               handleError(error, this.errorHandler, Object.getPrototypeOf(this.context), this.context)
-            }
+            error() {}
          })
       }
    }
@@ -507,7 +514,7 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
    const dispatcher = inject(Dispatcher)
    const changeDetector = inject(ChangeDetectorRef)
    const events = inject(Events)
-   return function (type: string, subscriber: any) {
+   return function (type: string) {
       return function (value?: any) {
          dispatcher.dispatch(type as ActionType, value)
          try {
@@ -515,8 +522,8 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
          } catch (error) {
             onError(error)
          }
-         if (type !== ActionType.Error || !observer?.error) {
-            subscriber[type](value)
+         if (type === ActionType.Error && !observer?.error) {
+            onError(value)
          }
          if (type !== ActionType.Next) {
             observer?.finalize?.call(context, value)
@@ -533,52 +540,45 @@ export function createDispatch<T>(token: Type<T>) {
       const context = observer && isPlainObject(observer) ? instance : observer as any
       const errorHandler = inject(ErrorHandler)
       const changeDetector = inject(ChangeDetectorRef)
-      const isEffect = source instanceof EffectObservable
       const onError = (error: unknown) => handleError(error, errorHandler, token.prototype, instance)
       const observe = createObserver(observer, context, onError)
 
       changeDetector.markForCheck()
 
-      return new Observable(subscriber => {
-         const next = observe(ActionType.Next, subscriber)
-         const error = observe(ActionType.Error, subscriber)
-         const complete = observe(ActionType.Complete, subscriber)
-         if (isEffect) {
-            source.subscribe((notification: any) => {
-               switch (notification.kind) {
-                  case "N":
-                     next(notification.value)
-                     break
-                  case "E":
-                     error(notification.error)
-                     break
-                  case "C":
-                     complete()
-                     break
-               }
-            })
-            return
+      const effect = source instanceof EffectObservable ? source : new EffectObservable(source, switchAll())
+
+      effect.observer = {
+         next: observe(ActionType.Next),
+         error: observe(ActionType.Error),
+         complete: observe(ActionType.Complete),
+      }
+      effect.effect = inject(Effect)
+
+      return effect.pipe(share())
+   }
+}
+
+class EffectObservable extends Observable<any> {
+   observer: any
+   effect!: Effect
+
+   constructor(source: any, operator: any) {
+      super((subscriber) => {
+         if (this.observer) {
+            const subscription = this.effect.setOperator(operator).subscribe()
+            this.effect.next(source.pipe(tap(this.observer), tap(subscriber), materialize()))
+            subscriber.add(subscription)
          } else {
-            return source.subscribe({
-               next,
-               error,
-               complete
-            })
+            return source.subscribe(subscriber)
          }
+         return subscriber
+
       })
    }
 }
 
-class EffectObservable extends Observable<any> {}
-
-export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>): Observable<T> {
-   const effect = inject(Effect)
-   effect.operator = operator
-   return new EffectObservable(subscriber => {
-      const subscription = effect.subscribe(subscriber)
-      effect.next(source.pipe(materialize()))
-      return subscription
-   })
+export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>) {
+   return new EffectObservable(source, operator)
 }
 
 type ExtractEvents<T, U extends PropertyKey> = {

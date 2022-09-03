@@ -1,27 +1,34 @@
 import {
    $,
-   Action, Caught,
+   Action,
+   Caught,
    createDispatch,
    createEffect,
-   Invoke, Layout, Queue,
+   fromAction as fromStore,
+   Invoke,
+   Layout,
    Select,
    Store,
+   Queue,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
-import {delay, mergeAll, Observable} from 'rxjs';
+import {delay, forkJoin, mergeAll, Observable, switchAll} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
    Component,
    inject,
-   Input, QueryList, ViewChildren,
+   Input,
+   QueryList,
+   ViewChildren,
 } from '@angular/core';
 import { Todo } from './interfaces';
 import { CommonModule } from '@angular/common';
+import { UISpinner } from './spinner.component';
 
 @Store()
 @Component({
-   imports: [UITodo, CommonModule],
+   imports: [UITodo, UISpinner, CommonModule],
    selector: 'ui-todos',
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
@@ -33,7 +40,7 @@ export class UITodos {
    @Queue() pending = false;
 
    @ViewChildren(UITodo)
-   uiTodos!: QueryList<UITodos>
+   uiTodos!: QueryList<UITodos>;
 
    todos: Todo[] = [];
 
@@ -46,6 +53,7 @@ export class UITodos {
    }
 
    @Invoke() loadTodos() {
+      // Invoke, Before and Layout react to changes on "this"
       return dispatch(loadTodos(this.userId), {
          next(todos) {
             this.todos = todos;
@@ -53,9 +61,14 @@ export class UITodos {
       });
    }
 
-   @Layout() logTodos() {
-      const { length } = $(this.uiTodos)
-      console.log(`There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${length === 1 ? '' : 's'} on the page`)
+   @Layout() countElements() {
+      // Use "$" to track arbitrary objects
+      const { length } = $(this.uiTodos);
+      console.log(
+         `There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${
+            length === 1 ? '' : 's'
+         } on the page`
+      );
    }
 
    @Action() createTodo(todo: Todo) {
@@ -65,14 +78,33 @@ export class UITodos {
    }
 
    @Action() updateTodo(todo: Todo) {
-      return dispatch(updateTodo(todo), {
-         finalize: this.loadTodos
+      return dispatch(createEffect(updateTodo(todo), switchAll()), {
+         error(error) {
+            console.log('error observed, rethrowing', error);
+            throw error;
+         },
+         finalize: this.loadTodos,
       });
    }
 
+   @Action() toggleAll(todos: Todo[]) {
+      return dispatch(toggleAll(todos), {
+         finalize: this.loadTodos,
+      });
+   }
+
+   // create a todo then toggle complete to trigger an error
    @Caught() handleError(error: unknown) {
-      console.log('error caught, rethrowing')
-      throw error
+      console.log('error caught, rethrowing', error);
+      throw error;
+   }
+
+   @Invoke() logEvents() {
+      // observe events from a store
+      fromStore(UITodos).subscribe((event) => {
+         const name = Object.getPrototypeOf(event.context).constructor.name;
+         console.log(`${name}:${event.name as string}:${event.type}`, event);
+      });
    }
 
    trackById(_: number, value: Todo) {
@@ -81,13 +113,10 @@ export class UITodos {
 }
 
 function loadTodos(userId: string): Observable<Todo[]> {
-   return createEffect(
-      inject(HttpClient).get<Todo[]>(
-         `https://jsonplaceholder.typicode.com/todos`,
-         { params: { userId } }
-      ).pipe(delay(2000)),
-      mergeAll(),
-   )
+   return inject(HttpClient).get<Todo[]>(
+      `https://jsonplaceholder.typicode.com/todos`,
+      { params: { userId } }
+   );
 }
 
 function createTodo(userId: string, title: string): Observable<Todo> {
@@ -107,6 +136,12 @@ function updateTodo(todo: Todo): Observable<Todo> {
          todo
       ),
       mergeAll()
+   );
+}
+
+export function toggleAll(todos: Todo[]) {
+   return forkJoin(
+      todos.map(todo => updateTodo({ ...todo, completed: !todo.completed}))
    );
 }
 

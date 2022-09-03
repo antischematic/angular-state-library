@@ -6,10 +6,9 @@ import {
    Input,
    Output,
 } from '@angular/core';
+import { Action, Queue, Store } from '@mmuscat/angular-state-library';
 import { Todo } from './interfaces';
-import {UISpinner} from "./spinner.component";
-import {Action, createDispatch, Queue, Store} from "@mmuscat/angular-state-library";
-import {timer} from "rxjs";
+import { UISpinner } from './spinner.component';
 
 @Store()
 @Component({
@@ -23,14 +22,13 @@ export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
    @Output() save = new EventEmitter<Todo>();
 
-   @Queue() pending = false
+   @Queue() pending = false;
 
    @Action() toggleComplete(completed: boolean) {
       this.save.emit({
          ...this.value,
          completed,
       });
-      return dispatch(timer(2000))
    }
 
    @Action() updateText(title: string) {
@@ -46,5 +44,3 @@ export class UITodo {
       completed: false,
    };
 }
-
-const dispatch = createDispatch(UITodo)
