@@ -154,6 +154,7 @@ export class Dispatcher {
    errorHandler = inject(ErrorHandler)
    subscription = Subscription.EMPTY
    effect: Function | null = null
+   queue: Function[] = []
 
    dispatch(type: ActionType, value?: any) {
       const {events, context, name} = this
@@ -174,18 +175,15 @@ export class Dispatcher {
    }
 
    connect() {
-      const {effect} = this
-      if (effect) {
-         this.effect = null
-         this.subscription.unsubscribe()
-         this.subscription = effect({
-            error() {}
-         })
+      if (this.queue.length) {
+         const effects = this.queue
+         this.queue = []
+         for (const effect of effects) {
+            effect({
+               error() {}
+            })
+         }
       }
-   }
-
-   ngOnDestroy() {
-      this.subscription.unsubscribe()
    }
 }
 
@@ -379,13 +377,13 @@ export function Store() {
                   })
                }))
                setMeta("deps", deps, this, action.key)
-               dispatcher.effect = (observer: any) => current.run(() => {
+               dispatcher.queue.push((observer: any) => current.run(() => {
                   let subscription = Subscription.EMPTY
                   if (result) {
                      subscription = result.subscribe(observer)
                   }
                   return subscription
-               })
+               }))
                return result
             } catch (e) {
                handleError(e, injector.get(ErrorHandler), prototype, this)
