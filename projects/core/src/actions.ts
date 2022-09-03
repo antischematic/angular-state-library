@@ -5,7 +5,7 @@ import {
    ErrorHandler,
    inject,
    Injectable,
-   InjectionToken,
+   InjectionToken, InjectOptions,
    INJECTOR,
    NgZone,
    Type,
@@ -596,10 +596,12 @@ type ExtractEvents<T, U extends PropertyKey> = {
    [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => Observable<infer R> ? EventType<key, P, R> : never : never
 }[U]
 
-export function fromAction<T extends object>(token: Type<T>): Observable<ExtractEvents<T, keyof T>> {
-   const context = inject(token)
+export function fromStore<T extends Type<any>>(token: T, options?: InjectOptions): Observable<ExtractEvents<InstanceType<T>, keyof InstanceType<T>>>
+export function fromStore<T extends object>(store: T): Observable<ExtractEvents<T, keyof T>>
+export function fromStore(token: unknown, options?: InjectOptions): Observable<EventType> {
+   const context = typeof token === "function" ? inject(token, options ?? {}) : token
    const dispatcher = inject(DISPATCHER)
    return dispatcher.pipe(
       filter(event => event.context === context)
-   ) as Observable<ExtractEvents<T, keyof T>>
+   )
 }

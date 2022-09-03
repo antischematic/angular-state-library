@@ -4,7 +4,7 @@ import {
    Caught,
    createDispatch,
    createEffect,
-   fromAction as fromStore,
+   fromStore,
    Invoke,
    Layout,
    Select,
@@ -12,7 +12,7 @@ import {
    Queue, loadEffect,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
-import {delay, forkJoin, mergeAll, Observable, switchAll} from 'rxjs';
+import {mergeAll, Observable} from 'rxjs';
 import { HttpClient } from '@angular/common/http';
 import {
    ChangeDetectionStrategy,

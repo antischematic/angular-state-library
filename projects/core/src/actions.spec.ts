@@ -10,7 +10,7 @@ import {
   Dispatcher,
   DISPATCHER,
   EventType,
-  fromAction, Invoke, Layout,
+  fromStore, Invoke, Layout,
   Select,
   Store
 } from "./actions";
@@ -491,7 +491,7 @@ describe("Library", () => {
         }
 
         @Action({ immediate: true }) saga(): Observable<unknown> {
-          const effect = fromAction(Test).pipe(
+          const effect = fromStore(Test).pipe(
             tap(() => this.count += 1),
             filter(event => ["actionWithArgs", "action"].includes(event.name)),
             map(event => `${event.name}.${event.type}`)
