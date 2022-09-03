@@ -9,7 +9,7 @@ import {
    Layout,
    Select,
    Store,
-   Queue,
+   Queue, loadEffect,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
 import {delay, forkJoin, mergeAll, Observable, switchAll} from 'rxjs';
@@ -78,7 +78,7 @@ export class UITodos {
    }
 
    @Action() updateTodo(todo: Todo) {
-      return dispatch(createEffect(updateTodo(todo), switchAll()), {
+      return dispatch(updateTodo(todo), {
          error(error) {
             console.log('error observed, rethrowing', error);
             throw error;
@@ -129,20 +129,7 @@ function createTodo(userId: string, title: string): Observable<Todo> {
    );
 }
 
-function updateTodo(todo: Todo): Observable<Todo> {
-   return createEffect(
-      inject(HttpClient).put<Todo>(
-         `https://jsonplaceholder.typicode.com/todos/${todo.id}`,
-         todo
-      ),
-      mergeAll()
-   );
-}
-
-export function toggleAll(todos: Todo[]) {
-   return forkJoin(
-      todos.map(todo => updateTodo({ ...todo, completed: !todo.completed}))
-   );
-}
+const updateTodo = loadEffect(() => import("./effects/update-todo"))
+const toggleAll = loadEffect(() => import("./effects/toggle-all"))
 
 const dispatch = createDispatch(UITodos);

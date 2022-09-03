@@ -21,7 +21,7 @@ import {
    PartialObserver,
    Subject,
    Subscription,
-   ObservableNotification, share, tap, switchAll
+   ObservableNotification, share, tap, switchAll, defer, switchMap
 } from "rxjs";
 import {createProxy, runInContext} from "./proxy";
 import {createTransitionZone} from "./transition";
@@ -577,6 +577,19 @@ class EffectObservable extends Observable<any> {
 
 export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>) {
    return new EffectObservable(source, operator)
+}
+
+export function loadEffect<Args extends any[], Result extends Observable<any>>(
+   fn: () => Promise<{ default(...args: Args): Result }>
+) {
+   return function (...args: Args) {
+      // transition workaround
+      setTimeout(() => {}, 0);
+      const injector = inject(EnvironmentInjector);
+      return defer(fn).pipe(
+         switchMap((mod) => injector.runInContext(() => mod.default(...args)))
+      );
+   }
 }
 
 type ExtractEvents<T, U extends PropertyKey> = {
