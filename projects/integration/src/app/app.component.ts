@@ -1,8 +1,9 @@
-import {ChangeDetectionStrategy, ChangeDetectorRef, Component, inject} from '@angular/core';
-import { UITodos } from './ui-todos.component';
-import { HttpClientModule } from '@angular/common/http';
-import { FakeBackendModule } from './fake-backend';
-import {Action, Invoke, Store} from "@mmuscat/angular-state-library";
+import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {UITodos} from './ui-todos.component';
+import {HttpClientModule} from '@angular/common/http';
+import {FakeBackendModule} from './fake-backend';
+import {App} from "./interfaces";
+import {Action, Store} from "@mmuscat/angular-state-library";
 
 @Store()
 @Component({
@@ -12,11 +13,13 @@ import {Action, Invoke, Store} from "@mmuscat/angular-state-library";
    templateUrl: './app.component.html',
    styleUrls: ['./app.component.css'],
    changeDetection: ChangeDetectionStrategy.OnPush,
+   providers: [App.Provide(AppComponent)]
 })
 export class AppComponent {
    userId = '1';
-
    count = 0
+
+   @Input() appStore: any
 
    @Action() increment() {
       this.count++

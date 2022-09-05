@@ -28,6 +28,7 @@ export {
    TypedChanges,
    onChanges,
    StoreConfig,
-   setup
+   setup,
+   StoreToken
 } from "./actions"
 export {track, track as $, isProxy} from "./proxy"

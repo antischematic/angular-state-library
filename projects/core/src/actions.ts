@@ -3,9 +3,9 @@ import {
    createEnvironmentInjector,
    EnvironmentInjector,
    ErrorHandler,
+   ExistingProvider,
    inject,
    Injectable,
-   InjectFlags,
    InjectionToken,
    InjectOptions,
    INJECTOR,
@@ -319,6 +319,22 @@ export function setup(context: any, prototype: object = Object.getPrototypeOf(co
 const TransitionZone = new InjectionToken<Function>("TransitionZone")
 
 const transitions = new WeakMap()
+
+
+
+interface StoreToken {
+   new<T>(name: string): { prototype: T, new(): T, Provide(token: Type<T>): ExistingProvider }
+}
+
+export const StoreToken = function (name: string) {
+   class StoreToken {
+      static Provide(token: Type<any>) {
+         return { provide: StoreToken, useExisting: token }
+      }
+   }
+   Object.defineProperty(StoreToken, "name", { value: name })
+   return StoreToken
+} as unknown as StoreToken
 
 export function Store() {
    return function (target: any) {

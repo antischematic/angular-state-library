@@ -2,12 +2,13 @@ import { CommonModule } from '@angular/common';
 import {
    ChangeDetectionStrategy,
    Component,
-   EventEmitter, forwardRef, inject,
+   EventEmitter, forwardRef,
+   inject,
    Input,
    Output,
 } from '@angular/core';
 import {Action, dependsOn, Invoke, Queue, Store} from '@mmuscat/angular-state-library';
-import { Todo } from './interfaces';
+import {App, Todo} from './interfaces';
 import { UISpinner } from './spinner.component';
 import {AppComponent} from "./app.component";
 
@@ -18,9 +19,7 @@ import {AppComponent} from "./app.component";
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todo.component.html',
-   providers: [
-      dependsOn(forwardRef(() => AppComponent))
-   ]
+   providers: [dependsOn(forwardRef(() => AppComponent))]
 })
 export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
