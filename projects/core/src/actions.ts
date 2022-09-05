@@ -269,37 +269,36 @@ export function onChanges(): SimpleChanges {
    return track(changes).value
 }
 
-export interface StoreConfig {
-   deps?: any[]
-}
+const DEPS = new InjectionToken<any[]>("DEPS")
 
 export function dependsOn(...deps: ProviderToken<any>[]) {
-   return [{
-      provide: Store,
-      useValue: {
-         deps
+   const providers = deps.map(dep => {
+      return {
+         provide: dep,
+         useFactory() {
+            const instance = inject(dep, { skipSelf: true })
+            const cdr = inject(ChangeDetectorRef) as ViewRef
+            const dispatcher = inject(DISPATCHER)
+            const subscription = dispatcher.subscribe((event) => {
+               if (cdr.destroyed) {
+                  subscription.unsubscribe()
+               } else if (event.context === instance) {
+                  cdr.markForCheck()
+               }
+            })
+            return instance
+         }
       }
-   }]
+   })
+   return [
+      providers,
+      { provide: DEPS, useValue: deps }
+   ]
 }
 
 export function setup(context: any, prototype: object = Object.getPrototypeOf(context)) {
-   const parent = inject(INJECTOR)
    const rootInjector = getMeta(INJECTOR, context) as EnvironmentInjector
-
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
-   const config = parent.get(Store, { optional: true }) as StoreConfig
-   const deps = config?.deps?.map(token => inject(token))
-
-   if (deps) {
-      const changeDetector = rootInjector.get(ChangeDetectorRef) as ViewRef
-      const subscription = rootInjector.get(DISPATCHER).subscribe((event) => {
-         if (changeDetector.destroyed) {
-            subscription.unsubscribe()
-         } else if (deps.includes(event.context)) {
-            changeDetector.markForCheck()
-         }
-      })
-   }
 
    transitions.set(context, new Set())
    for (const action of actions) {
@@ -319,8 +318,6 @@ export function setup(context: any, prototype: object = Object.getPrototypeOf(co
 const TransitionZone = new InjectionToken<Function>("TransitionZone")
 
 const transitions = new WeakMap()
-
-
 
 interface StoreToken {
    new<T>(name: string): { prototype: T, new(): T, Provide(token: Type<T>): ExistingProvider }
@@ -354,13 +351,12 @@ export function Store() {
       wrap(target, 'ɵfac', function (factory, ...args) {
          const count = new Subject<number>()
          const parent = inject(INJECTOR)
-         const config = parent.get(Store, { optional: true }) as StoreConfig
-         const deps = config?.deps ?? [] as any[]
+         const deps = parent.get(DEPS, [])
          const rootInjector = createEnvironmentInjector([
             Events,
             { provide: Changes, useFactory: createChanges },
             { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)},
-            ...deps.map(dep => {
+            ...deps.map((dep) => {
                return {
                   provide: dep,
                   useFactory() {

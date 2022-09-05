@@ -27,7 +27,6 @@ export {
    dependsOn,
    TypedChanges,
    onChanges,
-   StoreConfig,
    setup,
    StoreToken
 } from "./actions"
