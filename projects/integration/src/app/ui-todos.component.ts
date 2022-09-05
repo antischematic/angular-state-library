@@ -9,7 +9,9 @@ import {
    Layout,
    Select,
    Store,
-   Queue, loadEffect,
+   Queue,
+   loadEffect,
+   onChanges,
 } from '@mmuscat/angular-state-library';
 import { UITodo } from './ui-todo.component';
 import {mergeAll, Observable} from 'rxjs';
@@ -91,6 +93,11 @@ export class UITodos {
       return dispatch(toggleAll(todos), {
          finalize: this.loadTodos,
       });
+   }
+
+   @Invoke() trackInputChanges() {
+      const { userId } = onChanges<UITodos>()
+      console.log("inputs changed!", userId)
    }
 
    // create a todo then toggle complete to trigger an error

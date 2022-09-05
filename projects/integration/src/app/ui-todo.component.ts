@@ -6,7 +6,7 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import {$, Action, configureStore, Queue, Select, Store} from '@mmuscat/angular-state-library';
+import {Action, dependsOn, Queue, Store} from '@mmuscat/angular-state-library';
 import { Todo } from './interfaces';
 import { UISpinner } from './spinner.component';
 import {AppComponent} from "./app.component";
@@ -19,7 +19,7 @@ import {AppComponent} from "./app.component";
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todo.component.html',
    providers: [
-      configureStore({ deps: [forwardRef(() => AppComponent)] })
+      dependsOn(forwardRef(() => AppComponent))
    ]
 })
 export class UITodo {

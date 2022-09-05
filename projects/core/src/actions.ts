@@ -1,5 +1,4 @@
 import {
-   ApplicationRef,
    ChangeDetectorRef,
    createEnvironmentInjector,
    EnvironmentInjector,
@@ -8,7 +7,7 @@ import {
    Injectable,
    InjectionToken, InjectOptions,
    INJECTOR,
-   NgZone,
+   NgZone, ProviderToken, SimpleChanges,
    Type, ViewRef,
 } from "@angular/core";
 import {
@@ -24,13 +23,11 @@ import {
    share,
    tap,
    switchAll,
-   defer,
-   switchMap,
-   isObservable,
-   scheduled,
-   asapScheduler, mergeAll, concatAll, exhaustAll
+   mergeAll,
+   concatAll,
+   exhaustAll
 } from "rxjs";
-import {createProxy, runInContext} from "./proxy";
+import {createProxy, runInContext, track} from "./proxy";
 import {createTransitionZone} from "./transition";
 
 const meta = new WeakMap()
@@ -235,21 +232,55 @@ class Events {
    }
 }
 
+const Changes = new InjectionToken("Changes", {
+   factory: createChanges
+})
+
+function createChanges() {
+   let changes = {}
+   return {
+      set value(value) {
+         changes = value
+      },
+      get value() {
+         return changes
+      }
+   }
+}
+
+export type TypedChanges<T> = {
+   readonly [key in keyof T]?: {
+      previousValue?: T[key]
+      currentValue: T[key]
+      firstChange: boolean
+      isFirstChange(): boolean
+   }
+}
+
+export function onChanges<T>(): TypedChanges<T>
+export function onChanges(): SimpleChanges
+export function onChanges(): SimpleChanges {
+   const changes = inject(Changes)
+   return track(changes).value
+}
+
 export interface StoreConfig {
    deps?: any[]
 }
 
-export function configureStore(config: StoreConfig) {
+export function dependsOn(...deps: ProviderToken<any>[]) {
    return {
       provide: Store,
-      useValue: config
+      useValue: {
+         deps
+      }
    }
 }
 
-export function setup(context: any, prototype: object) {
+export function setup(context: any, prototype: object = Object.getPrototypeOf(context)) {
    const parent = inject(INJECTOR)
    const count = new Subject<number>()
-   const rootInjector = createEnvironmentInjector([Events, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
+   const rootInjector = createEnvironmentInjector([Events, { provide: Changes, useFactory: createChanges }, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
    const config = parent.get(Store, { optional: true }) as StoreConfig
    const deps = config?.deps?.map(token => inject(token))
@@ -304,6 +335,18 @@ export function Store() {
          const instance = factory()
          setup(instance, prototype)
          return instance
+      })
+
+      wrap(prototype, "ngOnChanges", function (fn, changes) {
+         const injector = getMeta(INJECTOR, this) as EnvironmentInjector
+         injector.get(Changes).value = changes
+         injector.get(Events).push({
+            name: "ngOnChanges",
+            context: this,
+            type: ActionType.Dispatch,
+            value: changes
+         })
+         fn.apply(this)
       })
 
       if (selectors.length) {

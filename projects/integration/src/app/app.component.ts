@@ -2,7 +2,7 @@ import {ChangeDetectionStrategy, ChangeDetectorRef, Component, inject} from '@an
 import { UITodos } from './ui-todos.component';
 import { HttpClientModule } from '@angular/common/http';
 import { FakeBackendModule } from './fake-backend';
-import {Action, Store} from "@mmuscat/angular-state-library";
+import {Action, Invoke, Store} from "@mmuscat/angular-state-library";
 
 @Store()
 @Component({
