@@ -1,8 +1,10 @@
-import { ChangeDetectionStrategy, Component } from '@angular/core';
+import {ChangeDetectionStrategy, ChangeDetectorRef, Component, inject} from '@angular/core';
 import { UITodos } from './ui-todos.component';
 import { HttpClientModule } from '@angular/common/http';
 import { FakeBackendModule } from './fake-backend';
+import {Action, Store} from "@mmuscat/angular-state-library";
 
+@Store()
 @Component({
    imports: [UITodos, HttpClientModule, FakeBackendModule],
    selector: 'app-root',
@@ -13,4 +15,17 @@ import { FakeBackendModule } from './fake-backend';
 })
 export class AppComponent {
    userId = '1';
+
+   count = 0
+
+   @Action() increment() {
+      this.count++
+      console.log('increment', this.count)
+   }
+
+   constructor() {
+      setInterval(() => {
+         this.increment()
+      }, 1000)
+   }
 }

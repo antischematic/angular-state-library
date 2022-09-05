@@ -1,4 +1,5 @@
 import {
+   ApplicationRef,
    ChangeDetectorRef,
    createEnvironmentInjector,
    EnvironmentInjector,
@@ -8,20 +9,26 @@ import {
    InjectionToken, InjectOptions,
    INJECTOR,
    NgZone,
-   Type,
+   Type, ViewRef,
 } from "@angular/core";
 import {
-   dematerialize,
    filter,
    materialize,
    MonoTypeOperatorFunction,
    Observable,
    ObservableInput,
    OperatorFunction,
-   PartialObserver,
    Subject,
    Subscription,
-   ObservableNotification, share, tap, switchAll, defer, switchMap
+   ObservableNotification,
+   share,
+   tap,
+   switchAll,
+   defer,
+   switchMap,
+   isObservable,
+   scheduled,
+   asapScheduler, mergeAll, concatAll, exhaustAll
 } from "rxjs";
 import {createProxy, runInContext} from "./proxy";
 import {createTransitionZone} from "./transition";
@@ -71,29 +78,53 @@ function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: 
    })
 }
 
-function decorateLifecycleHook(prototype: object, key: string, actions: ActionMeta[]) {
+function checkDeps(deps: Map<any, any>, update = true) {
+   let changed = false
+   if (deps) {
+      for (const [object, keyValue] of deps) {
+         for (const [key, previous] of keyValue) {
+            const current = object[key]
+            if (current !== previous) {
+               // update deps in case of error, so it doesn't automatically run until the value
+               // changes again
+               if (update) {
+                  keyValue.set(key, current)
+               }
+               changed = true
+            }
+         }
+      }
+   }
+   return changed
+}
+
+function decorateLifecycleHook(prototype: object, key: string, actions: ActionMeta[], selectors: SelectMeta[]) {
+   if (selectors.length) {
+      wrap(prototype, key, function (fn) {
+         const injector = getMeta(INJECTOR, this) as EnvironmentInjector
+         const changeDetector = injector.get(ChangeDetectorRef)
+         for (const selector of selectors) {
+            const deps = getMeta("deps", this, selector.key) as Map<any, any>
+            if (checkDeps(deps, false)) {
+               setMeta("dirty", true, this, selector.key)
+               changeDetector.markForCheck()
+            }
+         }
+         fn.apply(this)
+      })
+   }
    if (actions.length) {
       wrap(prototype, key, function (fn) {
          for (const action of actions) {
             const deps = getMeta("deps", this, action.key) as Map<any, any>
-            let changed = false
-            if (deps) {
-               for (const [object, keyValue] of deps) {
-                  for (const [key, previous] of keyValue) {
-                     const current = object[key]
-                     if (current !== previous) {
-                        // update deps in case of error, so it doesn't automatically run until the value
-                        // changes again
-                        keyValue.set(key, current)
-                        changed = true
-                     }
-                  }
-               }
-            }
+            const changed = checkDeps(deps)
             if (!deps && action.config.immediate && action.method.length === 0 || changed) {
                this[action.key].call(this)
             }
          }
+         const events = (getMeta(INJECTOR, this) as EnvironmentInjector).get(Events)
+         events.dequeue()
+         events.flush()
          fn.apply(this)
       })
    }
@@ -151,10 +182,6 @@ export class Dispatcher {
    context!: object
    tries = 1
    events = inject(Events)
-   errorHandler = inject(ErrorHandler)
-   subscription = Subscription.EMPTY
-   effect: Function | null = null
-   queue: Function[] = []
 
    dispatch(type: ActionType, value?: any) {
       const {events, context, name} = this
@@ -174,16 +201,8 @@ export class Dispatcher {
       events.push(event)
    }
 
-   connect() {
-      if (this.queue.length) {
-         const effects = this.queue
-         this.queue = []
-         for (const effect of effects) {
-            effect({
-               error() {}
-            })
-         }
-      }
+   queue(effect: any) {
+      this.events.queue.push(effect)
    }
 }
 
@@ -193,6 +212,7 @@ const tick = Promise.resolve()
 class Events {
    events = [] as EventType[]
    dispatcher = inject(DISPATCHER)
+   queue = [] as any[];
 
    push(event: EventType) {
       this.events.push(event)
@@ -204,6 +224,26 @@ class Events {
          this.dispatcher.next(event)
       }
    }
+
+   dequeue() {
+      let effect
+      while (effect = this.queue.shift()) {
+         effect({
+            error() {}
+         })
+      }
+   }
+}
+
+export interface StoreConfig {
+   deps?: any[]
+}
+
+export function configureStore(config: StoreConfig) {
+   return {
+      provide: Store,
+      useValue: config
+   }
 }
 
 export function setup(context: any, prototype: object) {
@@ -211,7 +251,19 @@ export function setup(context: any, prototype: object) {
    const count = new Subject<number>()
    const rootInjector = createEnvironmentInjector([Events, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
+   const config = parent.get(Store, { optional: true }) as StoreConfig
+   const deps = config?.deps?.map(token => inject(token))
 
+   if (deps) {
+      const changeDetector = rootInjector.get(ChangeDetectorRef) as ViewRef
+      const subscription = rootInjector.get(DISPATCHER).subscribe((event) => {
+         if (changeDetector.destroyed) {
+            subscription.unsubscribe()
+         } else if (deps.includes(event.context)) {
+            changeDetector.markForCheck()
+         }
+      })
+   }
 
    transitions.set(context, new Set())
    setMeta(INJECTOR, rootInjector, context)
@@ -244,9 +296,9 @@ export function Store() {
       const queues = Array.from(getMetaKeys(Queue, prototype).values()) as QueueMeta[]
       const rootQueues = queues.filter(q => q.action === undefined)
 
-      decorateLifecycleHook(prototype, "ngDoCheck", checkActions)
-      decorateLifecycleHook(prototype, "ngAfterContentChecked", contentActions)
-      decorateLifecycleHook(prototype, "ngAfterViewChecked", viewActions)
+      decorateLifecycleHook(prototype, "ngDoCheck", checkActions, selectors)
+      decorateLifecycleHook(prototype, "ngAfterContentChecked", contentActions, selectors)
+      decorateLifecycleHook(prototype, "ngAfterViewChecked", viewActions, selectors)
 
       wrap(target, 'ɵfac', function (factory) {
          const instance = factory()
@@ -256,74 +308,28 @@ export function Store() {
 
       if (selectors.length) {
          for (const selector of selectors) {
-            const {get, value} = selector.descriptor
-            if (get) {
-               Object.defineProperty(prototype, selector.key, {
-                  get: function () {
-                     const deps = getMeta("deps", this, selector.key) as Map<any, any>
-                     let changed = !deps
-                     if (deps) {
-                        outer: for (const [object, keyValue] of deps) {
-                           for (const [key, value] of keyValue) {
-                              if (object[key] !== value) {
-                                 changed = true
-                                 break outer
-                              }
-                           }
-                        }
-                     }
-                     if (changed) {
-                        const deps = new Map()
-                        const value = runInContext(deps, () => get.call(selector.config.track ? createProxy(this) : this))
-                        setMeta("value", value, this, selector.key)
-                        setMeta("deps", deps, this, selector.key)
-                     }
-                     return getMeta("value", this, selector.key)
+            const { get, value = get } = selector.descriptor
+            Object.defineProperty(prototype, selector.key, {
+               [get ? "get" : "value"]: function (...args: any[]) {
+                  const deps = getMeta("deps", this, selector.key) as Map<any, any>
+                  const changed = checkDeps(deps, false) || !deps
+                  const argKey = JSON.stringify(args)
+                  const cache = getMeta("cache", this, selector.key) as Map<any, any> ?? new Map()
+                  if (changed) {
+                     const deps = new Map()
+                     const result = runInContext(deps, () => value.apply(selector.config.track ? createProxy(this) : this, args))
+                     cache.set(argKey, result)
+                     setMeta("deps", deps, this, selector.key)
+                  } else if (!cache.has(argKey)) {
+                     const result = value.apply(this, args)
+                     cache.set(argKey, result)
                   }
-               })
-            } else if (typeof value === "function") {
-               Object.defineProperty(prototype, selector.key, {
-                  value: function (...args: any[]) {
-                     const deps = getMeta("deps", this, selector.key) as Map<any, any>
-                     const argKey = JSON.stringify(args)
-                     let changed = !deps
-                     if (deps) {
-                        outer: for (const [object, keyValue] of deps) {
-                           for (const [key, value] of keyValue) {
-                              if (object[key] !== value) {
-                                 changed = true
-                                 break outer
-                              }
-                           }
-                        }
-                     }
-                     const cache = getMeta("cache", this, selector.key) as Map<any, any> ?? new Map()
-                     if (changed) {
-                        const deps = new Map()
-                        const result = runInContext(deps, () => value.apply(selector.config.track ? createProxy(this) : this, args))
-                        cache.set(argKey, result)
-                        setMeta("deps", deps, this, selector.key)
-                     } else if (!cache.has(argKey)) {
-                        const result = value.apply(this, args)
-                        cache.set(argKey, result)
-                     }
-                     setMeta("cache", cache, this, selector.key)
-                     return cache.get(argKey)
-                  }
-               })
-            } else {
-               throw new Error("Selector must be a getter or method")
-            }
+                  setMeta("cache", cache, this, selector.key)
+                  return cache.get(argKey)
+               }
+            })
          }
       }
-
-      wrap(prototype, "ngAfterViewChecked", function (fn) {
-         for (const action of actions) {
-            (getMeta(INJECTOR, this, action.key) as EnvironmentInjector).get(Dispatcher).connect()
-         }
-         (getMeta(INJECTOR, this) as EnvironmentInjector).get(Events).flush()
-         fn.apply(this)
-      })
 
       wrap(prototype, "ngOnDestroy", function (fn) {
          const injector = getMetaKeys(INJECTOR, this) as Map<any, EnvironmentInjector>
@@ -344,6 +350,8 @@ export function Store() {
             const ngZone = injector.get(NgZone)
             let current: Zone
             const transition = transitions.get(this)! as Set<any>
+
+            changeDetector.markForCheck()
 
             // todo: find a better way to coalesce transitions
             // probably causes a bunch of memory leaks
@@ -377,7 +385,7 @@ export function Store() {
                   })
                }))
                setMeta("deps", deps, this, action.key)
-               dispatcher.queue.push((observer: any) => current.run(() => {
+               dispatcher.queue((observer: any) => current.run(() => {
                   let subscription = Subscription.EMPTY
                   if (result) {
                      subscription = result.subscribe(observer)
@@ -537,13 +545,10 @@ export function createDispatch<T>(token: Type<T>) {
       const instance = inject(token)
       const context = observer && isPlainObject(observer) ? instance : observer as any
       const errorHandler = inject(ErrorHandler)
-      const changeDetector = inject(ChangeDetectorRef)
       const onError = (error: unknown) => handleError(error, errorHandler, token.prototype, instance)
       const observe = createObserver(observer, context, onError)
 
-      changeDetector.markForCheck()
-
-      const effect = source instanceof EffectObservable ? source : new EffectObservable(source, switchAll())
+      const effect = source instanceof EffectObservable || source instanceof LoadEffect ? source : new EffectObservable(source, switchAll())
 
       effect.observer = {
          next: observe(ActionType.Next),
@@ -575,8 +580,37 @@ class EffectObservable extends Observable<any> {
    }
 }
 
-export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>) {
+export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>): Observable<T> {
    return new EffectObservable(source, operator)
+}
+
+export function mergeEffect<T>(source: Observable<T>, concurrent?: number): Observable<T> {
+   return createEffect(source, mergeAll(concurrent))
+}
+
+export function concatEffect<T>(source: Observable<T>): Observable<T> {
+   return createEffect(source, concatAll())
+}
+
+export function exhaustEffect<T>(source: Observable<T>): Observable<T> {
+   return createEffect(source, exhaustAll())
+}
+
+class LoadEffect extends Observable<any> {
+   observer: any
+   effect: any
+   constructor(fn: any, injector: any, args: any) {
+      super(subscriber => {
+         fn().then((mod: any) => {
+            let source = injector.runInContext(() => mod.default(...args))
+            source = source instanceof  EffectObservable ? source : new EffectObservable(source, switchAll())
+            source.effect = this.effect
+            source.observer = this.observer
+            subscriber.add(source.subscribe(subscriber))
+         })
+         return subscriber
+      });
+   }
 }
 
 export function loadEffect<Args extends any[], Result extends Observable<any>>(
@@ -586,9 +620,7 @@ export function loadEffect<Args extends any[], Result extends Observable<any>>(
       // transition workaround
       setTimeout(() => {}, 0);
       const injector = inject(EnvironmentInjector);
-      return defer(fn).pipe(
-         switchMap((mod) => injector.runInContext(() => mod.default(...args)))
-      );
+      return new LoadEffect(fn, injector, args);
    }
 }
 
