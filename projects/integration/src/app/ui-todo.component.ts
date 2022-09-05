@@ -6,7 +6,7 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import {Action, dependsOn, Queue, Store} from '@mmuscat/angular-state-library';
+import {Action, dependsOn, Invoke, Queue, Store} from '@mmuscat/angular-state-library';
 import { Todo } from './interfaces';
 import { UISpinner } from './spinner.component';
 import {AppComponent} from "./app.component";
@@ -29,6 +29,10 @@ export class UITodo {
    @Queue() pending = false;
 
    root = inject(AppComponent)
+
+   @Invoke() trackCount() {
+      console.log("reactive parent", this.root.count)
+   }
 
    @Action() toggleComplete(completed: boolean) {
       this.save.emit({

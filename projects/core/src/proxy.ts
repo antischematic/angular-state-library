@@ -70,6 +70,6 @@ export function runInContext<T extends (...args: any[]) => any>(deps: Map<any, a
   }
 }
 
-export function track<T extends object>(object: T): T {
-  return createProxy(object)
+export function track<T>(object: T): T {
+  return typeof object === "object" && object !== null ? createProxy(object as any) : object
 }

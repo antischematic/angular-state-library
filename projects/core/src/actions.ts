@@ -5,27 +5,32 @@ import {
    ErrorHandler,
    inject,
    Injectable,
-   InjectionToken, InjectOptions,
+   InjectFlags,
+   InjectionToken,
+   InjectOptions,
    INJECTOR,
-   NgZone, ProviderToken, SimpleChanges,
-   Type, ViewRef,
+   NgZone,
+   ProviderToken,
+   SimpleChanges,
+   Type,
+   ViewRef,
 } from "@angular/core";
 import {
+   concatAll,
+   exhaustAll,
    filter,
    materialize,
+   mergeAll,
    MonoTypeOperatorFunction,
    Observable,
    ObservableInput,
+   ObservableNotification,
    OperatorFunction,
+   share,
    Subject,
    Subscription,
-   ObservableNotification,
-   share,
-   tap,
    switchAll,
-   mergeAll,
-   concatAll,
-   exhaustAll
+   tap
 } from "rxjs";
 import {createProxy, runInContext, track} from "./proxy";
 import {createTransitionZone} from "./transition";
@@ -269,18 +274,18 @@ export interface StoreConfig {
 }
 
 export function dependsOn(...deps: ProviderToken<any>[]) {
-   return {
+   return [{
       provide: Store,
       useValue: {
          deps
       }
-   }
+   }]
 }
 
 export function setup(context: any, prototype: object = Object.getPrototypeOf(context)) {
    const parent = inject(INJECTOR)
-   const count = new Subject<number>()
-   const rootInjector = createEnvironmentInjector([Events, { provide: Changes, useFactory: createChanges }, { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)}], parent as EnvironmentInjector)
+   const rootInjector = getMeta(INJECTOR, context) as EnvironmentInjector
+
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
    const config = parent.get(Store, { optional: true }) as StoreConfig
    const deps = config?.deps?.map(token => inject(token))
@@ -297,7 +302,6 @@ export function setup(context: any, prototype: object = Object.getPrototypeOf(co
    }
 
    transitions.set(context, new Set())
-   setMeta(INJECTOR, rootInjector, context)
    for (const action of actions) {
       const injector = createEnvironmentInjector([{
          provide: Dispatcher,
@@ -331,8 +335,26 @@ export function Store() {
       decorateLifecycleHook(prototype, "ngAfterContentChecked", contentActions, selectors)
       decorateLifecycleHook(prototype, "ngAfterViewChecked", viewActions, selectors)
 
-      wrap(target, 'ɵfac', function (factory) {
-         const instance = factory()
+      wrap(target, 'ɵfac', function (factory, ...args) {
+         const count = new Subject<number>()
+         const parent = inject(INJECTOR)
+         const config = parent.get(Store, { optional: true }) as StoreConfig
+         const deps = config?.deps ?? [] as any[]
+         const rootInjector = createEnvironmentInjector([
+            Events,
+            { provide: Changes, useFactory: createChanges },
+            { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)},
+            ...deps.map(dep => {
+               return {
+                  provide: dep,
+                  useFactory() {
+                     return track(inject(dep, { skipSelf: true }))
+                  }
+               }
+            })
+         ], parent as EnvironmentInjector)
+         const instance = rootInjector.runInContext(() => factory(...args)) as object
+         setMeta(INJECTOR, rootInjector, instance)
          setup(instance, prototype)
          return instance
       })
