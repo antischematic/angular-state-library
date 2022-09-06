@@ -5,10 +5,13 @@ import {FakeBackendModule} from './fake-backend';
 import {Action, createDispatch, Invoke, Store} from "@mmuscat/angular-state-library";
 import {Observable, timer} from "rxjs";
 import {AppStore} from "./providers";
+import {UICounter} from "./ui-counter.component";
+import {UIDescendent} from "./ui-descendent.component";
+import {UIDouble} from "./ui-double.component";
 
 @Store()
 @Component({
-   imports: [UITodos, HttpClientModule, FakeBackendModule],
+   imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule],
    selector: 'app-root',
    standalone: true,
    templateUrl: './app.component.html',

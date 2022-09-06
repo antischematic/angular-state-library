@@ -400,8 +400,9 @@ export function Store() {
       }
 
       wrap(prototype, "ngOnDestroy", function (fn) {
-         const rootInjector = getMeta(INJECTOR, this) as EnvironmentInjector
-         rootInjector.destroy()
+         for (const injector of getMetaKeys(INJECTOR, this).values()) {
+            injector.destroy()
+         }
          fn.apply(this)
       })
 
