@@ -24,10 +24,9 @@ export {
    exhaustEffect,
    mergeEffect,
    concatEffect,
-   dependsOn,
    TypedChanges,
    onChanges,
    setup,
-   StoreToken
+   StoreToken,
 } from "./actions"
-export {track, track as $, isProxy} from "./proxy"
+export {track, track as $, untrack, untrack as $$, isProxy} from "./proxy"

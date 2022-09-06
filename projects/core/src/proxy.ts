@@ -1,5 +1,5 @@
 const cache = new WeakMap()
-const proxies = new WeakSet()
+const proxies = new WeakMap()
 
 let deps: Map<any, any>[] = []
 
@@ -53,7 +53,7 @@ export function createProxy(object: object) {
   }
   const proxy = createObjectProxy(object)
   cache.set(object, proxy)
-  proxies.add(proxy)
+  proxies.set(proxy, object)
   return proxy
 }
 
@@ -70,6 +70,14 @@ export function runInContext<T extends (...args: any[]) => any>(deps: Map<any, a
   }
 }
 
+function isObject(value: any) {
+   return typeof value === "object" && value !== null
+}
+
 export function track<T>(object: T): T {
-  return typeof object === "object" && object !== null ? createProxy(object as any) : object
+  return isObject(object) ? createProxy(object as any) : object
+}
+
+export function untrack<T>(object: T): T {
+   return proxies.get(object as any) ?? object
 }

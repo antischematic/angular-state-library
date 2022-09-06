@@ -2,8 +2,9 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {App} from "./interfaces";
-import {Action, Store} from "@mmuscat/angular-state-library";
+import {Action, createDispatch, Invoke, Store} from "@mmuscat/angular-state-library";
+import {Observable, timer} from "rxjs";
+import {AppStore} from "./providers";
 
 @Store()
 @Component({
@@ -13,22 +14,26 @@ import {Action, Store} from "@mmuscat/angular-state-library";
    templateUrl: './app.component.html',
    styleUrls: ['./app.component.css'],
    changeDetection: ChangeDetectionStrategy.OnPush,
-   providers: [App.Provide(AppComponent)]
+   providers: [AppStore.Provide(AppComponent)]
 })
 export class AppComponent {
    userId = '1';
    count = 0
+   interval: any
 
    @Input() appStore: any
 
-   @Action() increment() {
+   @Invoke() increment(): Observable<number> {
       this.count++
-      console.log('increment', this.count)
+
+      this.otherAction()
+
+      return dispatch(timer(1000), {
+         next: this.increment
+      })
    }
 
-   constructor() {
-      setInterval(() => {
-         this.increment()
-      }, 1000)
-   }
+   @Action() otherAction() {}
 }
+
+const dispatch = createDispatch(AppComponent)

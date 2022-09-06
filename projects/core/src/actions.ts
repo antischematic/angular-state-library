@@ -1,6 +1,6 @@
 import {
    ChangeDetectorRef,
-   createEnvironmentInjector,
+   createEnvironmentInjector, ENVIRONMENT_INITIALIZER,
    EnvironmentInjector,
    ErrorHandler,
    ExistingProvider,
@@ -32,7 +32,7 @@ import {
    switchAll,
    tap
 } from "rxjs";
-import {createProxy, runInContext, track} from "./proxy";
+import {createProxy, runInContext, track, untrack} from "./proxy";
 import {createTransitionZone} from "./transition";
 
 const meta = new WeakMap()
@@ -75,7 +75,7 @@ function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: 
    Object.defineProperty(target, key, {
       configurable: true,
       value: function (this: unknown, ...args: any[]) {
-         return fn.call(this, originalFunction, ...args)
+         return fn.call(untrack(this), originalFunction, ...args)
       }
    })
 }
@@ -131,7 +131,6 @@ function decorateLifecycleHook(prototype: object, key: string, actions: ActionMe
       })
    }
 }
-
 
 @Injectable()
 export class Effect {
@@ -203,8 +202,8 @@ export class Dispatcher {
       events.push(event)
    }
 
-   queue(effect: any) {
-      this.events.queue.push(effect)
+   queue(name: PropertyKey, subscribe: any) {
+      this.events.queue.push({ name, subscribe })
    }
 }
 
@@ -215,6 +214,7 @@ class Events {
    events = [] as EventType[]
    dispatcher = inject(DISPATCHER)
    queue = [] as any[];
+   subscriptions = new Map()
 
    push(event: EventType) {
       this.events.push(event)
@@ -230,9 +230,16 @@ class Events {
    dequeue() {
       let effect
       while (effect = this.queue.shift()) {
-         effect({
+         this.subscriptions.get(effect.name)?.unsubscribe()
+         this.subscriptions.set(effect.name, effect.subscribe({
             error() {}
-         })
+         }))
+      }
+   }
+
+   ngOnDestroy() {
+      for (const subscription of this.subscriptions.values()) {
+         subscription.unsubscribe()
       }
    }
 }
@@ -269,33 +276,6 @@ export function onChanges(): SimpleChanges {
    return track(changes).value
 }
 
-const DEPS = new InjectionToken<any[]>("DEPS")
-
-export function dependsOn(...deps: ProviderToken<any>[]) {
-   const providers = deps.map(dep => {
-      return {
-         provide: dep,
-         useFactory() {
-            const instance = inject(dep, { skipSelf: true })
-            const cdr = inject(ChangeDetectorRef) as ViewRef
-            const dispatcher = inject(DISPATCHER)
-            const subscription = dispatcher.subscribe((event) => {
-               if (cdr.destroyed) {
-                  subscription.unsubscribe()
-               } else if (event.context === instance) {
-                  cdr.markForCheck()
-               }
-            })
-            return instance
-         }
-      }
-   })
-   return [
-      providers,
-      { provide: DEPS, useValue: deps }
-   ]
-}
-
 export function setup(context: any, prototype: object = Object.getPrototypeOf(context)) {
    const rootInjector = getMeta(INJECTOR, context) as EnvironmentInjector
    const actions = Array.from(getMetaKeys(Action, prototype).values()) as ActionMeta[]
@@ -326,7 +306,26 @@ interface StoreToken {
 export const StoreToken = function (name: string) {
    class StoreToken {
       static Provide(token: Type<any>) {
-         return { provide: StoreToken, useExisting: token }
+         return {
+            provide: StoreToken,
+            useFactory() {
+               return track(inject(token))
+            }
+         }
+      }
+      constructor() {
+         const instance = inject(StoreToken, { skipSelf: true })
+         const context = untrack(instance)
+         const cdr = inject(ChangeDetectorRef) as ViewRef
+         const dispatcher = inject(DISPATCHER)
+         const subscription = dispatcher.subscribe((event) => {
+            if (cdr.destroyed) {
+               subscription.unsubscribe()
+            } else if (event.context === context) {
+               cdr.markForCheck()
+            }
+         })
+         return instance
       }
    }
    Object.defineProperty(StoreToken, "name", { value: name })
@@ -351,21 +350,12 @@ export function Store() {
       wrap(target, 'ɵfac', function (factory, ...args) {
          const count = new Subject<number>()
          const parent = inject(INJECTOR)
-         const deps = parent.get(DEPS, [])
          const rootInjector = createEnvironmentInjector([
             Events,
             { provide: Changes, useFactory: createChanges },
             { provide: TransitionZone, useFactory: () => createTransitionZone(prototype.constructor.name, count)},
-            ...deps.map((dep) => {
-               return {
-                  provide: dep,
-                  useFactory() {
-                     return track(inject(dep, { skipSelf: true }))
-                  }
-               }
-            })
          ], parent as EnvironmentInjector)
-         const instance = rootInjector.runInContext(() => factory(...args)) as object
+         const instance = factory(...args)
          setMeta(INJECTOR, rootInjector, instance)
          setup(instance, prototype)
          return instance
@@ -388,31 +378,30 @@ export function Store() {
             const { get, value = get } = selector.descriptor
             Object.defineProperty(prototype, selector.key, {
                [get ? "get" : "value"]: function (...args: any[]) {
-                  const deps = getMeta("deps", this, selector.key) as Map<any, any>
+                  const context = untrack(this)
+                  const deps = getMeta("deps", context, selector.key) as Map<any, any>
                   const changed = checkDeps(deps, false) || !deps
                   const argKey = JSON.stringify(args)
-                  const cache = getMeta("cache", this, selector.key) as Map<any, any> ?? new Map()
+                  const cache = getMeta("cache", context, selector.key) as Map<any, any> ?? new Map()
                   if (changed) {
                      const deps = new Map()
-                     const result = runInContext(deps, () => value.apply(selector.config.track ? createProxy(this) : this, args))
+                     const result = runInContext(deps, () => value.apply(selector.config.track ? createProxy(context) : context, args))
                      cache.set(argKey, result)
-                     setMeta("deps", deps, this, selector.key)
+                     setMeta("deps", deps, context, selector.key)
                   } else if (!cache.has(argKey)) {
-                     const result = value.apply(this, args)
+                     const result = value.apply(context, args)
                      cache.set(argKey, result)
                   }
-                  setMeta("cache", cache, this, selector.key)
-                  return cache.get(argKey)
+                  setMeta("cache", cache, context, selector.key)
+                  return untrack(cache.get(argKey))
                }
             })
          }
       }
 
       wrap(prototype, "ngOnDestroy", function (fn) {
-         const injector = getMetaKeys(INJECTOR, this) as Map<any, EnvironmentInjector>
-         for (const meta of injector.values()) {
-            meta.destroy()
-         }
+         const rootInjector = getMeta(INJECTOR, this) as EnvironmentInjector
+         rootInjector.destroy()
          fn.apply(this)
       })
 
@@ -462,7 +451,7 @@ export function Store() {
                   })
                }))
                setMeta("deps", deps, this, action.key)
-               dispatcher.queue((observer: any) => current.run(() => {
+               dispatcher.queue(action.key, (observer: any) => current.run(() => {
                   let subscription = Subscription.EMPTY
                   if (result) {
                      subscription = result.subscribe(observer)

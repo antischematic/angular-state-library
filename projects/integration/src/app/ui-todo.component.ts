@@ -2,15 +2,15 @@ import { CommonModule } from '@angular/common';
 import {
    ChangeDetectionStrategy,
    Component,
-   EventEmitter, forwardRef,
+   EventEmitter,
    inject,
    Input,
    Output,
 } from '@angular/core';
-import {Action, dependsOn, Invoke, Queue, Store} from '@mmuscat/angular-state-library';
-import {App, Todo} from './interfaces';
+import {Action, Invoke, Queue, Store} from '@mmuscat/angular-state-library';
+import {Todo} from './interfaces';
 import { UISpinner } from './spinner.component';
-import {AppComponent} from "./app.component";
+import {AppStore} from "./providers";
 
 @Store()
 @Component({
@@ -19,7 +19,7 @@ import {AppComponent} from "./app.component";
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todo.component.html',
-   providers: [dependsOn(forwardRef(() => AppComponent))]
+   providers: [AppStore]
 })
 export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
@@ -27,7 +27,7 @@ export class UITodo {
 
    @Queue() pending = false;
 
-   root = inject(AppComponent)
+   root = inject(AppStore)
 
    @Invoke() trackCount() {
       console.log("reactive parent", this.root.count)
