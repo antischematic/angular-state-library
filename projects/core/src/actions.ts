@@ -32,7 +32,7 @@ import {
    switchAll,
    tap
 } from "rxjs";
-import {createProxy, runInContext, track, untrack} from "./proxy";
+import {changes, createProxy, runInContext, track, untrack} from "./proxy";
 import {createTransitionZone} from "./transition";
 
 const meta = new WeakMap()
@@ -184,12 +184,15 @@ export class Dispatcher {
    tries = 1
    events = inject(Events)
 
-   dispatch(type: ActionType, value?: any) {
+   dispatch(type: ActionType, value: any, deps: Map<any, Map<any, any>>) {
       const {events, context, name} = this
+      const keyValues = deps.get(context)!
+      const changelist = Array.from(changes.get(keyValues) ?? [])
       const event = {
          name,
          context,
          type,
+         changelist
       } as any
       switch (type) {
          case ActionType.Dispatch:
@@ -368,7 +371,8 @@ export function Store() {
             name: "ngOnChanges",
             context: this,
             type: ActionType.Dispatch,
-            value: changes
+            value: changes,
+            changelist: []
          })
          fn.apply(this)
       })
@@ -444,7 +448,6 @@ export function Store() {
             })
 
             try {
-               dispatcher.dispatch(ActionType.Dispatch, args)
                const result: any = injector.runInContext(() => runInContext(deps, () => {
                   return startTransition(() => {
                      current = Zone.current
@@ -452,6 +455,7 @@ export function Store() {
                   })
                }))
                setMeta("deps", deps, this, action.key)
+               dispatcher.dispatch(ActionType.Dispatch, args, deps)
                dispatcher.queue(action.key, (observer: any) => current.run(() => {
                   let subscription = Subscription.EMPTY
                   if (result) {
@@ -484,31 +488,29 @@ const defaultConfig = {
    check: true,
 }
 
-export interface DispatchEvent<K = PropertyKey, T = unknown> {
+interface StoreEvent<K> {
    readonly name: K
    readonly context: object
-   readonly value: T
-   readonly type: ActionType.Dispatch
+   readonly changelist: any[]
 }
 
-export interface NextEvent<K = PropertyKey, T = unknown> {
-   readonly name: K
-   readonly context: object
+export interface DispatchEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
+   readonly type: ActionType.Dispatch
+   readonly value: T
+}
+
+export interface NextEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
    readonly value: T
    readonly type: ActionType.Next
 }
 
-export interface ErrorEvent<K = PropertyKey> {
-   readonly name: K
-   readonly context: object
+export interface ErrorEvent<K = PropertyKey> extends StoreEvent<K> {
    readonly error: unknown
    readonly tries: number
    readonly type: ActionType.Error
 }
 
-export interface CompleteEvent<K = PropertyKey> {
-   readonly name: K
-   readonly context: object
+export interface CompleteEvent<K = PropertyKey> extends StoreEvent<K> {
    readonly type: ActionType.Complete
 }
 
@@ -584,14 +586,16 @@ function isPlainObject(obj: object) {
 }
 
 function createObserver(observer: any, context: any, onError: (error: unknown) => void) {
+   const proxy = createProxy(context)
    const dispatcher = inject(Dispatcher)
    const changeDetector = inject(ChangeDetectorRef)
    const events = inject(Events)
    return function (type: string) {
       return function (value?: any) {
-         dispatcher.dispatch(type as ActionType, value)
+         const deps = new Map()
          try {
-            observer?.[type]?.call(context, value)
+            runInContext(deps, observer?.[type] ?? noop, proxy, value)
+            dispatcher.dispatch(type as ActionType, value, deps)
          } catch (error) {
             onError(error)
          }
@@ -599,7 +603,7 @@ function createObserver(observer: any, context: any, onError: (error: unknown) =
             onError(value)
          }
          if (type !== ActionType.Next) {
-            observer?.finalize?.call(context, value)
+            runInContext(deps, observer?.finalize ?? noop, proxy)
          }
          events.flush()
          changeDetector.markForCheck()
