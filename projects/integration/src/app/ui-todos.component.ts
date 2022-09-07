@@ -95,7 +95,7 @@ export class UITodos {
       });
    }
 
-   @Invoke() trackInputChanges() {
+   trackInputChanges() {
       const { userId } = onChanges<UITodos>()
       console.log("inputs changed!", userId)
    }

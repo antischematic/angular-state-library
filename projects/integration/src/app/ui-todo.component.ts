@@ -29,7 +29,7 @@ export class UITodo {
 
    root = inject(AppStore)
 
-   @Invoke() trackCount() {
+   trackCount() {
       console.log("reactive parent", this.root.count)
    }
 

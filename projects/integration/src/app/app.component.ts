@@ -2,16 +2,16 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {Action, createDispatch, Invoke, Store} from "@mmuscat/angular-state-library";
-import {Observable, timer} from "rxjs";
+import {createDispatch, Store, UIDevtool, Invoke, Action} from "@mmuscat/angular-state-library";
 import {AppStore} from "./providers";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
+import {Observable, timer} from "rxjs";
 
 @Store()
 @Component({
-   imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule],
+   imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule, UIDevtool],
    selector: 'app-root',
    standalone: true,
    templateUrl: './app.component.html',

@@ -30,3 +30,4 @@ export {
    StoreToken,
 } from "./actions"
 export {track, track as $, untrack, untrack as $$, isProxy} from "./proxy"
+export {Devtool, UIDevtool} from "./devtool"

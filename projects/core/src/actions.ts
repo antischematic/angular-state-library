@@ -10,7 +10,7 @@ import {
    InjectOptions,
    INJECTOR,
    NgZone,
-   ProviderToken,
+   ProviderToken, SimpleChange,
    SimpleChanges,
    Type,
    ViewRef,
@@ -44,15 +44,15 @@ function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
 }
 
-function getMetaKeys(metaKey: any, target: object) {
+export function getMetaKeys(metaKey: any, target: object) {
    return ensureKey(ensureKey(meta, target), metaKey)
 }
 
-function getMeta(metaKey: any, target: object, key?: PropertyKey): unknown {
+export function getMeta(metaKey: any, target: object, key?: PropertyKey): unknown {
    return getMetaKeys(metaKey, target).get(key)
 }
 
-function setMeta(metaKey: any, value: any, target: object, key?: PropertyKey) {
+export function setMeta(metaKey: any, value: any, target: object, key?: PropertyKey) {
    return ensureKey(ensureKey(meta, target), metaKey).set(key, value)
 }
 
@@ -177,6 +177,8 @@ export enum ActionType {
    Complete = "complete"
 }
 
+let id = 0
+
 @Injectable()
 export class Dispatcher {
    name!: PropertyKey
@@ -184,18 +186,23 @@ export class Dispatcher {
    tries = 1
    events = inject(Events)
 
-   dispatch(type: ActionType, value: any, deps: Map<any, Map<any, any>>) {
+   dispatch(type: ActionType, value: any, deps: Map<any, Map<any, any>>, previousDeps?: Map<any, Map<any, any>>) {
       const {events, context, name} = this
       const keyValues = deps.get(context)!
       const changelist = Array.from(changes.get(keyValues) ?? [])
       const event = {
+         id: id++,
          name,
          context,
          type,
-         changelist
+         changelist,
+         timestamp: Date.now()
       } as any
       switch (type) {
          case ActionType.Dispatch:
+            event.value = value
+            event.deps = [previousDeps, deps]
+            break
          case ActionType.Next:
             event.value = value
             break
@@ -226,17 +233,22 @@ class Events {
    flush() {
       let event
       while (event = this.events.shift()) {
-         this.dispatcher.next(event)
+         if (running) {
+            this.dispatcher.next(event)
+         }
       }
    }
 
    dequeue() {
       let effect
       while (effect = this.queue.shift()) {
-         this.subscriptions.get(effect.name)?.unsubscribe()
-         this.subscriptions.set(effect.name, effect.subscribe({
-            error() {}
-         }))
+         if (running) {
+            this.subscriptions.get(effect.name)?.unsubscribe()
+            this.subscriptions.set(effect.name, effect.subscribe({
+               error() {
+               }
+            }))
+         }
       }
    }
 
@@ -324,7 +336,7 @@ export const StoreToken = function (name: string) {
          const subscription = dispatcher.subscribe((event) => {
             if (cdr.destroyed) {
                subscription.unsubscribe()
-            } else if (event.context === context) {
+            } else if (event.context === context || event.name === "@@applyChanges") {
                cdr.markForCheck()
             }
          })
@@ -366,13 +378,20 @@ export function Store() {
 
       wrap(prototype, "ngOnChanges", function (fn, changes) {
          const injector = getMeta(INJECTOR, this) as EnvironmentInjector
+         const changelist = Object.entries<SimpleChange>(changes).reduce((acc, [key, { previousValue, currentValue }]) => {
+            acc.push([key, [previousValue, currentValue]])
+            return acc
+         }, [] as any[])
          injector.get(Changes).value = changes
          injector.get(Events).push({
+            id: id++,
             name: "ngOnChanges",
             context: this,
             type: ActionType.Dispatch,
             value: changes,
-            changelist: []
+            changelist,
+            deps: [],
+            timestamp: Date.now()
          })
          fn.apply(this)
       })
@@ -419,6 +438,7 @@ export function Store() {
             const startTransition = createTransitionZone(action.key, count)
             const changeDetector = injector.get(ChangeDetectorRef)
             const ngZone = injector.get(NgZone)
+            const previousDeps = getMeta("deps", this, action.key) as Map<any, any>
             let current: Zone
             const transition = transitions.get(this)! as Set<any>
 
@@ -455,7 +475,7 @@ export function Store() {
                   })
                }))
                setMeta("deps", deps, this, action.key)
-               dispatcher.dispatch(ActionType.Dispatch, args, deps)
+               dispatcher.dispatch(ActionType.Dispatch, args, deps, previousDeps)
                dispatcher.queue(action.key, (observer: any) => current.run(() => {
                   let subscription = Subscription.EMPTY
                   if (result) {
@@ -489,14 +509,17 @@ const defaultConfig = {
 }
 
 interface StoreEvent<K> {
+   readonly id: number
    readonly name: K
    readonly context: object
    readonly changelist: any[]
+   readonly timestamp: number
 }
 
 export interface DispatchEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
    readonly type: ActionType.Dispatch
    readonly value: T
+   readonly deps: Map<any, Map<any, any>>[]
 }
 
 export interface NextEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
@@ -707,4 +730,18 @@ export function fromStore(token: unknown, options?: InjectOptions): Observable<E
    return dispatcher.pipe(
       filter(event => event.context === context)
    )
+}
+
+let running = true
+
+export function pause() {
+   running = false
+}
+
+export function resume() {
+   running = true
+}
+
+export function isRunning() {
+   return running
 }
