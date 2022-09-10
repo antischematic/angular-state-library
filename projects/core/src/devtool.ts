@@ -141,7 +141,7 @@ class FilterPipe {
      }
 
      button {
-        whitespace: nowrap;
+        white-space: nowrap;
      }
 
      .flex {

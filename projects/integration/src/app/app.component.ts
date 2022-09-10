@@ -8,10 +8,11 @@ import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
 import {Observable, timer} from "rxjs";
+import {UITheme} from "./ui-theme.component";
 
 @Store()
 @Component({
-   imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule, UIDevtool],
+   imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule, UIDevtool, UITheme],
    selector: 'app-root',
    standalone: true,
    templateUrl: './app.component.html',
@@ -23,6 +24,12 @@ export class AppComponent {
    userId = '1';
    count = 0
    interval: any
+   blueTheme = {
+      color: "blue"
+   }
+   greenTheme = {
+      color: "green"
+   }
 
    @Input() appStore: any
 
@@ -37,6 +44,12 @@ export class AppComponent {
    }
 
    @Action() otherAction() {}
+
+   swapThemes() {
+      const { blueTheme, greenTheme } = this
+      this.blueTheme = greenTheme
+      this.greenTheme = blueTheme
+   }
 }
 
 const dispatch = createDispatch(AppComponent)

@@ -3,7 +3,7 @@ import {
    createEnvironmentInjector, ENVIRONMENT_INITIALIZER,
    EnvironmentInjector,
    ErrorHandler,
-   ExistingProvider,
+   ExistingProvider, FactoryProvider,
    inject,
    Injectable,
    InjectionToken,
@@ -315,7 +315,11 @@ const TransitionZone = new InjectionToken<Function>("TransitionZone")
 const transitions = new WeakMap()
 
 interface StoreToken {
-   new<T>(name: string): { prototype: T, new(): T, Provide(token: Type<T>): ExistingProvider }
+   new<T>(name: string): { prototype: T, new(next?: Function): T, Provide(token: Type<T>): FactoryProvider }
+}
+
+interface ValueToken {
+   new<T>(name: string): { prototype: T, new(): T[keyof T], Provide(token: Type<T>): FactoryProvider }
 }
 
 export const StoreToken = function (name: string) {
@@ -328,7 +332,7 @@ export const StoreToken = function (name: string) {
             }
          }
       }
-      constructor() {
+      constructor(next: Function = noop) {
          const instance = inject(StoreToken, { skipSelf: true })
          const context = untrack(instance)
          const cdr = inject(ChangeDetectorRef) as ViewRef
@@ -338,14 +342,37 @@ export const StoreToken = function (name: string) {
                subscription.unsubscribe()
             } else if (event.context === context || event.name === "@@applyChanges") {
                cdr.markForCheck()
+               next.call(this, event)
             }
          })
-         return instance
+         return next === noop ? instance : this
       }
    }
    Object.defineProperty(StoreToken, "name", { value: name })
    return StoreToken
 } as unknown as StoreToken
+
+function assign(this: any, event: EventType) {
+   if (event.name !== "ngOnChanges") return
+   const current = event.changelist[0][1][1]
+   for (const key of Object.keys(this)) {
+      if (!(key in current)) {
+         delete this[key]
+      }
+   }
+   Object.assign(this, current)
+}
+
+export const ValueToken = function (name: string) {
+   return class ValueToken extends new StoreToken<any>(name) {
+      constructor() {
+         super(assign)
+         const key = Object.keys(this)[0]
+         Object.assign(this, this[key])
+         return track(this)
+      }
+   }
+} as unknown as ValueToken
 
 export function Store() {
    return function (target: any) {
@@ -383,7 +410,7 @@ export function Store() {
             return acc
          }, [] as any[])
          injector.get(Changes).value = changes
-         injector.get(Events).push({
+         injector.get(DISPATCHER).next({
             id: id++,
             name: "ngOnChanges",
             context: this,

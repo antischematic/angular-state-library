@@ -576,22 +576,30 @@ describe("Library", () => {
          flushMicrotasks()
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "action",
             context: fixture.componentInstance,
             type: ActionType.Dispatch,
             value: [],
-            changelist: []
+            changelist: [],
+            deps: jasmine.any(Array) as any
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Dispatch,
             value: [],
-            changelist: []
+            changelist: [],
+            deps: jasmine.any(Array) as any
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -606,14 +614,19 @@ describe("Library", () => {
          flushMicrotasks()
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "actionWithArgs",
             context: fixture.componentInstance,
             type: ActionType.Dispatch,
             value: [10, 20, 30],
-            changelist: []
+            changelist: [],
+            deps: jasmine.any(Array) as any
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -624,6 +637,8 @@ describe("Library", () => {
          tick(2000)
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "action",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -632,6 +647,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -640,6 +657,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "action",
             context: fixture.componentInstance,
             type: ActionType.Complete,
@@ -647,6 +666,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -655,6 +676,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "actionWithArgs",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -663,6 +686,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
@@ -671,6 +696,8 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "actionWithArgs",
             context: fixture.componentInstance,
             type: ActionType.Complete,
@@ -678,11 +705,13 @@ describe("Library", () => {
          })
 
          expect(spy).toHaveBeenCalledWith(<EventType>{
+            id: jasmine.any(Number) as any,
+            timestamp: Date.now(),
             name: "saga",
             context: fixture.componentInstance,
             type: ActionType.Next,
             value: "actionWithArgs.complete",
-            changelist: []
+            changelist: [],
          })
 
          expect(spy).toHaveBeenCalledTimes(13)

@@ -22,12 +22,14 @@ Count: {{ count }}
 
 <ui-todos [userId]="userId"></ui-todos>
 
-<!--<ui-counter>-->
-<!--   <ui-descendent></ui-descendent>-->
-<!--   <ui-double>-->
-<!--      <ui-descendent></ui-descendent>-->
-<!--      <ui-double></ui-double>-->
-<!--   </ui-double>-->
-<!--</ui-counter>-->
+<ui-counter [theme]="blueTheme">
+   <ui-descendent></ui-descendent>
+   <ui-double [theme]="greenTheme">
+      <ui-descendent></ui-descendent>
+      <ui-double></ui-double>
+   </ui-double>
+</ui-counter>
+
+<button (click)="swapThemes()">Swap themes</button>
 
 <ui-devtool></ui-devtool>
