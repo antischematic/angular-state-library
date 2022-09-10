@@ -1,11 +1,23 @@
 {
-  "name": "@mmuscat/angular-state-library",
-  "version": "0.0.12",
-  "peerDependencies": {
-    "@angular/common": "^14.1.0",
-    "@angular/core": "^14.1.0"
-  },
-  "dependencies": {
-    "tslib": "^2.3.0"
-  }
+   "name": "@mmuscat/angular-state-library",
+   "description": "Reactive state without boilerplate",
+   "version": "0.0.12",
+   "author": {
+      "name": "Michael Muscat"
+   },
+   "keywords": ["Angular", "Reactive", "RxJS", "Redux", "State", "State Management", "Reactivity", "Component Store"],
+   "license": "MIT",
+   "homepage": "https://github.com/mmuscat/angular-state-library",
+   "repository": {
+      "type": "git",
+      "url": "https://github.com/mmuscat/angular-state-library.git"
+   },
+   "peerDependencies": {
+      "@angular/common": "^14.1.0",
+      "@angular/core": "^14.1.0",
+      "rxjs": "^7.5.0"
+   },
+   "dependencies": {
+      "tslib": "^2.3.0"
+   }
 }
