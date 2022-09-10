@@ -4,7 +4,7 @@ import {
    EnvironmentInjector,
    inject,
    Injectable,
-   INJECTOR
+   INJECTOR, Pipe
 } from "@angular/core";
 import {
    ActionType,
@@ -25,6 +25,7 @@ export class Devtool {
    head: number = Infinity
    pause = pause
    resume = resume
+   pipe = new FilterPipe
 
    findEvents(from: number, to: number) {
       return this.eventStore.filter(event => {
@@ -40,24 +41,31 @@ export class Devtool {
 
    fastForward(from: number, to = Date.now()) {
       this.head = to
-      if (to >= this.eventStore[this.eventStore.length - 1].timestamp) {
-         this.resume()
-      }
+      const events = this.pipe.transform(this.eventStore)
       this.applyChanges(this.findEvents(to, from), false)
+      if (to > events[events.length - 1].timestamp) {
+         setTimeout(() => {
+            this.resume()
+         })
+      }
    }
 
-   jumpTo(event: EventType) {
-      if (event.timestamp < this.head) {
-         this.rewind(this.head, event.timestamp)
+   jumpTo(timestamp: number) {
+      if (timestamp < this.head) {
+         this.rewind(this.head, timestamp)
       }
-      if (event.timestamp > this.head) {
-         this.fastForward(this.head, event.timestamp)
+      if (timestamp > this.head) {
+         this.fastForward(this.head, timestamp)
       }
    }
 
    private applyChanges(events: EventType[], previous = true) {
-      console.log('apply', events)
+      const contexts = new Set<any>()
+      if (previous) {
+         events = events.slice(events.length - 2)
+      }
       for (const event of events) {
+         contexts.add(event.context)
          const { context, changelist, name } = event
          for (const [key, [previousValue, currentValue]] of changelist) {
             (context as any)[key] = previous ? previousValue : currentValue
@@ -66,6 +74,8 @@ export class Devtool {
             const [previousDeps, currentDeps] = event.deps
             setMeta("deps", previous ? previousDeps : currentDeps, context, name)
          }
+      }
+      for (const context of contexts) {
          this.dispatcher.next({
             id: -1,
             type: ActionType.Dispatch,
@@ -81,24 +91,40 @@ export class Devtool {
 
    constructor() {
       this.dispatcher.subscribe((event) => {
-         if (event.name !== "ngOnChanges" && event.name !== "@@applyChanges" && isRunning()) {
-            this.head = event.timestamp
-            this.eventStore.push(event)
+         if (event.name !== "@@applyChanges") {
+            if (event.name !== "ngOnChanges") {
+               this.head = event.timestamp
+            }
+            if (event.changelist.length) {
+               this.eventStore = this.eventStore.concat(event)
+            }
          }
       })
    }
 }
 
+@Pipe({
+   name: "filter",
+   pure: true,
+   standalone: true
+})
+class FilterPipe {
+   transform(value: EventType[]) {
+      return value.filter(val => val.name !== "ngOnChanges")
+   }
+}
 
 @Component({
-   imports: [NgForOf, SlicePipe, DatePipe],
+   imports: [NgForOf, SlicePipe, DatePipe, FilterPipe],
    standalone: true,
    selector: "ui-devtool",
    template: `
-      <div class="flex" *ngFor="let event of devtool.eventStore | slice:0:100">
-         <button type="button" (click)="devtool.jumpTo(event)">Jump to</button>
-         <span>{{event.id}}:{{event.name}}:{{event.type}}</span>
+      <button type="button" (click)="devtool.jumpTo(0)" style="margin-bottom: 1em">Start</button>
+      <div class="flex" *ngFor="let event of devtool.eventStore | filter | slice:0:100">
+         <button type="button" (click)="devtool.jumpTo(event.timestamp)">Jump to</button>
+         <span>{{event.name}}:{{event.type}}</span>
       </div>
+      <button type="button" (click)="devtool.jumpTo(end)" style="margin-top: 1em">Resume</button>
    `,
    styles: [`
      :host {
@@ -126,4 +152,6 @@ export class Devtool {
 })
 export class UIDevtool {
    devtool = inject(Devtool)
+
+   end = Infinity
 }

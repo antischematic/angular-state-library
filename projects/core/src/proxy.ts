@@ -21,13 +21,15 @@ function addDep(object: object, key: PropertyKey, value: any, previous: any = va
    if (isTracked() && Reflect.getOwnPropertyDescriptor(object, key)) {
       for (const dep of deps) {
          const keyValues = dep.get(object) ?? new Map
-         const changelist = changes.get(keyValues) ?? new Map()
          dep.set(object, keyValues)
-         changes.set(keyValues, changelist)
-         if (changelist.has(key)) {
-            [previous] = changelist.get(key)
+         if (update) {
+            const changelist = changes.get(keyValues) ?? new Map()
+            changes.set(keyValues, changelist)
+            if (changelist.has(key)) {
+               [previous] = changelist.get(key)
+            }
+            changelist.set(key, [previous, value])
          }
-         changelist.set(key, [previous, value])
          if (update && keyValues.has(key) || !update) {
             keyValues.set(key, value)
          }
