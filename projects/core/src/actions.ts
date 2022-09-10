@@ -326,14 +326,14 @@ export const StoreToken = function (name: string) {
    class StoreToken {
       static Provide(token: Type<any>) {
          return {
-            provide: StoreToken,
+            provide: StoreToken.Provide,
             useFactory() {
                return track(inject(token))
             }
          }
       }
       constructor(next: Function = noop) {
-         const instance = inject(StoreToken, { skipSelf: true })
+         const instance = inject(StoreToken.Provide)
          const context = untrack(instance)
          const cdr = inject(ChangeDetectorRef) as ViewRef
          const dispatcher = inject(DISPATCHER)

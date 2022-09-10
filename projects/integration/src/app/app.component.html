@@ -22,8 +22,8 @@ Count: {{ count }}
 
 <ui-todos [userId]="userId"></ui-todos>
 
-<ui-counter [theme]="blueTheme">
-   <ui-descendent></ui-descendent>
+<ui-counter [theme]="{ color: 'red' }">
+   <ui-descendent [theme]="blueTheme"></ui-descendent>
    <ui-double [theme]="greenTheme">
       <ui-descendent></ui-descendent>
       <ui-double></ui-double>
