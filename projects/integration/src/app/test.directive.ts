@@ -1,4 +1,4 @@
-import {Store} from "@mmuscat/angular-state-library";
+import {Store} from "@antischematic/angular-state-library";
 import {Directive} from "@angular/core";
 
 @Store()

@@ -5,7 +5,7 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import { createDispatch, Invoke, Store } from '@mmuscat/angular-state-library';
+import { createDispatch, Invoke, Store } from '@antischematic/angular-state-library';
 import {Observable, timer} from 'rxjs';
 import { Counter } from './providers';
 

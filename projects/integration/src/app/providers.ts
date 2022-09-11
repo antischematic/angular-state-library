@@ -1,4 +1,4 @@
-import {StoreToken} from "@mmuscat/angular-state-library";
+import {StoreToken} from "@antischematic/angular-state-library";
 import {type AppComponent} from "./app.component";
 import {type UICounter} from "./ui-counter.component";
 

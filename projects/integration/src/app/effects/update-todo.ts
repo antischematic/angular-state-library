@@ -1,6 +1,6 @@
 import {Todo} from "../interfaces";
 import {mergeAll, Observable} from "rxjs";
-import {createEffect} from "@mmuscat/angular-state-library";
+import {createEffect} from "@antischematic/angular-state-library";
 import {inject} from "@angular/core";
 import {HttpClient} from "@angular/common/http";
 

@@ -12,7 +12,7 @@ import {
    Queue,
    loadEffect,
    onChanges,
-} from '@mmuscat/angular-state-library';
+} from '@antischematic/angular-state-library';
 import { UITodo } from './ui-todo.component';
 import {mergeAll, Observable} from 'rxjs';
 import { HttpClient } from '@angular/common/http';

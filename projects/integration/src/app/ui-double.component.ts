@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Select, Store } from '@mmuscat/angular-state-library';
+import { Select, Store } from '@antischematic/angular-state-library';
 import { Counter } from './providers';
 
 @Store()

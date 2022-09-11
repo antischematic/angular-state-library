@@ -7,7 +7,7 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import {Action, Invoke, Queue, Store} from '@mmuscat/angular-state-library';
+import {Action, Invoke, Queue, Store} from '@antischematic/angular-state-library';
 import {Todo} from './interfaces';
 import { UISpinner } from './spinner.component';
 import {AppStore} from "./providers";

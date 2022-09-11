@@ -1,5 +1,5 @@
 {
-  "name": "@mmuscat/angular-state-library",
+  "name": "@antischematic/angular-state-library",
   "version": "0.0.0",
   "scripts": {
     "ng": "ng",

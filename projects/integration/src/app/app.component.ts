@@ -2,7 +2,7 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {createDispatch, Store, UIDevtool, Invoke, Action} from "@mmuscat/angular-state-library";
+import {createDispatch, Store, UIDevtool, Invoke, Action} from "@antischematic/angular-state-library";
 import {AppStore} from "./providers";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";

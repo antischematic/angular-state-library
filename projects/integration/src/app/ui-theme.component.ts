@@ -1,4 +1,4 @@
-import {Store, ValueToken} from "@mmuscat/angular-state-library";
+import {Store, ValueToken} from "@antischematic/angular-state-library";
 import {Directive, Input} from "@angular/core";
 
 export const Theme = new ValueToken<UITheme>("Theme")

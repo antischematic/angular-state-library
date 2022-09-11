@@ -3,7 +3,7 @@
   "compileOnSave": false,
   "compilerOptions": {
     "paths": {
-      "@mmuscat/angular-state-library": [
+      "@antischematic/angular-state-library": [
         "dist/angular-state-library"
       ]
     },
