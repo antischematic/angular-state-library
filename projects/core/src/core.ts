@@ -12,7 +12,7 @@ import {
    ProviderToken, SimpleChange, SimpleChanges,
    ViewRef
 } from "@angular/core";
-import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {createProxy, popStack, pushStack, track, untrack} from "./proxy";
 import {Observable, ObservableInput, OperatorFunction, PartialObserver, Subject, tap} from "rxjs";
 import {getMeta, getMetaValues, meta, setMeta} from "./metadata";
 import {ActionType, Dispatch, EventType} from "./interfaces";
@@ -353,7 +353,7 @@ export function select<T extends {}>(token: ProviderToken<T>): T {
          setMeta("connect", subscription, instance, token as any)
       }
    }
-   return instance
+   return track(instance)
 }
 
 @Directive()
