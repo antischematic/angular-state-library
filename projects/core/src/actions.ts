@@ -44,12 +44,12 @@ function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
 }
 
-export function getMetaKeys(metaKey: any, target: object) {
+export function getMetaKeys<T>(metaKey: any, target: object): Map<unknown, T> {
    return ensureKey(ensureKey(meta, target), metaKey)
 }
 
-export function getMeta(metaKey: any, target: object, key?: PropertyKey): unknown {
-   return getMetaKeys(metaKey, target).get(key)
+export function getMeta<T>(metaKey: any, target: object, key?: PropertyKey): T | undefined {
+   return getMetaKeys<any>(metaKey, target).get(key)
 }
 
 export function setMeta(metaKey: any, value: any, target: object, key?: PropertyKey) {
@@ -450,7 +450,7 @@ export function Store() {
       }
 
       wrap(prototype, "ngOnDestroy", function (fn) {
-         for (const injector of getMetaKeys(INJECTOR, this).values()) {
+         for (const injector of getMetaKeys<any>(INJECTOR, this).values()) {
             injector.destroy()
          }
          fn.apply(this)

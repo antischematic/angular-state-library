@@ -3,11 +3,11 @@ const proxies = new WeakMap()
 
 let deps: Map<any, Map<any, any>>[] = []
 
-function pushStack(value: Map<any, any>) {
+export function pushStack(value: Map<any, any>) {
    deps.push(value)
 }
 
-function popStack() {
+export function popStack() {
    deps.pop()
 }
 
