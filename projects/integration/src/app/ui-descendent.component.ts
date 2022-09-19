@@ -1,10 +1,10 @@
-import { ChangeDetectionStrategy, Component, inject } from '@angular/core';
-import { Counter } from './providers';
-import {Theme} from "./ui-theme.component";
+import {ChangeDetectionStrategy, Component, ElementRef, inject} from '@angular/core';
+import {UITheme} from "./ui-theme.component";
+import {UICounter} from "./ui-counter.component";
+import {select} from "@antischematic/angular-state-library";
 
 @Component({
    changeDetection: ChangeDetectionStrategy.OnPush,
-   providers: [Counter, Theme],
    selector: 'ui-descendent',
    standalone: true,
    template: `
@@ -12,6 +12,6 @@ import {Theme} from "./ui-theme.component";
   `,
 })
 export class UIDescendent {
-   counter = inject(Counter);
-   theme = inject(Theme)
+   counter = select(UICounter);
+   theme = select(UITheme)
 }

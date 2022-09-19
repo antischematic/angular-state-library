@@ -1,17 +1,17 @@
 import {
-   $,
+   $, $$,
    Action,
    Caught,
    createDispatch,
    createEffect,
-   fromStore,
+   // fromStore,
    Invoke,
    Layout,
    Select,
    Store,
-   Queue,
-   loadEffect,
-   onChanges,
+   // Queue,
+   // loadEffect,
+   // onChanges,
 } from '@antischematic/angular-state-library';
 import { UITodo } from './ui-todo.component';
 import {mergeAll, Observable} from 'rxjs';
@@ -27,6 +27,8 @@ import {
 import { Todo } from './interfaces';
 import { CommonModule } from '@angular/common';
 import { UISpinner } from './spinner.component';
+import updateTodo from './effects/update-todo';
+import toggleAll from './effects/toggle-all';
 
 @Store()
 @Component({
@@ -39,7 +41,7 @@ import { UISpinner } from './spinner.component';
 export class UITodos {
    @Input() userId!: string;
 
-   @Queue() pending = false;
+   pending = false;
 
    @ViewChildren(UITodo)
    uiTodos!: QueryList<UITodos>;
@@ -95,10 +97,10 @@ export class UITodos {
       });
    }
 
-   trackInputChanges() {
-      const { userId } = onChanges<UITodos>()
-      console.log("inputs changed!", userId)
-   }
+   // trackInputChanges() {
+   //    const { userId } = onChanges<UITodos>()
+   //    console.log("inputs changed!", userId)
+   // }
 
    // create a todo then toggle complete to trigger an error
    @Caught() handleError(error: unknown) {
@@ -106,13 +108,13 @@ export class UITodos {
       throw error;
    }
 
-   @Invoke() logEvents() {
-      // observe events from a store
-      fromStore(UITodos).subscribe((event) => {
-         const name = Object.getPrototypeOf(event.context).constructor.name;
-         console.log(`${name}:${event.name as string}:${event.type}`, event);
-      });
-   }
+   // @Invoke() logEvents() {
+   //    // observe events from a store
+   //    fromStore(UITodos).subscribe((event) => {
+   //       const name = Object.getPrototypeOf(event.context).constructor.name;
+   //       console.log(`${name}:${event.name as string}:${event.type}`, event);
+   //    });
+   // }
 
    trackById(_: number, value: Todo) {
       return value.id;
@@ -136,7 +138,7 @@ function createTodo(userId: string, title: string): Observable<Todo> {
    );
 }
 
-const updateTodo = loadEffect(() => import("./effects/update-todo"))
-const toggleAll = loadEffect(() => import("./effects/toggle-all"))
+// const updateTodo = loadEffect(() => import("./effects/update-todo"))
+// const toggleAll = loadEffect(() => import("./effects/toggle-all"))
 
 const dispatch = createDispatch(UITodos);

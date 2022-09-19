@@ -1,16 +1,11 @@
-import {Store, ValueToken} from "@antischematic/angular-state-library";
-import {Directive, Input} from "@angular/core";
+import {Provider} from "@antischematic/angular-state-library";
+import {Directive, ElementRef, inject} from "@angular/core";
 
-export const Theme = new ValueToken<UITheme>("Theme")
-
-@Store()
 @Directive({
    standalone: true,
-   selector: "[theme]",
-   providers: [Theme.Provide(UITheme)]
+   selector: "Theme",
 })
-export class UITheme {
-   @Input() theme = {
-      color: "red"
-   }
+export class UITheme extends Provider {
+   color = "red"
 }
+

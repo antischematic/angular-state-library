@@ -39,11 +39,11 @@ export enum ActionType {
    Complete = "complete"
 }
 
-export interface DispatchObserver<T> {
-   next?(value: T): void
-   error?(error: unknown): void
-   complete?(): void
-   finalize?(): void
+export interface DispatchObserver<T, U> {
+   next?(this: T, value: U): void
+   error?(this: T, error: unknown): void
+   complete?(this: T): void
+   finalize?(this: T): void
 }
 
-export type Dispatch = <T>(source: Observable<T>, observer?: DispatchObserver<T>) => Observable<T>
+export type Dispatch<T> = <U>(source: Observable<U>, observer?: DispatchObserver<T, U>) => Observable<U>

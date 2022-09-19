@@ -1,41 +1,36 @@
 import {
-   AfterViewInit,
-   ChangeDetectorRef,
    createEnvironmentInjector,
-   Directive,
-   ElementRef,
-   EnvironmentInjector, ErrorHandler,
+   EnvironmentInjector,
+   ErrorHandler,
    inject,
    Injectable,
    InjectionToken,
-   Injector,
-   INJECTOR,
-   Input,
-   OnChanges,
-   OnDestroy,
-   ProviderToken,
-   SimpleChanges,
-   ViewRef
+   INJECTOR
 } from "@angular/core";
-import {createProxy, popStack, pushStack, track, untrack} from "./proxy";
-import {Observable, ObservableInput, OperatorFunction, PartialObserver, Subject} from "rxjs";
+import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {Observable, ObservableInput, OperatorFunction, Subject} from "rxjs";
 import {
-   action, getActions,
-   getDeps, getErrorHandlers,
+   action,
+   getActions, getAllActions,
+   getDeps,
+   getErrorHandlers,
    getMeta,
-   getMetaValues, getSelectors,
-   getToken, injector,
+   getMetaValues,
+   getSelectors,
+   getToken,
+   injector,
    markDirty,
-   meta, selector,
-   setMeta, tracked
+   selector,
+   setMeta,
+   tracked
 } from "./metadata";
 import {ActionType, EventType} from "./interfaces";
 import {call, dispatch, getId, wrap} from "./utils";
 
 const defaults = { track: true, immediate: true }
 
-function createDecorator(symbol: symbol, defaults = {}) {
-   return function decorate(options: {}) {
+function createDecorator<T extends {}>(symbol: symbol, defaults = {}) {
+   return function decorate(options?: T) {
       return function (target: {}, key: PropertyKey, descriptor?: PropertyDescriptor) {
          setMeta(symbol, { ...defaults, ...options, key, descriptor }, target, key)
       }
@@ -65,15 +60,15 @@ export interface CaughtMetadata {
    descriptor: PropertyDescriptor
 }
 
-export const Action = createDecorator(action)
+export const Action = createDecorator<ActionMetadata>(action, { phase: "ngDoCheck" })
 
-export const Invoke = createDecorator(action, { ...defaults, phase: "ngDoCheck" })
+export const Invoke = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngDoCheck" })
 
-export const Before = createDecorator(action, { ...defaults, phase: "ngAfterContentChecked" })
+export const Before = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngAfterContentChecked" })
 
-export const Layout = createDecorator(action, { ...defaults, phase: "ngAfterViewChecked" })
+export const Layout = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngAfterViewChecked" })
 
-export const Select = createDecorator(selector)
+export const Select = createDecorator<SelectMetadata>(selector)
 
 export const Caught = createDecorator(selector)
 
@@ -93,18 +88,21 @@ function checkDeps(deps: DepMap) {
 
 function decorateCheck(target: {}, name: Phase) {
    const actions = getActions(target, name)
+   if (actions.length === 0 && !("ngOnChanges" in target)) return
    wrap(target, name, function (fn) {
-      const effect = getToken(EffectScheduler, this)
       const events = getToken(EventScheduler, this)
       for (const action of actions) {
          const deps = getDeps(this, action.key)
          const dirty = deps && checkDeps(deps)
-         if (action.immediate && action.phase === name || dirty) {
+         if (!deps && action.immediate && action.phase === name || dirty) {
             markDirty(this)
             call(this, action.key)
          }
       }
-      effect.dequeue()
+      for (const action of actions) {
+         const effect = getToken(EffectScheduler, this, action.key)
+         effect.dequeue()
+      }
       events.flush()
       fn.apply(this)
    })
@@ -118,7 +116,6 @@ export const DISPATCHER = new InjectionToken("Dispatcher", {
    }
 })
 
-@Injectable()
 export class ActionErrorHandler implements ErrorHandler {
    handleError(error: unknown) {
       const errorHandlers = getErrorHandlers(this.target)
@@ -135,14 +132,14 @@ export class ActionErrorHandler implements ErrorHandler {
    constructor(private target: any, private injector: EnvironmentInjector, private parent: ErrorHandler) {}
 }
 
-function decorateFactory(target: {}) {
+function decorateFactory(target: any) {
    wrap(target, "ɵfac", function (fn, ...args) {
       const instance = fn(...args)
       const parent = inject(INJECTOR) as EnvironmentInjector
       const errorHandler = new ActionErrorHandler(target, parent, parent.get(ErrorHandler))
       const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
       setMeta(injector, storeInjector, instance)
-      for (const action of getActions(target)) {
+      for (const action of getActions(target.prototype)) {
          const childInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, EffectScheduler], storeInjector)
          setMeta(injector, childInjector, instance, action.key)
       }
@@ -150,8 +147,8 @@ function decorateFactory(target: {}) {
    })
 }
 
-export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, ...args: Parameters<T>) {
-   const injector = getToken(EnvironmentInjector, context)
+export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
+   const injector = getToken(EnvironmentInjector, untrack(context), key)
    pushStack(deps)
    try {
       return injector.runInContext(() => fn.apply(context, args))
@@ -165,7 +162,7 @@ function decorateActions(target: {}) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
          const deps = new Map()
-         const value = runInContext(deps, fn, proxy, ...args)
+         const value = runInContext(deps, fn, proxy, key, ...args)
          setMeta(tracked, deps, this, key)
          dispatch(ActionType.Dispatch, this, key, value)
          return value
@@ -177,13 +174,16 @@ function decorateSelectors(target: {}) {
    for (const { key } of getSelectors(target)) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
-         const deps = new Map()
+         const deps = getDeps(target, key)
          const dirty = deps ? checkDeps(deps) : true
          const cacheKey = JSON.stringify(args)
-         const cacheValue = getMeta(cacheKey, this, key)
-         const result = dirty ? runInContext(deps, fn, proxy, ...args) : cacheValue
-         setMeta(cacheKey, result, this, key)
-         setMeta(tracked, deps, this, key)
+         let result = getMeta(cacheKey, this, key)
+         if (dirty) {
+            const newDeps = new Map()
+            result = runInContext(newDeps, fn, proxy, void 0, ...args)
+            setMeta(cacheKey, result, this, key)
+            setMeta(tracked, newDeps, this, key)
+         }
          return result
       })
    }
@@ -200,7 +200,7 @@ function decorateChanges(target: {}) {
          value: changes,
          timestamp: Date.now()
       })
-      fn.apply(this)
+      fn.call(this, changes)
    })
 }
 
