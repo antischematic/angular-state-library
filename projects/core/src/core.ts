@@ -4,19 +4,33 @@ import {
    createEnvironmentInjector,
    Directive,
    ElementRef,
-   EnvironmentInjector,
-   inject, Injectable,
+   EnvironmentInjector, ErrorHandler,
+   inject,
+   Injectable,
    InjectionToken,
    Injector,
-   INJECTOR, Input, OnChanges, OnDestroy,
-   ProviderToken, SimpleChange, SimpleChanges,
+   INJECTOR,
+   Input,
+   OnChanges,
+   OnDestroy,
+   ProviderToken,
+   SimpleChanges,
    ViewRef
 } from "@angular/core";
 import {createProxy, popStack, pushStack, track, untrack} from "./proxy";
-import {Observable, ObservableInput, OperatorFunction, PartialObserver, Subject, tap} from "rxjs";
-import {getMeta, getMetaValues, meta, setMeta} from "./metadata";
-import {ActionType, Dispatch, EventType} from "./interfaces";
-import {getMetaKeys} from "./actions";
+import {Observable, ObservableInput, OperatorFunction, PartialObserver, Subject} from "rxjs";
+import {
+   action, getActions,
+   getDeps, getErrorHandlers,
+   getMeta,
+   getMetaValues, getSelectors,
+   getToken, injector,
+   markDirty,
+   meta, selector,
+   setMeta, tracked
+} from "./metadata";
+import {ActionType, EventType} from "./interfaces";
+import {call, dispatch, getId, wrap} from "./utils";
 
 const defaults = { track: true, immediate: true }
 
@@ -28,27 +42,27 @@ function createDecorator(symbol: symbol, defaults = {}) {
    }
 }
 
-const enum Phase {
+export const enum Phase {
    DoCheck = "ngDoCheck",
    AfterContentChecked = "ngAfterContentChecked",
    AfterViewChecked = "ngAfterViewChecked"
 }
 
-const action = Symbol("action")
-const selector = Symbol("selector")
-const tracked = Symbol("track")
-const injector = Symbol("injector")
+export type DepMap = Map<Record<any, any>, Map<string, unknown>>
 
-type DepMap = Map<Record<any, any>, Map<string, unknown>>
-
-interface ActionMetadata {
-   immediate: boolean;
+export interface ActionMetadata {
    key: string
-   phase: Phase
+   immediate?: boolean;
+   phase?: Phase
 }
 
-interface SelectMetadata {
+export interface SelectMetadata {
    key: string
+}
+
+export interface CaughtMetadata {
+   key: string
+   descriptor: PropertyDescriptor
 }
 
 export const Action = createDecorator(action)
@@ -61,27 +75,7 @@ export const Layout = createDecorator(action, { ...defaults, phase: "ngAfterView
 
 export const Select = createDecorator(selector)
 
-function noop() {}
-
-function getActions(target: {}, phase?: Phase) {
-   return getMetaValues<ActionMetadata>(action, target).filter(meta => phase ? meta.phase === phase : true)
-}
-
-function getSelectors(target:{}) {
-   return getMetaValues<SelectMetadata>(selector, target)
-}
-
-function getDeps(target: {}, key: PropertyKey): DepMap | undefined {
-   return getMeta(tracked, target, key)
-}
-
-function getToken<T>(token: ProviderToken<T>, context: {}): T {
-   return getMeta<Injector>(injector, context)!.get(token)
-}
-
-function markDirty(context: {}) {
-   getToken(ChangeDetectorRef, context).markForCheck()
-}
+export const Caught = createDecorator(selector)
 
 function checkDeps(deps: DepMap) {
    let dirty = false
@@ -97,25 +91,11 @@ function checkDeps(deps: DepMap) {
    return dirty
 }
 
-function call(target: Record<any, any>, key: string, ...args: any[]) {
-   return target[key].apply(target, args)
-}
-
-function wrap(target: { [key: PropertyKey]: any }, key: PropertyKey, fn: (this: any, ...args: any[]) => any) {
-   const originalFunction = target[key] ?? noop
-   Object.defineProperty(target, key, {
-      configurable: true,
-      value: function (this: unknown, ...args: any[]) {
-         return fn.call(untrack(this), originalFunction, ...args)
-      }
-   })
-}
-
 function decorateCheck(target: {}, name: Phase) {
    const actions = getActions(target, name)
    wrap(target, name, function (fn) {
-      const effect = getToken(Effect, this)
-      const events = getToken(Events, this)
+      const effect = getToken(EffectScheduler, this)
+      const events = getToken(EventScheduler, this)
       for (const action of actions) {
          const deps = getDeps(this, action.key)
          const dirty = deps && checkDeps(deps)
@@ -138,35 +118,39 @@ export const DISPATCHER = new InjectionToken("Dispatcher", {
    }
 })
 
+@Injectable()
+export class ActionErrorHandler implements ErrorHandler {
+   handleError(error: unknown) {
+      const errorHandlers = getErrorHandlers(this.target)
+      for (const handler of errorHandlers) {
+         try {
+            return handler.descriptor.value.call(this.injector.get(this.target), error)
+         } catch (e) {
+            error = e
+         }
+      }
+      this.parent.handleError(error)
+   }
+
+   constructor(private target: any, private injector: EnvironmentInjector, private parent: ErrorHandler) {}
+}
+
 function decorateFactory(target: {}) {
    wrap(target, "ɵfac", function (fn, ...args) {
       const instance = fn(...args)
       const parent = inject(INJECTOR) as EnvironmentInjector
-      const storeInjector = createEnvironmentInjector([Events], parent)
+      const errorHandler = new ActionErrorHandler(target, parent, parent.get(ErrorHandler))
+      const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
       setMeta(injector, storeInjector, instance)
       for (const action of getActions(target)) {
-         const childInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, Effect], storeInjector)
+         const childInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, EffectScheduler], storeInjector)
          setMeta(injector, childInjector, instance, action.key)
       }
       return instance
    })
 }
 
-let id = 0
-
-function dispatch(type: ActionType, context: {}, name: string, value: unknown) {
-   const events = getToken(Events, context)
-   events.push({
-      id: id++,
-      timestamp: Date.now(),
-      type,
-      context,
-      name,
-      value,
-   })
-}
-
-function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context: {}, ...args: Parameters<T>) {
+export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, context)
    pushStack(deps)
    try {
@@ -207,9 +191,9 @@ function decorateSelectors(target: {}) {
 
 function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, changes) {
-      const events = getToken(Events, this)
+      const events = getToken(EventScheduler, this)
       events.push({
-         id: id++,
+         id: getId(),
          name: "ngOnChanges",
          context: this,
          type: ActionType.Dispatch,
@@ -246,48 +230,8 @@ export function Store() {
    }
 }
 
-function isPlainObject(obj: object) {
-   const proto = Object.getPrototypeOf(obj)
-   return proto === null || proto === Object.prototype
-}
-
-const observers = [ActionType.Next, ActionType.Error, ActionType.Complete]
-
-export function createDispatch<T>(token: ProviderToken<T>): Dispatch {
-   return function (source, observer = {}) {
-      const action = inject(ACTION)
-      const context = observer && !isPlainObject(observer) ? observer : inject(token)
-      const events = inject(Events)
-      const effect = inject(Effect)
-      for (const key of observers) {
-         if (key in observer) {
-            wrap(observer, key, function (fn, value) {
-               dispatch(key, context, action.key, value)
-               fn.call(context, value)
-               markDirty(context)
-               events.flush()
-            })
-         }
-      }
-      const signal = new Subject()
-      const operator = operators.get(source)
-
-      operators.set(source, operator)
-      effect.enqueue(source.pipe(tap(observer), tap(signal)))
-
-      return signal as any
-   }
-}
-
-const operators = new WeakMap()
-
-export function createEffect<T>(source: Observable<T>, operator: OperatorFunction<ObservableInput<T>, T>): Observable<T> {
-   operators.set(source, operator)
-   return source
-}
-
 @Injectable()
-class Events {
+export class EventScheduler {
    events: EventType[] = []
    dispatcher = inject(DISPATCHER)
 
@@ -304,21 +248,22 @@ class Events {
 }
 
 @Injectable()
-class Effect {
+export class EffectScheduler {
    source = new Subject<Observable<any>>()
    queue: Observable<any>[] = []
    operator!: OperatorFunction<ObservableInput<any>, any>
    destination!: Subject<any>
+   connected = false
 
    next(source: Observable<any>) {
-      this.operator = operators.get(source)
-      if (this.destination.closed) {
+      if (!this.connected) {
          this.connect()
       }
       this.source.next(source)
    }
 
-   enqueue(source: Observable<any>) {
+   enqueue(source: Observable<any>, operator: any) {
+      this.operator = operator
       this.queue.push(source)
    }
 
@@ -330,64 +275,8 @@ class Effect {
    }
 
    connect() {
+      this.connected = true
       this.destination = new Subject()
-      this.source.pipe(this.operator).subscribe(this.destination)
-   }
-
-   subscribe(observer: PartialObserver<any>) {
-      return this.destination.subscribe(observer)
-   }
-}
-
-export function select<T extends {}>(token: ProviderToken<T>): T {
-   const instance = inject(token)
-   if (meta.has(token) && !getMeta("connect", instance, token as any)) {
-      const cdr = inject(ChangeDetectorRef, { optional: true }) as ViewRef
-      if (cdr) {
-         const subscription = inject(DISPATCHER).subscribe((event) => {
-            if (cdr.destroyed) subscription.unsubscribe()
-            if (event.context === instance) {
-               cdr.markForCheck()
-            }
-         })
-         setMeta("connect", subscription, instance, token as any)
-      }
-   }
-   return track(instance)
-}
-
-@Directive()
-export class Fragment implements AfterViewInit, OnDestroy {
-   __element__ = inject(ElementRef).nativeElement
-   __nodes__: ChildNode[] = []
-
-   ngAfterViewInit() {
-      const el = this.__element__
-      const parent = el.parentNode;
-      this.__nodes__ = [...el.childNodes]
-
-      while (el.firstChild) parent.insertBefore(el.firstChild, el);
-
-      parent.removeChild(el);
-   }
-
-   ngOnDestroy() {
-      for (const node of this.__nodes__) node.remove()
-   }
-}
-
-@Directive()
-export class Provider extends Fragment implements OnChanges {
-   @Input("value") set __value__(_: Omit<this, "__value__">) {}
-
-   ngOnChanges(this: any, { __value__ }: SimpleChanges) {
-      if (__value__) {
-         for (const key of Object.keys(this)) {
-            if (!(key in __value__)) {
-               delete this[key]
-            }
-         }
-         Object.assign(this, __value__)
-      }
+      this.source.pipe(this.operator).subscribe(this.destination).add(() => this.connected = false)
    }
 }

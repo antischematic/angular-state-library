@@ -32,8 +32,9 @@ import {
    switchAll,
    tap
 } from "rxjs";
-import {changes, createProxy, runInContext, track, untrack} from "./proxy";
+import {changes, createProxy, track, untrack} from "./proxy";
 import {createTransitionZone} from "./transition";
+import {runInContext} from "./core";
 
 const meta = new WeakMap()
 

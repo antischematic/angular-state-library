@@ -1,4 +1,13 @@
+import {ChangeDetectorRef, Injector, ProviderToken} from "@angular/core";
+import {ActionMetadata, CaughtMetadata, DepMap, Phase, SelectMetadata} from "./core";
+
 export const meta = new WeakMap()
+
+export const action = Symbol("action")
+export const selector = Symbol("selector")
+export const tracked = Symbol("track")
+export const injector = Symbol("injector")
+export const caught = Symbol("caught")
 
 function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
@@ -18,4 +27,28 @@ export function setMeta(metaKey: any, value: any, target: object, key?: Property
 
 export function getMetaValues<T>(metaKey: any, target: object): T[] {
    return Array.from(getMetaKeys<any>(metaKey, target).values())
+}
+
+export function getActions(target: {}, phase?: Phase) {
+   return getMetaValues<ActionMetadata>(action, target).filter(meta => phase ? meta.phase === phase : true)
+}
+
+export function getSelectors(target: {}) {
+   return getMetaValues<SelectMetadata>(selector, target)
+}
+
+export function getErrorHandlers(target: {}) {
+   return getMetaValues<CaughtMetadata>(caught, target)
+}
+
+export function getDeps(target: {}, key: PropertyKey): DepMap | undefined {
+   return getMeta(tracked, target, key)
+}
+
+export function getToken<T>(token: ProviderToken<T>, context: {}): T {
+   return getMeta<Injector>(injector, context)?.get(token)!
+}
+
+export function markDirty(context: {}) {
+   getToken(ChangeDetectorRef, context).markForCheck()
 }

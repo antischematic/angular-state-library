@@ -32,6 +32,8 @@ module.exports = function (config) {
         { type: 'text-summary' }
       ]
     },
+     browserDisconnectTimeout : 210000,
+     browserNoActivityTimeout : 210000,
     reporters: ['progress', 'kjhtml'],
     port: 9876,
     colors: true,
