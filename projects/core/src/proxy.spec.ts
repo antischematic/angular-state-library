@@ -1,9 +1,17 @@
-import {createProxy, isProxy, runInContext, track} from "./proxy";
-
+import {createProxy, isProxy, popStack, pushStack, track} from "./proxy";
 
 function createProxyTest<T extends object>(object: T): [T, T] {
   const proxy = createProxy(object)
   return [proxy, object]
+}
+
+function runInContext<T extends (...args: any[]) => any>(deps: Map<any, any>, fn: T, thisArg: any = null, ...args: any[]) {
+   pushStack(deps)
+   try {
+      return fn.apply(thisArg, args)
+   } finally {
+      popStack()
+   }
 }
 
 describe("proxy", () => {

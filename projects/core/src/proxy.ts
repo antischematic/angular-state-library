@@ -74,15 +74,6 @@ export function isProxy(object: object) {
    return proxies.has(object)
 }
 
-export function runInContext<T extends (...args: any[]) => any>(deps: Map<any, any>, fn: T, thisArg: any = null, ...args: any[]) {
-   pushStack(deps)
-   try {
-      return fn.apply(thisArg, args)
-   } finally {
-      popStack()
-   }
-}
-
 function isObject(value: any) {
    return typeof value === "object" && value !== null
 }
