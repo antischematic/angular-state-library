@@ -33,6 +33,10 @@ export function getActions(target: {}, phase?: Phase) {
    return getMetaValues<ActionMetadata>(action, target).filter(meta => phase ? meta.phase === phase : true)
 }
 
+export function getAllActions(target: {}) {
+   return getMetaValues<ActionMetadata>(action, target)
+}
+
 export function getSelectors(target: {}) {
    return getMetaValues<SelectMetadata>(selector, target)
 }
@@ -45,8 +49,8 @@ export function getDeps(target: {}, key: PropertyKey): DepMap | undefined {
    return getMeta(tracked, target, key)
 }
 
-export function getToken<T>(token: ProviderToken<T>, context: {}): T {
-   return getMeta<Injector>(injector, context)?.get(token)!
+export function getToken<T>(token: ProviderToken<T>, context: {}, key?: string): T {
+   return getMeta<Injector>(injector, context, key)?.get(token)!
 }
 
 export function markDirty(context: {}) {

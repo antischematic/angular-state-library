@@ -7,10 +7,10 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import {Action, Invoke, Queue, Store} from '@antischematic/angular-state-library';
+import {Action, Invoke, select, Store} from '@antischematic/angular-state-library';
 import {Todo} from './interfaces';
 import { UISpinner } from './spinner.component';
-import {AppStore} from "./providers";
+import {AppComponent} from "./app.component";
 
 @Store()
 @Component({
@@ -19,15 +19,14 @@ import {AppStore} from "./providers";
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todo.component.html',
-   providers: [AppStore]
 })
 export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
    @Output() save = new EventEmitter<Todo>();
 
-   @Queue() pending = false;
+   pending = false;
 
-   root = inject(AppStore)
+   root = select(AppComponent)
 
    trackCount() {
       console.log("reactive parent", this.root.count)

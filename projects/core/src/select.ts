@@ -1,21 +1,21 @@
-import {ChangeDetectorRef, inject, ProviderToken, ViewRef} from "@angular/core";
-import {getMeta, meta, setMeta} from "./metadata";
+import {ChangeDetectorRef, ElementRef, inject, ProviderToken, ViewRef} from "@angular/core";
 import {track} from "./proxy";
 import {DISPATCHER} from "./core";
+import {getMeta, selector, setMeta} from "./metadata";
 
 export function select<T extends {}>(token: ProviderToken<T>): T {
+   // There is only one change detector per host element, so this is close enough
+   const { nativeElement } = inject(ElementRef)
    const instance = inject(token)
-   if (meta.has(token) && !getMeta("connect", instance, token as any)) {
-      const cdr = inject(ChangeDetectorRef, { optional: true }) as ViewRef
-      if (cdr) {
-         const subscription = inject(DISPATCHER).subscribe((event) => {
-            if (cdr.destroyed) subscription.unsubscribe()
-            if (event.context === instance) {
-               cdr.markForCheck()
-            }
-         })
-         setMeta("connect", subscription, instance, token as any)
-      }
+   if (!getMeta(selector, token, nativeElement)) {
+      setMeta(selector, token, nativeElement)
+      const cdr = inject(ChangeDetectorRef) as ViewRef
+      const subscription = inject(DISPATCHER).subscribe((event) => {
+         if (cdr.destroyed) subscription.unsubscribe()
+         if (event.context === instance) {
+            cdr.markForCheck()
+         }
+      })
    }
    return track(instance)
 }

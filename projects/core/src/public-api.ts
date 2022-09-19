@@ -6,6 +6,7 @@ export {
    Layout,
    Invoke,
    Select,
+   Caught,
    Store,
 } from "./core"
 export {
