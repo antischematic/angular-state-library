@@ -19,5 +19,4 @@ export {
 export {createDispatch} from "./create-dispatch";
 export {createEffect} from "./create-effect"
 export {select} from "./select"
-export {Fragment} from "./fragment"
-export {Provider} from "./provider"
+export {TemplateProvider} from "./template-provider"

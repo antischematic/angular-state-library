@@ -7,7 +7,7 @@ import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
 import {Observable, timer} from "rxjs";
-import {UITheme} from "./ui-theme.component";
+import {UITheme} from "./ui-theme";
 
 @Store()
 @Component({

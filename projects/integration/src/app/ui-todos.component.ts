@@ -1,21 +1,17 @@
 import {
-   $, $$,
+   $,
    Action,
    Caught,
    createDispatch,
    createEffect,
-   // fromStore,
    Invoke,
    Layout,
    Select,
    Store,
-   // Queue,
-   // loadEffect,
-   // onChanges,
 } from '@antischematic/angular-state-library';
-import { UITodo } from './ui-todo.component';
+import {UITodo} from './ui-todo.component';
 import {mergeAll, Observable} from 'rxjs';
-import { HttpClient } from '@angular/common/http';
+import {HttpClient} from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
    Component,
@@ -24,15 +20,16 @@ import {
    QueryList,
    ViewChildren,
 } from '@angular/core';
-import { Todo } from './interfaces';
-import { CommonModule } from '@angular/common';
-import { UISpinner } from './spinner.component';
+import {Todo} from './interfaces';
+import {CommonModule} from '@angular/common';
+import {UISpinner} from './spinner.component';
 import updateTodo from './effects/update-todo';
 import toggleAll from './effects/toggle-all';
+import {UITheme} from "./ui-theme";
 
 @Store()
 @Component({
-   imports: [UITodo, UISpinner, CommonModule],
+   imports: [UITodo, UISpinner, CommonModule, UITheme],
    selector: 'ui-todos',
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
@@ -118,6 +115,13 @@ export class UITodos {
 
    trackById(_: number, value: Todo) {
       return value.id;
+   }
+
+   shuffle(array = this.todos) {
+      for (let i = array.length - 1; i > 0; i--) {
+         const j = Math.floor(Math.random() * (i + 1));
+         [array[i], array[j]] = [array[j], array[i]];
+      }
    }
 }
 
