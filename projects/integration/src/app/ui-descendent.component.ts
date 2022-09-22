@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, ElementRef, inject} from '@angular/core';
-import {UITheme} from "./ui-theme.component";
+import {UITheme} from "./ui-theme";
 import {UICounter} from "./ui-counter.component";
 import {select} from "@antischematic/angular-state-library";
 

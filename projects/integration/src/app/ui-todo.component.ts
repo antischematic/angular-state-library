@@ -1,15 +1,8 @@
-import { CommonModule } from '@angular/common';
-import {
-   ChangeDetectionStrategy,
-   Component,
-   EventEmitter,
-   inject,
-   Input,
-   Output,
-} from '@angular/core';
-import {Action, Invoke, select, Store} from '@antischematic/angular-state-library';
+import {CommonModule} from '@angular/common';
+import {ChangeDetectionStrategy, Component, EventEmitter, Input, Output,} from '@angular/core';
+import {Action, select, Store} from '@antischematic/angular-state-library';
 import {Todo} from './interfaces';
-import { UISpinner } from './spinner.component';
+import {UISpinner} from './spinner.component';
 import {AppComponent} from "./app.component";
 
 @Store()
