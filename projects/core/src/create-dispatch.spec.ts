@@ -31,6 +31,7 @@ describe("createDispatch", () => {
    }))
 
    it("should return an observable", fakeAsync(runTestInAction(() => {
+      spyOn(console, "error")
       const next = createSpy("next")
       const error = createSpy("error")
       const complete = createSpy("complete")

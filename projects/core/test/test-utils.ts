@@ -1,5 +1,5 @@
 import {Component} from "@angular/core";
-import {ACTION, ActionMetadata, EffectScheduler, EventScheduler} from "../src/core";
+import {ACTION, ActionMetadata, EffectScheduler, EventScheduler, Store} from "../src/core";
 import {TestBed} from "@angular/core/testing";
 
 @Component({
