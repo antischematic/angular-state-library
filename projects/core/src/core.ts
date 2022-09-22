@@ -10,7 +10,7 @@ import {
 import {createProxy, popStack, pushStack, untrack} from "./proxy";
 import {Observable, ObservableInput, OperatorFunction, Subject} from "rxjs";
 import {
-   action,
+   action, caught,
    getActions, getAllActions,
    getDeps,
    getErrorHandlers,
@@ -70,7 +70,7 @@ export const Layout = createDecorator<ActionMetadata>(action, { ...defaults, pha
 
 export const Select = createDecorator<SelectMetadata>(selector)
 
-export const Caught = createDecorator(selector)
+export const Caught = createDecorator(caught)
 
 function checkDeps(deps: DepMap) {
    let dirty = false
@@ -118,10 +118,11 @@ export const DISPATCHER = new InjectionToken("Dispatcher", {
 
 export class ActionErrorHandler implements ErrorHandler {
    handleError(error: unknown) {
-      const errorHandlers = getErrorHandlers(this.target)
+      const errorHandlers = getErrorHandlers(this.target.prototype)
+      const context = this.injector.get(this.target)
       for (const handler of errorHandlers) {
          try {
-            return handler.descriptor.value.call(this.injector.get(this.target), error)
+            return handler.descriptor.value.call(context, error)
          } catch (e) {
             error = e
          }
