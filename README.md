@@ -275,7 +275,7 @@ Use with `createDispatch` to lazy load effects.
 // load-todos.ts
 export default function loadTodos(userId: string) {
    const endpoint = "https://jsonplaceholder.typicode.com/todos"
-   return loadTodos = inject(HttpClient).get(endpoint, {
+   return inject(HttpClient).get(endpoint, {
       params: { userId }
    })
 }
@@ -308,7 +308,7 @@ Actions can be configured with their own providers. Action providers can be inje
 
 #### useOperator
 
-Sets the flattening operator for merging observing streams. The default strategy is `switchAll`. When calling `useOperator` multiple times only the last call before calling `dispatch` is used. Once `dispatch` is called the last operator is locked and cannot be changed.
+Sets the flattening operator for merging effects. The default strategy is `switchAll`. When calling `useOperator` multiple times only the last call before calling `dispatch` is used. Once `dispatch` is called the operator is locked and cannot be changed.
 
 **Example: Debounce effects**
 
@@ -346,7 +346,7 @@ export class UITodos {
 ```ts
 export default function loadTodos(userId: string) {
    useSwitchDebounce(1000)
-   return loadTodos = inject(HttpClient).get(endpoint, {
+   return inject(HttpClient).get(endpoint, {
       params: { userId }
    })
 }
@@ -388,9 +388,9 @@ export class UITheme extends TemplateProvider {
 
 ```html
 <ui-theme>
-   <ui-theme-button></ui-theme-button>
+   <ui-theme-button>Red button</ui-theme-button>
    <ui-theme [value]="{ color: 'green' }">
-      <ui-theme-button></ui-theme-button>
+      <ui-theme-button>Green button</ui-theme-button>
    </ui-theme>
 </ui-theme>
 ```
