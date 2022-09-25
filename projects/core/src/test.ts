@@ -2,11 +2,13 @@
 
 import 'zone.js';
 import 'zone.js/testing';
-import { getTestBed } from '@angular/core/testing';
+import {getTestBed} from '@angular/core/testing';
 import {
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
+import {initStoreTestEnvironment} from "@antischematic/angular-state-library/testing";
+
 
 declare const require: {
   context(path: string, deep?: boolean, filter?: RegExp): {
@@ -20,6 +22,7 @@ getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting(),
 );
+initStoreTestEnvironment()
 
 // Then we find all the tests.
 const context = require.context('./', true, /\.spec\.ts$/);

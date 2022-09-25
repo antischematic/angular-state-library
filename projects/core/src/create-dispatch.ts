@@ -1,42 +1,45 @@
-import {ErrorHandler, inject, ProviderToken} from "@angular/core";
+import {ChangeDetectorRef, ErrorHandler, inject, ProviderToken} from "@angular/core";
 import {ActionType, Dispatch} from "./interfaces";
-import {Subject, switchAll, tap} from "rxjs";
-import {ACTION, EffectScheduler} from "./core";
-import {dispatch, isPlainObject, wrap} from "./utils";
-import {markDirty} from "./metadata";
-import {operators} from "./create-effect";
+import {Observable, Subject, tap} from "rxjs";
+import {ACTION, EffectScheduler, EventScheduler} from "./core";
+import {isPlainObject, wrap} from "./utils";
 
 const observers = [ActionType.Next, ActionType.Error, ActionType.Complete, "finalize"] as const
 
 export function createDispatch<T>(token: ProviderToken<T>): Dispatch<T> {
-   return function (source, observer = {}) {
+   return function dispatcher(source, observer) {
       const action = inject(ACTION)
       const context = observer && !isPlainObject(observer) ? observer : inject(token)
+      const event = inject(EventScheduler)
       const effect = inject(EffectScheduler)
       const errorHandler = inject(ErrorHandler)
-      observer = Object.create(observer)
+      const changeDetector = inject(ChangeDetectorRef)
+      const signal = new Subject<any>()
+      const enqueue = (source: Observable<any>) => effect.enqueue(source.pipe(tap(observer as {})))
+
+      observer = typeof observer === "function" ? { next: observer } : Object.create(observer ?? null)
+
       for (const key of observers) {
          wrap(observer!, key, function (fn, value) {
+            const isAction = key !== "finalize"
             try {
-               if (key !== "finalize") {
-                  dispatch(key, context, action.key, value)
-               }
-               markDirty(context)
+               isAction && event.schedule(key, context, action.key, value)
+               changeDetector.markForCheck()
                fn.call(context, value)
             } catch (e) {
                errorHandler.handleError(e)
             } finally {
-               key !== "finalize" && signal[key](value)
+               isAction && signal[key](value)
             }
          })
       }
-      const signal = new Subject<any>()
-      const operator = operators.get(source) ?? switchAll()
 
-      source = source.pipe(tap(observer))
-
-      effect.enqueue(source, operator)
+      if ("then" in source) {
+         source.then(enqueue).catch(e => errorHandler.handleError(e))
+      } else {
+         enqueue(source)
+      }
 
       return signal as any
-   }
+   } as Dispatch<T>
 }

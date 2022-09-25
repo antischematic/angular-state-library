@@ -46,4 +46,11 @@ export interface DispatchObserver<T, U> {
    finalize?(this: T): void
 }
 
-export type Dispatch<T> = <U>(source: Observable<U>, observer?: DispatchObserver<T, U>) => Observable<U>
+export interface Dispatch<T> {
+   <U>(source: Promise<Observable<U>>): Observable<U>
+   <U>(source: Promise<Observable<U>>, observer: DispatchObserver<T, U>): Observable<U>
+   <U>(source: Promise<Observable<U>>, next: (this: T, value: U) => void): Observable<U>
+   <U>(source: Observable<U>): Observable<U>
+   <U>(source: Observable<U>, observer: DispatchObserver<T, U>): Observable<U>
+   <U>(source: Observable<U>, next: (this: T, value: U) => void): Observable<U>
+}

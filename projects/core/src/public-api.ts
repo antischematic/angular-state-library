@@ -1,3 +1,4 @@
+// noinspection JSUnusedGlobalSymbols
 export {
    ACTION,
    DISPATCHER,
@@ -8,7 +9,10 @@ export {
    Select,
    Caught,
    Store,
+   stores as ɵɵstores,
+   decorateFactory as ɵɵdecorateFactory
 } from "./core"
+// noinspection JSUnusedGlobalSymbols
 export {
    track,
    isProxy,
@@ -17,6 +21,7 @@ export {
    untrack as $$,
 } from "./proxy"
 export {createDispatch} from "./create-dispatch";
-export {createEffect} from "./create-effect"
+export {useOperator, useConcat, useExhaust, useMerge, useSwitch} from "./hooks"
 export {select} from "./select"
 export {TemplateProvider} from "./template-provider"
+export {loadEffect} from "./load-effect"
