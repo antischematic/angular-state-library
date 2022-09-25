@@ -5,13 +5,15 @@ import {
    inject,
    Injectable,
    InjectionToken,
-   INJECTOR
+   INJECTOR,
+   NgModule
 } from "@angular/core";
 import {createProxy, popStack, pushStack, untrack} from "./proxy";
-import {Observable, ObservableInput, OperatorFunction, Subject} from "rxjs";
+import {Observable, ObservableInput, OperatorFunction, Subject, switchAll} from "rxjs";
 import {
-   action, caught,
-   getActions, getAllActions,
+   action,
+   caught,
+   getActions,
    getDeps,
    getErrorHandlers,
    getMeta,
@@ -25,7 +27,7 @@ import {
    tracked
 } from "./metadata";
 import {ActionType, EventType} from "./interfaces";
-import {call, dispatch, getId, wrap} from "./utils";
+import {call, getId, wrap} from "./utils";
 
 const defaults = { track: true, immediate: true }
 
@@ -118,11 +120,10 @@ export const DISPATCHER = new InjectionToken("Dispatcher", {
 
 export class ActionErrorHandler implements ErrorHandler {
    handleError(error: unknown) {
-      const errorHandlers = getErrorHandlers(this.target.prototype)
-      const context = this.injector.get(this.target)
+      const errorHandlers = getErrorHandlers(this.prototype)
       for (const handler of errorHandlers) {
          try {
-            return handler.descriptor.value.call(context, error)
+            return handler.descriptor.value.call(this.instance, error)
          } catch (e) {
             error = e
          }
@@ -130,32 +131,68 @@ export class ActionErrorHandler implements ErrorHandler {
       this.parent.handleError(error)
    }
 
-   constructor(private target: any, private injector: EnvironmentInjector, private parent: ErrorHandler) {}
+   constructor(private prototype: any, private instance: {}, private parent: ErrorHandler) {}
 }
 
-function decorateFactory(target: any) {
-   wrap(target, "ɵfac", function (fn, ...args) {
-      const instance = fn(...args)
-      const parent = inject(INJECTOR) as EnvironmentInjector
-      const errorHandler = new ActionErrorHandler(target, parent, parent.get(ErrorHandler))
-      const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
-      setMeta(injector, storeInjector, instance)
-      for (const action of getActions(target.prototype)) {
-         const childInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, EffectScheduler], storeInjector)
-         setMeta(injector, childInjector, instance, action.key)
-      }
-      return instance
-   })
+function setup(instance: {}) {
+   if (getMeta(injector, instance)) return
+   const prototype = Object.getPrototypeOf(instance)
+   const parent = inject(INJECTOR) as EnvironmentInjector
+   const errorHandler = new ActionErrorHandler(prototype, instance, parent.get(ErrorHandler))
+   const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
+   setMeta(injector, storeInjector, instance)
+   for (const action of getActions(prototype)) {
+      const childInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, EffectScheduler], storeInjector)
+      setMeta(injector, childInjector, instance, action.key)
+   }
+}
+
+export function processStores() {
+   for (const store of stores) {
+      Object.defineProperty(store, "ɵfac", {configurable: true, value: store["ɵfac"]})
+      decorateFactory(store)
+   }
+}
+
+@NgModule()
+export class StoreTestingModule {
+   constructor() {
+      processStores()
+   }
+}
+
+export const stores = new Set<any>()
+const decorated = new WeakSet()
+
+export function decorateFactory(target: any) {
+   stores.add(target)
+   if (Object.getOwnPropertyDescriptor(target, "ɵfac")?.value && !decorated.has(target)) {
+      decorated.add(target)
+      wrap(target, "ɵfac", function (fn, ...args) {
+         const instance = fn(...args)
+         setup(instance)
+         return instance
+      })
+   }
 }
 
 export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, untrack(context), key)
+   const errorHandler = getToken(ErrorHandler, untrack(context), key)
    pushStack(deps)
    try {
       return injector.runInContext(() => fn.apply(context, args))
+   } catch (e) {
+      errorHandler.handleError(e)
    } finally {
       popStack()
    }
+}
+
+function runAction(this: any, fn: any, key: any, ...args: any[]) {
+   const event = inject(EventScheduler)
+   event.schedule(ActionType.Dispatch, untrack(this), key, args)
+   return fn.apply(this, args)
 }
 
 function decorateActions(target: {}) {
@@ -163,10 +200,8 @@ function decorateActions(target: {}) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
          const deps = new Map()
-         const value = runInContext(deps, fn, proxy, key, ...args)
          setMeta(tracked, deps, this, key)
-         dispatch(ActionType.Dispatch, this, key, value)
-         return value
+         return runInContext(deps, runAction, proxy, key, fn, key, ...args)
       })
    }
 }
@@ -193,14 +228,7 @@ function decorateSelectors(target: {}) {
 function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, changes) {
       const events = getToken(EventScheduler, this)
-      events.push({
-         id: getId(),
-         name: "ngOnChanges",
-         context: this,
-         type: ActionType.Dispatch,
-         value: changes,
-         timestamp: Date.now()
-      })
+      events.schedule(ActionType.Dispatch, this, "ngOnChanges", changes)
       fn.call(this, changes)
    })
 }
@@ -236,8 +264,15 @@ export class EventScheduler {
    events: EventType[] = []
    dispatcher = inject(DISPATCHER)
 
-   push(event: EventType) {
-      this.events.push(event)
+   schedule(type: ActionType, context: {}, name: string, value: unknown) {
+      this.events.push({
+         id: getId(),
+         timestamp: Date.now(),
+         type,
+         context,
+         name,
+         value,
+      })
    }
 
    flush() {
@@ -252,7 +287,7 @@ export class EventScheduler {
 export class EffectScheduler {
    source = new Subject<Observable<any>>()
    queue: Observable<any>[] = []
-   operator!: OperatorFunction<ObservableInput<any>, any>
+   operator: OperatorFunction<ObservableInput<any>, any> = switchAll()
    destination!: Subject<any>
    connected = false
 
@@ -263,8 +298,7 @@ export class EffectScheduler {
       this.source.next(source)
    }
 
-   enqueue(source: Observable<any>, operator: any) {
-      this.operator = operator
+   enqueue(source: Observable<any>) {
       this.queue.push(source)
    }
 

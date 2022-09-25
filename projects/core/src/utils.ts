@@ -1,7 +1,4 @@
 import {untrack} from "./proxy";
-import {ActionType} from "./interfaces";
-import {EventScheduler} from "./core";
-import {getToken} from "./metadata";
 
 export function isPlainObject(obj: object) {
    const proto = Object.getPrototypeOf(obj)
@@ -24,6 +21,8 @@ export function wrap(target: { [key: PropertyKey]: any }, property: PropertyKey,
          return fn.call(untrack(this), originalFunction, ...args)
       }
    })
+
+   return originalFunction === noop
 }
 
 function noop() {}
@@ -32,16 +31,4 @@ let id = 0
 
 export function getId() {
    return id++
-}
-
-export function dispatch(type: ActionType, context: {}, name: string, value: unknown) {
-   const events = getToken(EventScheduler, context)
-   events.push({
-      id: getId(),
-      timestamp: Date.now(),
-      type,
-      context,
-      name,
-      value,
-   })
 }

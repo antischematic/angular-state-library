@@ -3,14 +3,13 @@ import {
    Action,
    Caught,
    createDispatch,
-   createEffect,
    Invoke,
-   Layout,
+   Layout, loadEffect,
    Select,
-   Store,
+   Store, useMerge,
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
-import {mergeAll, Observable} from 'rxjs';
+import {Observable} from 'rxjs';
 import {HttpClient} from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
@@ -23,8 +22,6 @@ import {
 import {Todo} from './interfaces';
 import {CommonModule} from '@angular/common';
 import {UISpinner} from './spinner.component';
-import updateTodo from './effects/update-todo';
-import toggleAll from './effects/toggle-all';
 import {UITheme} from "./ui-theme";
 
 @Store()
@@ -133,16 +130,14 @@ function loadTodos(userId: string): Observable<Todo[]> {
 }
 
 function createTodo(userId: string, title: string): Observable<Todo> {
-   return createEffect(
-      inject(HttpClient).post<Todo>(
-         'https://jsonplaceholder.typicode.com/todos',
-         { userId, title }
-      ),
-      mergeAll()
-   );
+   useMerge()
+   return inject(HttpClient).post<Todo>(
+      'https://jsonplaceholder.typicode.com/todos',
+      { userId, title }
+   )
 }
 
-// const updateTodo = loadEffect(() => import("./effects/update-todo"))
-// const toggleAll = loadEffect(() => import("./effects/toggle-all"))
+const updateTodo = loadEffect(() => import("./effects/update-todo"))
+const toggleAll = loadEffect(() => import("./effects/toggle-all"))
 
 const dispatch = createDispatch(UITodos);

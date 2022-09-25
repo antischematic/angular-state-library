@@ -33,10 +33,6 @@ export function getActions(target: {}, phase?: Phase) {
    return getMetaValues<ActionMetadata>(action, target).filter(meta => phase ? meta.phase === phase : true)
 }
 
-export function getAllActions(target: {}) {
-   return getMetaValues<ActionMetadata>(action, target)
-}
-
 export function getSelectors(target: {}) {
    return getMetaValues<SelectMetadata>(selector, target)
 }
