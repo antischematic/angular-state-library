@@ -136,7 +136,7 @@ export class UIDynamic {
    @ContentChild(TemplateRef)
    template?: TemplateRef
 
-   @Invoke() createOrDestroyView() {
+   @Before() createView() {
       const viewContainer = inject(ViewContainerRef)
       if (this.template) {
          viewContainer.createEmbeddedView(this.template)
@@ -161,7 +161,7 @@ export class UIParent {
    @ViewChildren(UIChild)
    viewChildren?: QueryList<UIChild>
 
-   @Invoke() countChildElements() {
+   @Layout() countElements() {
       const { length } = $(this.viewChildren)
       console.log(`There are ${length} elements on the page`)
    }
