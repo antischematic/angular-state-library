@@ -71,7 +71,7 @@ Marks the decorated method as an action. Each action runs in its own `Environmen
 @Component()
 export class UICounter {
    @Input() count = 0
-   
+
    @Action() increment() {
       this.count++
    }
@@ -85,11 +85,11 @@ export class UICounter {
 @Component()
 export class UITodos {
    todos = []
-   
+
    @Action() loadTodos() {
       const endpoint = "https://jsonplaceholder.typicode.com/todos"
       const loadTodos = inject(HttpClient).get(endpoint)
-      
+
       dispatch(loadTodos, (todos) => {
          this.todos = todos
       })
@@ -181,7 +181,7 @@ For method selectors, arguments must be serializable with `JSON.stringify`.
 @Component()
 export class UICounter {
    @Input() count = 0
-   
+
    @Select() get double() {
       return this.count * 2
    }
@@ -195,7 +195,7 @@ export class UICounter {
 @Component()
 export class UITodos {
    todos = []
-   
+
    @Select() getTodosByUserId(userId: string) {
       return this.todos.filter(todo => todo.userId === userId)
    }
@@ -215,7 +215,7 @@ export class UITodos {
    @Action() loadTodos() {
       throw new Error("Whoops!")
    }
-   
+
    @Caught() handleError(error: unknown) {
       console.debug("Error caught", error)
    }
@@ -252,7 +252,7 @@ Dispatch an effect from an action. Dispatch can only be called inside the stack 
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
@@ -270,7 +270,8 @@ export class UITodos {
 
 #### loadEffect
 
-Use with `dispatch` to lazy load effects.
+Returns a function that lazy loads an effect. The effect is loaded the first time it is called inside an action. The `useOperator` hook is evaluated
+*after* lazy effects have loaded.
 
 **Example: Lazy load effects**
 
@@ -290,7 +291,7 @@ const loadTodos = loadEffect(() => import("./load-todos"))
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
@@ -312,7 +313,7 @@ Returns an observable stream of events emitted from a store. Actions automatical
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
