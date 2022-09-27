@@ -59,6 +59,7 @@ export interface ActionMetadata {
    key: string
    immediate?: boolean;
    phase?: Phase
+   track?: boolean
 }
 
 export interface SelectMetadata {
@@ -102,11 +103,13 @@ function decorateCheck(target: {}, name: Phase) {
    wrap(target, name, function (fn) {
       const events = getToken(EventScheduler, this)
       for (const action of actions) {
-         const deps = getDeps(this, action.key)
-         const dirty = deps && checkDeps(deps)
-         if (!deps && action.immediate && action.phase === name || dirty) {
-            markDirty(this)
-            call(this, action.key)
+         if (action.track) {
+            const deps = getDeps(this, action.key)
+            const dirty = deps && checkDeps(deps)
+            if (!deps && action.immediate && action.phase === name || dirty) {
+               markDirty(this)
+               call(this, action.key)
+            }
          }
       }
       for (const action of actions) {
@@ -354,7 +357,10 @@ export class EffectScheduler {
 
    addPending(promise: Promise<any>) {
       this.pending.add(promise)
-      promise.finally(() => this.pending.delete(promise))
+      promise.finally(() => {
+         this.pending.delete(promise)
+         this.dequeue()
+      })
    }
 
    ngOnDestroy() {

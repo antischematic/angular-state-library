@@ -30,7 +30,7 @@ describe("loadEffect", () => {
       const scheduler = TestBed.inject(EffectScheduler)
       const errorHandler = TestBed.inject(ErrorHandler)
       spyOn(errorHandler, "handleError").and.callThrough()
-      const throwInput = loadEffect(() => {
+      const throwInput = loadEffect(async () => {
          throw new Error("BOGUS")
       })
 
