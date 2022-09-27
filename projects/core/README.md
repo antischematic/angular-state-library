@@ -270,8 +270,7 @@ export class UITodos {
 
 #### loadEffect
 
-Returns a function that lazy loads an effect. The effect is loaded the first time it is called inside an action. The `useOperator` hook is evaluated
-*after* lazy effects have loaded.
+Returns a function that lazy loads an effect. The effect is loaded the first time it is called inside an action.
 
 **Example: Lazy load effects**
 
@@ -349,7 +348,7 @@ Actions can be configured with their own providers. Action providers can be inje
 
 #### useOperator
 
-Sets the flattening operator for merging effects. The default strategy is `switchAll`. When calling `useOperator` multiple times only the last call before calling `dispatch` is used. Once `dispatch` is called the operator is locked and cannot be changed.
+Sets the merge strategy for effects dispatched from an action. The default strategy is `switchAll`. Once `useOperator` is called, the operator is locked and cannot be changed.
 
 **Example: Debounce effects**
 

@@ -322,7 +322,7 @@ export class EventScheduler {
 export class EffectScheduler {
    source = new Subject<Observable<any>>()
    queue: Observable<any>[] = []
-   operator: OperatorFunction<ObservableInput<any>, any> = switchAll()
+   operator?: OperatorFunction<ObservableInput<any>, any>
    destination!: Subject<any>
    connected = false
    subscription = Subscription.EMPTY
@@ -351,7 +351,7 @@ export class EffectScheduler {
    connect() {
       this.connected = true
       this.destination = new Subject()
-      this.subscription = this.source.pipe(this.operator).subscribe(this.destination)
+      this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe(this.destination)
       this.subscription.add(() => this.connected = false)
    }
 

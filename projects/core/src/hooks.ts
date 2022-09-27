@@ -3,7 +3,10 @@ import {EffectScheduler} from "./core";
 import {concatAll, exhaustAll, mergeAll, ObservableInput, OperatorFunction, switchAll} from "rxjs";
 
 export function useOperator<T extends OperatorFunction<ObservableInput<unknown>, unknown>>(operator: T) {
-   inject(EffectScheduler).operator = operator
+   const effect = inject(EffectScheduler)
+   if (!effect.operator) {
+      effect.operator = operator
+   }
 }
 
 export function useSwitch() {
