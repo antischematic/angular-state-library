@@ -9,6 +9,8 @@ export {
    Select,
    Caught,
    Store,
+   configureStore,
+   fromStore,
    stores as ɵɵstores,
    decorateFactory as ɵɵdecorateFactory
 } from "./core"
@@ -20,7 +22,7 @@ export {
    track as $,
    untrack as $$,
 } from "./proxy"
-export {createDispatch} from "./create-dispatch";
+export {dispatch} from "./create-dispatch";
 export {useOperator, useConcat, useExhaust, useMerge, useSwitch} from "./hooks"
 export {select} from "./select"
 export {TemplateProvider} from "./template-provider"

@@ -1,56 +1,47 @@
 import {Observable} from "rxjs";
 
-export interface StoreEvent<K> {
+export interface EventData<K> {
    readonly id: number
    readonly name: K
    readonly context: object
    readonly timestamp: number
 }
 
-export interface DispatchEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
-   readonly type: ActionType.Dispatch
+export interface DispatchEvent<K = PropertyKey, T = unknown> extends EventData<K> {
+   readonly type: EventType.Dispatch
    readonly value: T
 }
 
-export interface NextEvent<K = PropertyKey, T = unknown> extends StoreEvent<K> {
-   readonly value: T
-   readonly type: ActionType.Next
+export interface NextEvent<K = PropertyKey, T = unknown> extends EventData<K> {
+   readonly value: T extends Observable<infer R> ? R : never
+   readonly type: EventType.Next
 }
 
-export interface ErrorEvent<K = PropertyKey> extends StoreEvent<K> {
+export interface ErrorEvent<K = PropertyKey> extends EventData<K> {
    readonly value: unknown
-   readonly type: ActionType.Error
+   readonly type: EventType.Error
 }
 
-export interface CompleteEvent<K = PropertyKey> extends StoreEvent<K> {
-   readonly type: ActionType.Complete
+export interface CompleteEvent<K = PropertyKey> extends EventData<K> {
+   readonly type: EventType.Complete
 }
 
-export type EventType<ActionKey = PropertyKey, ActionType = unknown, EffectType = unknown> =
-   | DispatchEvent<ActionKey, ActionType>
-   | NextEvent<ActionKey, EffectType>
-   | ErrorEvent<ActionKey>
-   | CompleteEvent<ActionKey>
+export type StoreEvent<ActionName = PropertyKey, ActionType = unknown, EffectType = unknown> =
+   | DispatchEvent<ActionName, ActionType>
+   | NextEvent<ActionName, EffectType>
+   | ErrorEvent<ActionName>
+   | CompleteEvent<ActionName>
 
-export enum ActionType {
+export enum EventType {
    Dispatch = "dispatch",
    Next = "next",
    Error = "error",
    Complete = "complete"
 }
 
-export interface DispatchObserver<T, U> {
-   next?(this: T, value: U): void
-   error?(this: T, error: unknown): void
-   complete?(this: T): void
-   finalize?(this: T): void
-}
-
-export interface Dispatch<T> {
-   <U>(source: Promise<Observable<U>>): Observable<U>
-   <U>(source: Promise<Observable<U>>, observer: DispatchObserver<T, U>): Observable<U>
-   <U>(source: Promise<Observable<U>>, next: (this: T, value: U) => void): Observable<U>
-   <U>(source: Observable<U>): Observable<U>
-   <U>(source: Observable<U>, observer: DispatchObserver<T, U>): Observable<U>
-   <U>(source: Observable<U>, next: (this: T, value: U) => void): Observable<U>
+export interface DispatchObserver<U> {
+   next?(value: U): void
+   error?(error: unknown): void
+   complete?(): void
+   finalize?(): void
 }

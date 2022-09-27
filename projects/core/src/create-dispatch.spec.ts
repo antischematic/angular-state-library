@@ -7,23 +7,23 @@ import createSpy = jasmine.createSpy;
 
 describe("createDispatch", () => {
    it("should create a dispatcher", () => {
-      const dispatch = createDispatch(UIComponent)
+      const dispatch = createDispatch<UIComponent>()
       expect(dispatch).toBeInstanceOf(Function)
    })
 
    it("should throw when called outside action", () => {
-      const dispatch = createDispatch(UIComponent)
+      const dispatch = createDispatch<UIComponent>()
       expect(() => dispatch(of(1337))).toThrow()
    })
 
    it("should not throw when called inside action", runTestInAction(() => {
-      const dispatch = createDispatch(UIComponent)
+      const dispatch = createDispatch<UIComponent>()
       expect(() => dispatch(of(1337))).not.toThrow()
    }))
 
    it("should dispatch effects", runTestInAction(() => {
       const scheduler = TestBed.inject(EffectScheduler)
-      const dispatch = createDispatch(UIComponent)
+      const dispatch = createDispatch<UIComponent>()
 
       dispatch(of(1337))
 
@@ -34,7 +34,7 @@ describe("createDispatch", () => {
       const next = createSpy("next")
       const error = createSpy("error")
       const complete = createSpy("complete")
-      const dispatch = createDispatch(UIComponent)
+      const dispatch = createDispatch<UIComponent>()
       const scheduler = TestBed.inject(EffectScheduler)
 
       const result = dispatch(of(1337))
