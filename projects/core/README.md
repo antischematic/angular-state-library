@@ -23,9 +23,11 @@ This API is experimental.
          * [Layout](#layout)
          * [Select](#select)
          * [Caught](#caught)
+         * [configureStore](#configurestore)
       * [Effects](#effects)
-         * [createDispatch](#createdispatch)
+         * [dispatch](#dispatch)
          * [loadEffect](#loadeffect)
+         * [fromStore](#fromstore)
       * [Hooks](#hooks)
          * [useOperator](#useoperator)
          * [useConcat](#useconcat)
@@ -35,8 +37,8 @@ This API is experimental.
       * [Reactivity](#reactivity)
          * [TemplateProvider](#templateprovider)
          * [select](#select)
-         * [track (alias: `$`)](#track--alias---)
-         * [untrack (alias: `$$`)](#untrack--alias---)
+         * [track (alias: `$`)](#track-alias-)
+         * [untrack (alias: `$$`)](#untrack-alias-)
          * [isProxy](#isproxy)
    * [Testing Environment](#testing-environment)
 <!-- TOC -->
@@ -93,8 +95,6 @@ export class UITodos {
       })
    }
 }
-
-const dispatch = createDispatch(UITodos)
 ```
 
 #### Invoke
@@ -136,7 +136,7 @@ export class UIDynamic {
    @ContentChild(TemplateRef)
    template?: TemplateRef
 
-   @Invoke() createOrDestroyView() {
+   @Before() createView() {
       const viewContainer = inject(ViewContainerRef)
       if (this.template) {
          viewContainer.createEmbeddedView(this.template)
@@ -161,7 +161,7 @@ export class UIParent {
    @ViewChildren(UIChild)
    viewChildren?: QueryList<UIChild>
 
-   @Invoke() countChildElements() {
+   @Layout() countElements() {
       const { length } = $(this.viewChildren)
       console.log(`There are ${length} elements on the page`)
    }
@@ -222,23 +222,28 @@ export class UITodos {
 }
 ```
 
+#### configureStore
+
+Add configuration for all stores, or override configuration for a particular store.
+
+```ts
+interface StoreConfig {
+   root?: boolean // default: false
+   actionProviders?: Provider[]
+}
+```
+
+`root` Set to true so stores inherit the configuration. Set to false to configure a specific store.
+
+`actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will receive a unique instance of each provider.
+
 ### Effects
 
 In Angular State Library effects are just plain RxJS observables.
 
-#### createDispatch
+#### dispatch
 
-Creates a function for dispatching effects from an action. Dispatchers can only be called inside the stack frame of a method decorated with `@Action`, `@Invoke`, `@Before` or `@Layout`. The dispatcher has the following type signature:
-
-```ts
-export interface Dispatch<T> {
-   <U>(source: Observable<U>): Observable<U>
-   <U>(source: Observable<U>, observer: DispatchObserver<T, U>): Observable<U>
-   <U>(source: Observable<U>, next: (this: T, value: U) => void): Observable<U>
-}
-```
-
-The `DispatchObserver` is bound to the directive instance by default.
+Dispatch an effect from an action. Dispatch can only be called inside the stack frame of a method decorated with `@Action`, `@Invoke`, `@Before` or `@Layout`. Observer callbacks are bound to the directive instance.
 
 **Example: Dispatching effects**
 
@@ -261,13 +266,11 @@ export class UITodos {
       })
    }
 }
-
-const dispatch = createDispatch(UITodos)
 ```
 
 #### loadEffect
 
-Use with `createDispatch` to lazy load effects.
+Use with `dispatch` to lazy load effects.
 
 **Example: Lazy load effects**
 
@@ -281,6 +284,8 @@ export default function loadTodos(userId: string) {
 }
 ```
 ```ts
+const loadTodos = loadEffect(() => import("./load-todos"))
+
 @Store()
 @Component()
 export class UITodos {
@@ -294,17 +299,52 @@ export class UITodos {
       })
    }
 }
+```
 
-const dispatch = createDispatch(UITodos)
-const loadTodos = loadEffect(() => import("./load-todos"))
+#### fromStore
+
+Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an action for the type to be correctly inferred.
+
+**Example: Observe store events**
+
+```ts
+@Store()
+@Component()
+export class UITodos {
+   @Input() userId: string
+   
+   todos: Todo[] = []
+
+   @Invoke() loadTodos() {
+      const endpoint = "https://jsonplaceholder.typicode.com/todos"
+      const loadTodos = inject(HttpClient).get(endpoint, {
+         params: { userId: this.userId }
+      })
+
+      return dispatch(loadTodos, (todos) => {
+         this.todos = todos
+      })
+   }
+
+   @Invoke() logEvents() {
+      dispatch(fromStore(UITodos), event => {
+         switch (event.name) {
+            case "loadTodos": {
+               switch (event.type) {
+                  case EventType.Next: {
+                     console.log('todos loaded!', event.value) // type: Todo[]
+                  }
+               }
+            }
+         }
+      })
+   }
+}
 ```
 
 ### Hooks
 
-Actions can be configured with their own providers. Action providers can be injected using `inject`. Hooks are simply wrappers around `inject` for configuring action providers. Actions have access to the `EffectScheduler` used by `createDispatch` to schedule dispatched effects.
-
-> Note:
-> Custom action providers and hooks is planned for a future release.
+Actions can be configured with their own providers. Action providers can be injected using `inject`. Hooks are simply wrappers around `inject` for configuring action providers. Actions have access to the `EffectScheduler` used by `dispatch` to schedule dispatched effects.
 
 #### useOperator
 
@@ -328,12 +368,12 @@ function useSwitchDebounce(milliseconds: number) {
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
       useSwitchDebounce(1000)
-      
+
       dispatch(loadTodos(this.userId), (todos) => {
          this.todos = todos
       })
@@ -399,7 +439,7 @@ export class UITheme extends TemplateProvider {
 @Component()
 export class UIThemeButton {
    theme = select(UITheme)
-   
+
    @HostBinding("style.color") get color() {
       return this.theme.color
    }

@@ -1,6 +1,6 @@
 # Angular State Library
 
-Manage state in your Angular applications. **Status: in development** 
+Manage state in your Angular applications. **Status: in development**
 
 [Read the Intro](https://dev.to/antischematic/angular-state-library-3gkl)
 
@@ -14,38 +14,40 @@ This API is experimental.
 
 <!-- TOC -->
 * [Angular State Library](#angular-state-library)
-  * [API](#api)
-    * [Core](#core)
-      * [Store](#store)
-      * [Action](#action)
-      * [Invoke](#invoke)
-      * [Before](#before)
-      * [Layout](#layout)
-      * [Select](#select)
-      * [Caught](#caught)
-    * [Effects](#effects)
-      * [dispatch](#dispatch)
-      * [loadEffect](#loadeffect)
-    * [Hooks](#hooks)
-      * [useOperator](#useoperator)
-      * [useConcat](#useconcat)
-      * [useExhaust](#useexhaust)
-      * [useMerge](#usemerge)
-      * [useSwitch](#useswitch)
-    * [Reactivity](#reactivity)
-      * [TemplateProvider](#templateprovider)
-      * [select](#select)
-      * [track (alias: `$`)](#track-alias-)
-      * [untrack (alias: `$$`)](#untrack-alias-)
-      * [isProxy](#isproxy)
-  * [Testing Environment](#testing-environment)
+   * [API](#api)
+      * [Core](#core)
+         * [Store](#store)
+         * [Action](#action)
+         * [Invoke](#invoke)
+         * [Before](#before)
+         * [Layout](#layout)
+         * [Select](#select)
+         * [Caught](#caught)
+         * [configureStore](#configurestore)
+      * [Effects](#effects)
+         * [dispatch](#dispatch)
+         * [loadEffect](#loadeffect)
+         * [fromStore](#fromstore)
+      * [Hooks](#hooks)
+         * [useOperator](#useoperator)
+         * [useConcat](#useconcat)
+         * [useExhaust](#useexhaust)
+         * [useMerge](#usemerge)
+         * [useSwitch](#useswitch)
+      * [Reactivity](#reactivity)
+         * [TemplateProvider](#templateprovider)
+         * [select](#select)
+         * [track (alias: `$`)](#track-alias-)
+         * [untrack (alias: `$$`)](#untrack-alias-)
+         * [isProxy](#isproxy)
+   * [Testing Environment](#testing-environment)
 <!-- TOC -->
 
 ### Core
 
 #### Store
 
-> Note: 
+> Note:
 > `@Store` only works on classes decorated with `@Component` or `@Directive`
 
 Marks the decorated directive as a store. This decorator is required for all other decorators to function.
@@ -301,7 +303,7 @@ export class UITodos {
 
 #### fromStore
 
-Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched events can also be observed. Effects must be returned from an action for the type to be correctly inferred.
+Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an action for the type to be correctly inferred.
 
 **Example: Observe store events**
 
@@ -366,12 +368,12 @@ function useSwitchDebounce(milliseconds: number) {
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
       useSwitchDebounce(1000)
-      
+
       dispatch(loadTodos(this.userId), (todos) => {
          this.todos = todos
       })
@@ -437,7 +439,7 @@ export class UITheme extends TemplateProvider {
 @Component()
 export class UIThemeButton {
    theme = select(UITheme)
-   
+
    @HostBinding("style.color") get color() {
       return this.theme.color
    }
