@@ -25,7 +25,7 @@ export function wrap(target: { [key: PropertyKey]: any }, property: PropertyKey,
    return originalFunction === noop
 }
 
-function noop() {}
+export function noop() {}
 
 let id = 0
 

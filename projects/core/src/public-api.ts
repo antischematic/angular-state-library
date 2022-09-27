@@ -22,7 +22,7 @@ export {
    track as $,
    untrack as $$,
 } from "./proxy"
-export {dispatch} from "./create-dispatch";
+export {dispatch} from "./dispatch";
 export {useOperator, useConcat, useExhaust, useMerge, useSwitch} from "./hooks"
 export {select} from "./select"
 export {TemplateProvider} from "./template-provider"

@@ -1,4 +1,4 @@
-import {dispatch} from "./create-dispatch";
+import {dispatch} from "./dispatch";
 import {Observable, of} from "rxjs";
 import {fakeAsync, TestBed} from "@angular/core/testing";
 import {EffectScheduler} from "./core";

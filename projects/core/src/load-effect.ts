@@ -1,14 +1,24 @@
-import {Observable} from "rxjs";
+import {Observable, tap} from "rxjs";
 import {ChangeDetectorRef, EnvironmentInjector, inject} from "@angular/core";
+import {EffectScheduler} from "./core";
 
-export function loadEffect<TArgs extends unknown[], TReturn extends Observable<unknown>>(load: () => Promise<{ default: (...args: TArgs) => TReturn }>): (...args: TArgs) => Promise<TReturn> {
-   return async function (...args: any[]) {
+export function loadEffect<TArgs extends unknown[], TReturn extends Observable<unknown>>(load: () => Promise<{ default: (...args: TArgs) => TReturn }>): (...args: TArgs) => TReturn {
+   return function (...args: any[]) {
       const injector = inject(EnvironmentInjector)
       const changeDetector = inject(ChangeDetectorRef)
-      const mod = await load()
-      changeDetector.markForCheck()
-      return injector.runInContext(() => {
-         return mod.default(...args as TArgs)
-      })
+      const effect = inject(EffectScheduler)
+      return new Observable(subscriber => {
+         const promise = load()
+            .then(mod => {
+               changeDetector.markForCheck()
+               injector.runInContext(() => {
+                  mod.default(...args as TArgs).subscribe(subscriber)
+               })
+            })
+            .catch(e => {
+               subscriber.error(e)
+            })
+         effect.addPending(promise)
+      }) as TReturn
    }
 }

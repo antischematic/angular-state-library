@@ -1,7 +1,7 @@
 import {runTestInAction} from "../test/test-utils";
 import {loadEffect} from "./load-effect";
 import {Observable, of} from "rxjs";
-import {dispatch} from "./create-dispatch";
+import {dispatch} from "./dispatch";
 import {fakeAsync, flushMicrotasks, TestBed} from "@angular/core/testing";
 import {EffectScheduler} from "./core";
 import createSpy = jasmine.createSpy;
@@ -20,8 +20,8 @@ describe("loadEffect", () => {
       const returnInput = loadEffect(() => fakeImport((value) => of(value)))
 
       dispatch(returnInput(1337), next)
-      flushMicrotasks()
       scheduler.dequeue()
+      flushMicrotasks()
 
       expect(next).toHaveBeenCalledOnceWith(1337)
    })))
@@ -35,8 +35,8 @@ describe("loadEffect", () => {
       })
 
       dispatch(throwInput())
-      flushMicrotasks()
       scheduler.dequeue()
+      flushMicrotasks()
 
       expect(errorHandler.handleError).toHaveBeenCalledOnceWith(new Error("BOGUS"))
    })))
@@ -50,8 +50,8 @@ describe("loadEffect", () => {
       spyOn(errorHandler, "handleError").and.callThrough()
 
       dispatch(throwInput(new Error("BOGUS")))
-      flushMicrotasks()
       scheduler.dequeue()
+      flushMicrotasks()
 
       expect(errorHandler.handleError).toHaveBeenCalledOnceWith(new Error("BOGUS"))
    })))

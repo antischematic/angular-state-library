@@ -9,7 +9,15 @@ import {
    NgModule, Provider, Type
 } from "@angular/core";
 import {createProxy, popStack, pushStack, untrack} from "./proxy";
-import {filter, Observable, ObservableInput, OperatorFunction, Subject, switchAll} from "rxjs";
+import {
+   filter,
+   Observable,
+   ObservableInput,
+   OperatorFunction,
+   Subject,
+   Subscription,
+   switchAll
+} from "rxjs";
 import {
    action,
    caught,
@@ -314,6 +322,8 @@ export class EffectScheduler {
    operator: OperatorFunction<ObservableInput<any>, any> = switchAll()
    destination!: Subject<any>
    connected = false
+   subscription = Subscription.EMPTY
+   pending = new Set
 
    next(source: Observable<any>) {
       if (!this.connected) {
@@ -328,14 +338,26 @@ export class EffectScheduler {
 
    dequeue() {
       let source
-      while (source = this.queue.shift()) {
-         this.next(source)
+      if (this.pending.size === 0) {
+         while (source = this.queue.shift()) {
+            this.next(source)
+         }
       }
    }
 
    connect() {
       this.connected = true
       this.destination = new Subject()
-      this.source.pipe(this.operator).subscribe(this.destination).add(() => this.connected = false)
+      this.subscription = this.source.pipe(this.operator).subscribe(this.destination)
+      this.subscription.add(() => this.connected = false)
+   }
+
+   addPending(promise: Promise<any>) {
+      this.pending.add(promise)
+      promise.finally(() => this.pending.delete(promise))
+   }
+
+   ngOnDestroy() {
+      this.subscription.unsubscribe()
    }
 }

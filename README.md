@@ -270,7 +270,8 @@ export class UITodos {
 
 #### loadEffect
 
-Use with `dispatch` to lazy load effects.
+Returns a function that lazy loads an effect. The effect is loaded the first time it is called inside an action. The `useOperator` hook is evaluated
+*after* lazy effects have loaded.
 
 **Example: Lazy load effects**
 
