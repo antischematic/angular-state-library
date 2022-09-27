@@ -1,7 +1,7 @@
-import {runTestInAction, UIComponent} from "../test/test-utils";
+import {runTestInAction} from "../test/test-utils";
 import {loadEffect} from "./load-effect";
 import {Observable, of} from "rxjs";
-import {createDispatch} from "./create-dispatch";
+import {dispatch} from "./create-dispatch";
 import {fakeAsync, flushMicrotasks, TestBed} from "@angular/core/testing";
 import {EffectScheduler} from "./core";
 import createSpy = jasmine.createSpy;
@@ -16,7 +16,6 @@ async function fakeImport(effect: (...args: any) => Observable<any>) {
 describe("loadEffect", () => {
    it("should lazy load effects", runTestInAction(fakeAsync(() => {
       const next = createSpy()
-      const dispatch = createDispatch(UIComponent)
       const scheduler = TestBed.inject(EffectScheduler)
       const returnInput = loadEffect(() => fakeImport((value) => of(value)))
 
@@ -28,7 +27,6 @@ describe("loadEffect", () => {
    })))
 
    it("should catch load errors", runTestInAction(fakeAsync(() => {
-      const dispatch = createDispatch(UIComponent)
       const scheduler = TestBed.inject(EffectScheduler)
       const errorHandler = TestBed.inject(ErrorHandler)
       spyOn(errorHandler, "handleError").and.callThrough()
@@ -44,7 +42,6 @@ describe("loadEffect", () => {
    })))
 
    it("should catch effect creation errors", runTestInAction(fakeAsync(() => {
-      const dispatch = createDispatch(UIComponent)
       const scheduler = TestBed.inject(EffectScheduler)
       const errorHandler = TestBed.inject(ErrorHandler)
       const throwInput = loadEffect(() => fakeImport((value) => {

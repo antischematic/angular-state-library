@@ -2,7 +2,7 @@ import {
    $,
    Action,
    Caught,
-   createDispatch,
+   dispatch,
    Invoke,
    Layout, loadEffect,
    Select,
@@ -52,10 +52,8 @@ export class UITodos {
 
    @Invoke() loadTodos() {
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId), {
-         next(todos) {
-            this.todos = todos;
-         },
+      return dispatch(loadTodos(this.userId), (todos) => {
+         this.todos = todos;
       });
    }
 
@@ -139,5 +137,3 @@ function createTodo(userId: string, title: string): Observable<Todo> {
 
 const updateTodo = loadEffect(() => import("./effects/update-todo"))
 const toggleAll = loadEffect(() => import("./effects/toggle-all"))
-
-const dispatch = createDispatch(UITodos);

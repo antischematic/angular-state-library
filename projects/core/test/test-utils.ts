@@ -1,5 +1,5 @@
 import {ChangeDetectorRef, Component, ErrorHandler} from "@angular/core";
-import {ACTION, ActionMetadata, EffectScheduler, EventScheduler, Store} from "../src/core";
+import {ACTION, ActionMetadata, CONTEXT, EffectScheduler, EventScheduler, Store} from "../src/core";
 import {TestBed} from "@angular/core/testing";
 
 @Component({
@@ -17,6 +17,7 @@ export function runInAction(fn: Function, doneFn?: any) {
          EventScheduler,
          EffectScheduler,
          { provide: ACTION, useValue: action },
+         { provide: CONTEXT, useValue: {} },
          { provide: ChangeDetectorRef, useValue: { markForCheck() {} }},
          { provide: ErrorHandler, useValue: { handleError() {} }},
          { provide: UIComponent, useValue: new UIComponent },

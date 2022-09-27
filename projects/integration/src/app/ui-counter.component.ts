@@ -5,7 +5,7 @@ import {
    Input,
    Output,
 } from '@angular/core';
-import { createDispatch, Invoke, Store } from '@antischematic/angular-state-library';
+import { dispatch, Invoke, Store } from '@antischematic/angular-state-library';
 import {Observable, timer} from 'rxjs';
 
 @Store()
@@ -33,5 +33,3 @@ export class UICounter {
       });
    }
 }
-
-const dispatch = createDispatch(UICounter);

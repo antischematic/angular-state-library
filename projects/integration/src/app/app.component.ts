@@ -2,7 +2,7 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {createDispatch, Store, Invoke, Action} from "@antischematic/angular-state-library";
+import {dispatch, Store, Invoke, Action} from "@antischematic/angular-state-library";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
@@ -49,5 +49,3 @@ export class AppComponent {
       this.greenTheme = blueTheme
    }
 }
-
-const dispatch = createDispatch(AppComponent)
