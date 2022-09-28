@@ -57,6 +57,7 @@ export type DepMap = Map<Record<any, any>, Map<string, unknown>>
 
 export interface ActionMetadata {
    key: string
+   descriptor: PropertyDescriptor
    immediate?: boolean;
    phase?: Phase
    track?: boolean
@@ -64,6 +65,7 @@ export interface ActionMetadata {
 
 export interface SelectMetadata {
    key: string
+   descriptor: PropertyDescriptor
 }
 
 export interface CaughtMetadata {
@@ -106,7 +108,7 @@ function decorateCheck(target: {}, name: Phase) {
          if (action.track) {
             const deps = getDeps(this, action.key)
             const dirty = deps && checkDeps(deps)
-            if (!deps && action.immediate && action.phase === name || dirty) {
+            if (action.descriptor.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
                markDirty(this)
                call(this, action.key)
             }
@@ -122,9 +124,9 @@ function decorateCheck(target: {}, name: Phase) {
 }
 
 export const ACTION = new InjectionToken<ActionMetadata>("ACTION")
-export const CONTEXT = new InjectionToken<{}>("CONTEXT")
+export const CONTEXT = new InjectionToken<{ instance: unknown }>("CONTEXT")
 
-export const DISPATCHER = new InjectionToken("Dispatcher", {
+export const EVENTS = new InjectionToken("EVENTS", {
    factory() {
       return new Subject<StoreEvent>()
    }
@@ -138,7 +140,7 @@ export function fromStore<T>(type: Type<T>): Observable<ExtractEvents<T, keyof T
 export function fromStore<T>(type: T): Observable<ExtractEvents<T, keyof T>>
 export function fromStore(type: Type<any>): Observable<ExtractEvents<any, any>> {
    const instance = typeof type === "function" ? inject(type) : type
-   return inject(DISPATCHER).pipe(
+   return inject(EVENTS).pipe(
       filter(event => event.context === instance)
    ) as any
 }
@@ -191,7 +193,7 @@ function setup(instance: {}, target: Function) {
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
-      const actionInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, { provide: CONTEXT, useValue: instance }, EffectScheduler, storeConfig?.actionProviders ?? []], storeInjector)
+      const actionInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, { provide: CONTEXT, useValue: {instance} }, EffectScheduler, storeConfig?.actionProviders ?? []], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
 }
@@ -245,7 +247,7 @@ function decorateSelectors(target: {}) {
    for (const { key } of getSelectors(target)) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
-         const deps = getDeps(target, key)
+         const deps = getDeps(this, key)
          const dirty = deps ? checkDeps(deps) : true
          const cacheKey = JSON.stringify(args)
          let result = getMeta(cacheKey, this, key)
@@ -297,7 +299,7 @@ export function Store() {
 @Injectable()
 export class EventScheduler {
    events: StoreEvent[] = []
-   dispatcher = inject(DISPATCHER)
+   dispatcher = inject(EVENTS)
 
    schedule(type: EventType, context: {}, name: string, value: unknown) {
       this.events.push({

@@ -11,7 +11,7 @@ export function dispatch<TValue>(source: Observable<TValue>, observer: DispatchO
 export function dispatch<TValue>(source: Observable<TValue>, next: (value: TValue) => void): Observable<TValue>
 export function dispatch(source: Observable<any>, observer?: any) {
    const action = inject(ACTION)
-   const context = observer && !isPlainObject(observer) ? observer : inject(CONTEXT)
+   const context = observer && !isPlainObject(observer) ? observer : inject(CONTEXT).instance
    const event = inject(EventScheduler)
    const effect = inject(EffectScheduler)
    const errorHandler = inject(ErrorHandler)
@@ -34,7 +34,11 @@ export function dispatch(source: Observable<any>, observer?: any) {
          } catch (e) {
             errorHandler.handleError(e)
          } finally {
-            isAction && signal[key](value)
+            if (isAction) {
+               signal[key](value)
+            } else {
+               signal.complete()
+            }
          }
       })
    }

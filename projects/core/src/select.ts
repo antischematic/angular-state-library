@@ -1,6 +1,6 @@
 import {ChangeDetectorRef, ElementRef, inject, ProviderToken, ViewRef} from "@angular/core";
 import {track} from "./proxy";
-import {DISPATCHER} from "./core";
+import {EVENTS} from "./core";
 import {getMeta, selector, setMeta} from "./metadata";
 
 export function select<T extends {}>(token: ProviderToken<T>): T {
@@ -10,7 +10,7 @@ export function select<T extends {}>(token: ProviderToken<T>): T {
    if (!getMeta(selector, token, nativeElement)) {
       setMeta(selector, token, nativeElement)
       const cdr = inject(ChangeDetectorRef) as ViewRef
-      const subscription = inject(DISPATCHER).subscribe((event) => {
+      const subscription = inject(EVENTS).subscribe((event) => {
          if (cdr.destroyed) subscription.unsubscribe()
          if (event.context === instance) {
             cdr.markForCheck()

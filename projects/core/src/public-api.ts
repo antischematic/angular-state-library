@@ -1,7 +1,7 @@
 // noinspection JSUnusedGlobalSymbols
 export {
    ACTION,
-   DISPATCHER,
+   EVENTS,
    Action,
    Before,
    Layout,

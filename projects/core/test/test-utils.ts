@@ -11,6 +11,7 @@ export function runInAction(fn: Function, doneFn?: any) {
    const action: ActionMetadata = {
       key: "test",
       immediate: false,
+      descriptor: {}
    }
    TestBed.configureTestingModule({
       providers: [

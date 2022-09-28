@@ -8,7 +8,8 @@ Manage state in your Angular applications. **Status: in development**
 
 ## API
 
-Version: 0.2.0
+Version: 0.2.0<br/>
+<small>Bundle size: ~11kb min. ~3.3kb gzip</small>
 
 This API is experimental.
 

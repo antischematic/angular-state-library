@@ -18,7 +18,7 @@ function isTracked() {
 export const changes = new WeakMap()
 
 function addDep(object: object, key: PropertyKey, value: any, previous: any = value, update = false) {
-   if (isTracked() && Reflect.getOwnPropertyDescriptor(object, key)) {
+   if (isTracked()) {
       for (const dep of deps) {
          const keyValues = dep.get(object) ?? new Map
          dep.set(object, keyValues)
