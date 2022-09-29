@@ -436,6 +436,12 @@ export class UITheme extends TemplateProvider {
 </ui-theme>
 ```
 
+#### select
+
+Inject a store and run change detection whenever the store emits an event. Use this instead of `inject` to keep views in sync with store state.
+
+**Example: Select Theme**
+
 ```ts
 @Component()
 export class UIThemeButton {
@@ -447,9 +453,6 @@ export class UIThemeButton {
 }
 ```
 
-#### select
-
-Inject a store and run change detection whenever the store emits an event. Use this instead of `inject` to keep views in sync with store state.
 
 #### track (alias: `$`)
 

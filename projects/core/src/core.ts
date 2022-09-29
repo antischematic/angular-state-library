@@ -174,10 +174,14 @@ export class StoreErrorHandler implements ErrorHandler {
             error = e
          }
       }
-      throw error
+      if (error instanceof EffectError) {
+         this.parent.handleError(error.error)
+      } else {
+         throw error
+      }
    }
 
-   constructor(private prototype: any, private instance: {}) {}
+   constructor(private prototype: any, private instance: {}, private parent: ErrorHandler) {}
 }
 
 function getConfig() {
@@ -188,7 +192,7 @@ function setup(instance: {}, target: Function) {
    if (getMeta(injector, instance)) return
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
-   const errorHandler = new StoreErrorHandler(prototype, instance)
+   const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
    const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
@@ -324,7 +328,7 @@ export class EventScheduler {
 export class EffectScheduler {
    source = new Subject<Observable<any>>()
    queue: Observable<any>[] = []
-   operator?: OperatorFunction<ObservableInput<any>, any>
+   operator?: OperatorFunction<Observable<any>, any>
    destination!: Subject<any>
    connected = false
    subscription = Subscription.EMPTY
@@ -368,4 +372,8 @@ export class EffectScheduler {
    ngOnDestroy() {
       this.subscription.unsubscribe()
    }
+}
+
+export class EffectError {
+   constructor(public error: unknown) {}
 }

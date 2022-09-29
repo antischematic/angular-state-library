@@ -1,7 +1,7 @@
 import {ChangeDetectorRef, ErrorHandler, inject} from "@angular/core";
 import {EventType, DispatchObserver} from "./interfaces";
 import {Observable, Subject, tap} from "rxjs";
-import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "./core";
+import {ACTION, CONTEXT, EffectError, EffectScheduler, EventScheduler} from "./core";
 import {isPlainObject, noop, wrap} from "./utils";
 
 const observers = [EventType.Next, EventType.Error, EventType.Complete, "finalize"] as const
@@ -32,7 +32,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
                fn.call(context, value)
             }
          } catch (e) {
-            errorHandler.handleError(e)
+            errorHandler.handleError(new EffectError(e))
          } finally {
             if (isAction) {
                signal[key](value)
