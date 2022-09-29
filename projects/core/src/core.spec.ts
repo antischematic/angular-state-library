@@ -7,7 +7,7 @@ import {
    Select,
    Store,
    useChanges,
-   useTeardown
+   addTeardown
 } from "@antischematic/angular-state-library";
 import {ApplicationRef, Component, ElementRef, inject, Input, Type} from "@angular/core";
 import {ComponentFixture, TestBed} from "@angular/core/testing";
@@ -42,8 +42,8 @@ describe("Core", () => {
             return dispatch(NEVER.pipe(finalize(spy)))
          }
 
-         @Action() useTeardown(teardown: TeardownLogic) {
-            useTeardown(teardown)
+         @Action() addTeardown(teardown: TeardownLogic) {
+            addTeardown(teardown)
          }
       }
 
@@ -98,11 +98,11 @@ describe("Core", () => {
          const teardown = createSpy()
          const fixture = createComponent(UITest)
 
-         fixture.componentInstance.useTeardown(teardown)
+         fixture.componentInstance.addTeardown(teardown)
 
          expect(teardown).toHaveBeenCalledTimes(0)
 
-         fixture.componentInstance.useTeardown(teardown)
+         fixture.componentInstance.addTeardown(teardown)
 
          expect(teardown).toHaveBeenCalledTimes(1)
 

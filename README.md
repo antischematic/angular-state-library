@@ -343,9 +343,28 @@ export class UITodos {
 }
 ```
 
-### Hooks
+### Action Hooks
 
-Actions can be configured with their own providers. Action providers can be injected using `inject`. Hooks are simply wrappers around `inject` for configuring action providers. Actions have access to the `EffectScheduler` used by `dispatch` to schedule dispatched effects.
+Use action hooks to configure the behaviour of actions and effects.
+
+#### addTeardown
+
+Adds a teardown function or subscription to be executed the next time an action runs or when the component is destroyed.
+
+**Example: Using third party DOM plugins**
+
+```ts
+@Store()
+@Component()
+export class UIPlugin {
+   @Layout() mount() {
+      const { nativeElement } = inject(ElementRef)
+      const teardown = new ThirdPartyDOMPlugin(nativeElement)
+
+      addTeardown(teardown)
+   }
+}
+```
 
 #### useChanges
 
@@ -367,25 +386,6 @@ export class UITodos {
       dispatch(loadTodos(userId.currentValue), (todos) => {
          this.todos = todos
       })
-   }
-}
-```
-
-#### useTeardown
-
-Add a teardown function or subscription to be executed the next time an action runs or when the component is destroyed.
-
-**Example: Using third party DOM plugins**
-
-```ts
-@Store()
-@Component()
-export class UIPlugin {
-   @Layout() mount() {
-      const { nativeElement } = inject(ElementRef)
-      const teardown = new ThirdPartyDOMPlugin(nativeElement)
-
-      useTeardown(teardown)
    }
 }
 ```

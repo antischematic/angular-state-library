@@ -40,7 +40,7 @@ export function useExhaust(operator?: MonoTypeOperatorFunction<Observable<unknow
    useOperator(operator ? pipe(operator, exhaustAll()) : exhaustAll())
 }
 
-export function useTeardown(teardown: TeardownLogic) {
+export function addTeardown(teardown: TeardownLogic) {
    const subscription = new Subscription()
    subscription.add(teardown)
    inject(Teardown).subscriptions.push(subscription)

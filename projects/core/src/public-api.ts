@@ -23,7 +23,7 @@ export {
    untrack as $$,
 } from "./proxy"
 export {dispatch} from "./dispatch";
-export {useOperator, useConcat, useExhaust, useMerge, useSwitch, useTeardown, useChanges} from "./hooks"
+export {useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges} from "./hooks"
 export {select} from "./select"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
