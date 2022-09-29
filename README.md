@@ -29,7 +29,9 @@ This API is experimental.
          * [dispatch](#dispatch)
          * [loadEffect](#loadeffect)
          * [fromStore](#fromstore)
-      * [Hooks](#hooks)
+      * [Action Hooks](#action-hooks)
+         * [addTeardown](#addteardown)
+         * [useChanges](#usechanges)
          * [useOperator](#useoperator)
          * [useConcat](#useconcat)
          * [useExhaust](#useexhaust)
@@ -38,8 +40,8 @@ This API is experimental.
       * [Reactivity](#reactivity)
          * [TemplateProvider](#templateprovider)
          * [select](#select)
-         * [track (alias: `$`)](#track-alias-)
-         * [untrack (alias: `$$`)](#untrack-alias-)
+         * [track (alias: `$`)](#track--alias---)
+         * [untrack (alias: `$$`)](#untrack--alias---)
          * [isProxy](#isproxy)
    * [Testing Environment](#testing-environment)
 <!-- TOC -->
@@ -377,12 +379,12 @@ Returns a reactive `SimpleChanges` object for the current component. Use this to
 @Component()
 export class UITodos {
    @Input() userId!: string
-   
+
    todos: Todo[] = []
-   
+
    @Invoke() loadTodos() {
       const { userId } = useChanges<UITodos>()
-      
+
       dispatch(loadTodos(userId.currentValue), (todos) => {
          this.todos = todos
       })
