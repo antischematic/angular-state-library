@@ -157,9 +157,6 @@ describe("Core", () => {
 
    describe("Select", () => {
       it("should only evaluate selectors once per change", () => {
-         const multiply = createSpy()
-         const plusOne = createSpy()
-         const multiplyPlusOne = createSpy()
          @Store()
          @Component({ template: `` })
          class UITest {
@@ -178,6 +175,9 @@ describe("Core", () => {
                return this.multiply + this.plusOne
             }
          }
+         const multiply = createSpy()
+         const plusOne = createSpy()
+         const multiplyPlusOne = createSpy()
          const { componentInstance } = createComponent(UITest)
 
          expect(multiply).not.toHaveBeenCalled()
@@ -209,6 +209,82 @@ describe("Core", () => {
          expect(multiplyPlusOne).toHaveBeenCalledTimes(2)
          expect(plusOne).toHaveBeenCalledTimes(2)
          expect(multiply).toHaveBeenCalledTimes(2)
+      })
+
+      it("should memoize parameters", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            list = [1, 2, 3]
+
+            @Select() filterValues(value: number) {
+               filterValues()
+               return this.list.filter((item) => item === value)
+            }
+         }
+         const filterValues = createSpy()
+         const fixture = createComponent(UITest)
+
+         expect(fixture.componentInstance.filterValues(1)).toEqual([1])
+         expect(fixture.componentInstance.filterValues(1)).toEqual([1])
+         expect(filterValues).toHaveBeenCalledTimes(1)
+         expect(fixture.componentInstance.filterValues(2)).toEqual([2])
+         expect(fixture.componentInstance.filterValues(2)).toEqual([2])
+         expect(filterValues).toHaveBeenCalledTimes(2)
+         expect(fixture.componentInstance.filterValues(3)).toEqual([3])
+         expect(fixture.componentInstance.filterValues(3)).toEqual([3])
+         expect(filterValues).toHaveBeenCalledTimes(3)
+
+         fixture.componentInstance.list = [1, 2, 3]
+
+         expect(fixture.componentInstance.filterValues(1)).toEqual([1])
+         expect(fixture.componentInstance.filterValues(1)).toEqual([1])
+         expect(filterValues).toHaveBeenCalledTimes(4)
+      })
+
+      it("should compose parameterized selectors", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            list = [1, 2, 3]
+
+            @Select() selectValues(value: number) {
+               selectValues()
+               return this.list.filter((item) => item === value)
+            }
+
+            @Select() selectAndMultiplyValues(value: number, multiplier: number) {
+               selectAndMultiplyValues()
+               return this.selectValues(value).map(item => item * multiplier)
+            }
+         }
+         const selectValues = createSpy()
+         const selectAndMultiplyValues = createSpy()
+         const fixture = createComponent(UITest)
+
+         expect(fixture.componentInstance.selectValues(1)).toEqual([1])
+         expect(fixture.componentInstance.selectAndMultiplyValues(1, 2)).toEqual([2])
+         expect(fixture.componentInstance.selectAndMultiplyValues(1, 2)).toEqual([2])
+         expect(selectValues).toHaveBeenCalledTimes(1)
+         expect(selectAndMultiplyValues).toHaveBeenCalledTimes(1)
+
+         expect(fixture.componentInstance.selectAndMultiplyValues(1, 4)).toEqual([4])
+         expect(fixture.componentInstance.selectAndMultiplyValues(1, 4)).toEqual([4])
+         expect(selectValues).toHaveBeenCalledTimes(1)
+         expect(selectAndMultiplyValues).toHaveBeenCalledTimes(2)
+
+         expect(fixture.componentInstance.selectAndMultiplyValues(2, 4)).toEqual([8])
+         expect(fixture.componentInstance.selectAndMultiplyValues(2, 4)).toEqual([8])
+         expect(selectValues).toHaveBeenCalledTimes(2)
+         expect(selectAndMultiplyValues).toHaveBeenCalledTimes(3)
+
+         fixture.componentInstance.list = [1, 2, 3]
+
+         expect(fixture.componentInstance.selectAndMultiplyValues(2, 4)).toEqual([8])
+         expect(fixture.componentInstance.selectAndMultiplyValues(2, 4)).toEqual([8])
+         expect(fixture.componentInstance.selectValues(2)).toEqual([2])
+         expect(selectValues).toHaveBeenCalledTimes(3)
+         expect(selectAndMultiplyValues).toHaveBeenCalledTimes(4)
       })
    })
 

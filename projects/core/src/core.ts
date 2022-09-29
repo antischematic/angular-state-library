@@ -246,16 +246,16 @@ function decorateActions(target: {}) {
 function decorateSelectors(target: {}) {
    for (const { key } of getSelectors(target)) {
       wrap(target, key, function (fn, ...args) {
+         const cacheKey = key + JSON.stringify(args)
          const proxy = createProxy(this)
-         const deps = getDeps(this, key)
+         const deps = getDeps(this, cacheKey)
          const dirty = deps ? checkDeps(deps) : true
-         const cacheKey = JSON.stringify(args)
          let result = getMeta(cacheKey, this, key)
          if (dirty) {
             const newDeps = new Map()
             result = runInContext(newDeps, fn, proxy, void 0, ...args)
             setMeta(cacheKey, result, this, key)
-            setMeta(tracked, newDeps, this, key)
+            setMeta(tracked, newDeps, this, cacheKey)
          }
          return result
       })
