@@ -1,5 +1,5 @@
 import {inject} from "@angular/core";
-import {EffectScheduler} from "./core";
+import {Changes, CONTEXT, EffectScheduler, Teardown} from "./core";
 import {
    concatAll,
    exhaustAll,
@@ -7,9 +7,12 @@ import {
    MonoTypeOperatorFunction,
    Observable,
    OperatorFunction,
-   pipe,
-   switchAll
+   pipe, Subscription,
+   switchAll,
+   TeardownLogic
 } from "rxjs";
+import {changes, getMeta} from "./metadata";
+import {TypedChanges} from "./interfaces";
 
 export function useOperator<T extends OperatorFunction<Observable<unknown>, unknown>>(operator: T) {
    const effect = inject(EffectScheduler)
@@ -35,4 +38,14 @@ export function useConcat(operator?: MonoTypeOperatorFunction<Observable<unknown
 
 export function useExhaust(operator?: MonoTypeOperatorFunction<Observable<unknown>>) {
    useOperator(operator ? pipe(operator, exhaustAll()) : exhaustAll())
+}
+
+export function useTeardown(teardown: TeardownLogic) {
+   const subscription = new Subscription()
+   subscription.add(teardown)
+   inject(Teardown).subscriptions.push(subscription)
+}
+
+export function useChanges<T>(): TypedChanges<T> {
+   return inject(Changes).value
 }

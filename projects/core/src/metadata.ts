@@ -8,6 +8,7 @@ export const selector = Symbol("selector")
 export const tracked = Symbol("track")
 export const injector = Symbol("injector")
 export const caught = Symbol("caught")
+export const changes = Symbol("changes")
 
 function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!

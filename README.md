@@ -9,7 +9,7 @@ Manage state in your Angular applications. **Status: in development**
 ## API
 
 Version: 0.2.0<br/>
-<small>Bundle size: ~11kb min. ~3.3kb gzip</small>
+<small>Bundle size: ~11kb min. ~3.5kb gzip</small>
 
 This API is experimental.
 
@@ -346,6 +346,28 @@ export class UITodos {
 ### Hooks
 
 Actions can be configured with their own providers. Action providers can be injected using `inject`. Hooks are simply wrappers around `inject` for configuring action providers. Actions have access to the `EffectScheduler` used by `dispatch` to schedule dispatched effects.
+
+#### useChanges
+
+
+#### useTeardown
+
+Add a teardown function or subscription to be executed the next time an action runs or when the component is destroyed.
+
+**Example: Using third party DOM plugins**
+
+```ts
+@Store()
+@Component()
+export class UIPlugin {
+   @Layout() mount() {
+      const { nativeElement } = inject(ElementRef)
+      const teardown = new ThirdPartyDOMPlugin(nativeElement)
+
+      useTeardown(teardown)
+   }
+}
+```
 
 #### useOperator
 

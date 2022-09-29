@@ -1,4 +1,4 @@
-**# Angular State Library
+# Angular State Library
 
 Manage state in your Angular applications. **Status: in development**
 
@@ -9,7 +9,7 @@ Manage state in your Angular applications. **Status: in development**
 ## API
 
 Version: 0.2.0<br/>
-<small>Bundle size: ~11kb min. ~3.3kb gzip</small>
+<small>Bundle size: ~11kb min. ~3.5kb gzip</small>
 
 This API is experimental.
 
@@ -347,6 +347,28 @@ export class UITodos {
 
 Actions can be configured with their own providers. Action providers can be injected using `inject`. Hooks are simply wrappers around `inject` for configuring action providers. Actions have access to the `EffectScheduler` used by `dispatch` to schedule dispatched effects.
 
+#### useChanges
+
+
+#### useTeardown
+
+Add a teardown function or subscription to be executed the next time an action runs or when the component is destroyed.
+
+**Example: Using third party DOM plugins**
+
+```ts
+@Store()
+@Component()
+export class UIPlugin {
+   @Layout() mount() {
+      const { nativeElement } = inject(ElementRef)
+      const teardown = new ThirdPartyDOMPlugin(nativeElement)
+
+      useTeardown(teardown)
+   }
+}
+```
+
 #### useOperator
 
 Sets the merge strategy for effects dispatched from an action. The default strategy is `switchAll`. Once `useOperator` is called, the operator is locked and cannot be changed.
@@ -487,4 +509,4 @@ initStoreTestEnvironment() // <--------- ADD THIS LINE
 const context = require.context('./', true, /\.spec\.ts$/);
 // And load the modules.
 context.keys().forEach(context);
-```**
+```

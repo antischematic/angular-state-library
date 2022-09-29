@@ -9,7 +9,7 @@ import {
    Provider,
    Type
 } from "@angular/core";
-import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {createProxy, popStack, pushStack, track, untrack} from "./proxy";
 import {filter, Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
 import {
    action,
@@ -186,11 +186,11 @@ function setup(instance: {}, target: Function) {
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
    const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
-   const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
+   const storeInjector = createEnvironmentInjector([EventScheduler, Changes, { provide: ErrorHandler, useValue: errorHandler }], parent)
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
-      const actionInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, { provide: CONTEXT, useValue: {instance} }, EffectScheduler, storeConfig?.actionProviders ?? []], storeInjector)
+      const actionInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, { provide: CONTEXT, useValue: {instance} }, EffectScheduler, Teardown, storeConfig?.actionProviders ?? []], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
 }
@@ -235,6 +235,7 @@ function decorateActions(target: {}) {
          const proxy = createProxy(this)
          const deps = new Map()
          setMeta(tracked, deps, this, key)
+         teardown(this, key)
          return runInContext(deps, runAction, proxy, key, fn, key, ...args)
       })
    }
@@ -260,10 +261,12 @@ function decorateSelectors(target: {}) {
 }
 
 function decorateChanges(target: {}) {
-   wrap(target, "ngOnChanges", function (fn, changes) {
+   wrap(target, "ngOnChanges", function (fn, value) {
       const events = getToken(EventScheduler, this)
-      events.schedule(EventType.Dispatch, this, "ngOnChanges", changes)
-      fn.call(this, changes)
+      const changes = getToken(Changes, this)
+      events.schedule(EventType.Dispatch, this, "ngOnChanges", value)
+      changes.setValue(value)
+      fn.call(this, value)
    })
 }
 
@@ -365,6 +368,38 @@ export class EffectScheduler {
    ngOnDestroy() {
       this.subscription.unsubscribe()
    }
+}
+
+export class Changes {
+   value = track({}) as any
+   setValue(value: any) {
+      for (const key in this.value) {
+         if (!(key in value)) {
+            delete this.value[key]
+         }
+      }
+      Object.assign(this.value, value)
+   }
+}
+
+@Injectable()
+export class Teardown {
+   subscriptions: Subscription[] = []
+
+   unsubscribe() {
+      let subscription
+      while (subscription = this.subscriptions.shift()) {
+         subscription.unsubscribe()
+      }
+   }
+
+   ngOnDestroy() {
+      this.unsubscribe()
+   }
+}
+
+function teardown(context: {}, key: string) {
+   getToken(Teardown, context, key).unsubscribe()
 }
 
 export class EffectError {

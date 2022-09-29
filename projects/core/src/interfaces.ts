@@ -45,3 +45,12 @@ export interface DispatchObserver<U> {
    complete?(): void
    finalize?(): void
 }
+
+export type TypedChanges<T> = {
+   [key in keyof T]?: {
+      previousValue: T[key] | undefined;
+      currentValue: T[key];
+      firstChange: boolean;
+      isFirstChange(): boolean;
+   }
+}

@@ -5,11 +5,13 @@ import {
    EVENTS,
    Invoke,
    Select,
-   Store
+   Store,
+   useChanges,
+   useTeardown
 } from "@antischematic/angular-state-library";
-import {ApplicationRef, Component, ElementRef, inject, Type} from "@angular/core";
+import {ApplicationRef, Component, ElementRef, inject, Input, Type} from "@angular/core";
 import {ComponentFixture, TestBed} from "@angular/core/testing";
-import {concat, finalize, from, NEVER, Observable, of, throwError} from "rxjs";
+import {concat, finalize, from, NEVER, Observable, of, TeardownLogic, throwError} from "rxjs";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import createSpy = jasmine.createSpy;
 import Spy = jasmine.Spy;
@@ -38,6 +40,10 @@ describe("Core", () => {
 
          @Action() cleanupOnDestroy(spy: Spy) {
             return dispatch(NEVER.pipe(finalize(spy)))
+         }
+
+         @Action() useTeardown(teardown: TeardownLogic) {
+            useTeardown(teardown)
          }
       }
 
@@ -86,6 +92,23 @@ describe("Core", () => {
 
          expect(spy).toHaveBeenCalledTimes(1)
          expect(observerSpy.receivedComplete()).toBeTrue()
+      })
+
+      it("should execute teardown logic before each action and on destroy", () => {
+         const teardown = createSpy()
+         const fixture = createComponent(UITest)
+
+         fixture.componentInstance.useTeardown(teardown)
+
+         expect(teardown).toHaveBeenCalledTimes(0)
+
+         fixture.componentInstance.useTeardown(teardown)
+
+         expect(teardown).toHaveBeenCalledTimes(1)
+
+         fixture.destroy()
+
+         expect(teardown).toHaveBeenCalledTimes(2)
       })
    })
 
@@ -152,6 +175,34 @@ describe("Core", () => {
          fixture.detectChanges()
          fixture.detectChanges()
          expect(spy.getValuesLength()).withContext("ensure value is stable").toBe(2)
+      })
+
+      it("should react to input changes", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Input() count = 0
+            @Invoke() iAmReactive() {
+               const { count } = useChanges<UITest>()
+               iAmReactive(count)
+            }
+         }
+         const iAmReactive = createSpy()
+         const fixture = createComponent(UITest)
+
+         fixture.componentRef.setInput("count", 10)
+         fixture.detectChanges()
+         expect(iAmReactive).toHaveBeenCalledWith(objectContaining({ currentValue: 10, previousValue: undefined }))
+         expect(iAmReactive).toHaveBeenCalledTimes(1)
+
+         fixture.detectChanges()
+         fixture.detectChanges()
+         expect(iAmReactive).toHaveBeenCalledTimes(1)
+
+         fixture.componentRef.setInput("count", 20)
+         fixture.detectChanges()
+         expect(iAmReactive).toHaveBeenCalledWith(objectContaining({ currentValue: 20, previousValue: 10 }))
+         expect(iAmReactive).toHaveBeenCalledTimes(2)
       })
    })
 
