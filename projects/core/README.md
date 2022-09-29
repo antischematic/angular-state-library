@@ -349,6 +349,27 @@ Actions can be configured with their own providers. Action providers can be inje
 
 #### useChanges
 
+Returns a reactive `SimpleChanges` object for the current component. Use this to track changes to input values.
+
+**Example: Reacting to `@Input` changes**
+
+```ts
+@Store()
+@Component()
+export class UITodos {
+   @Input() userId!: string
+   
+   todos: Todo[] = []
+   
+   @Invoke() loadTodos() {
+      const { userId } = useChanges<UITodos>()
+      
+      dispatch(loadTodos(userId.currentValue), (todos) => {
+         this.todos = todos
+      })
+   }
+}
+```
 
 #### useTeardown
 
