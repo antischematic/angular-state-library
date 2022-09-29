@@ -25,11 +25,10 @@ This API is experimental.
       * [Select](#select)
       * [Caught](#caught)
       * [configureStore](#configurestore)
-    * [Effects](#effects)
+    * [Action Hooks](#action-hooks)
       * [dispatch](#dispatch)
       * [loadEffect](#loadeffect)
       * [fromStore](#fromstore)
-    * [Action Hooks](#action-hooks)
       * [addTeardown](#addteardown)
       * [useChanges](#usechanges)
       * [useOperator](#useoperator)
@@ -240,9 +239,9 @@ interface StoreConfig {
 
 `actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will receive a unique instance of each provider.
 
-### Effects
+### Action Hooks
 
-In Angular State Library effects are just plain RxJS observables.
+Use action hooks to configure the behaviour of actions and effects.
 
 #### dispatch
 
@@ -344,10 +343,6 @@ export class UITodos {
    }
 }
 ```
-
-### Action Hooks
-
-Use action hooks to configure the behaviour of actions and effects.
 
 #### addTeardown
 
