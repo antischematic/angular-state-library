@@ -1,5 +1,5 @@
 import {Observable} from "rxjs";
-import {ChangeDetectorRef, EnvironmentInjector, inject} from "@angular/core";
+import {EnvironmentInjector, inject} from "@angular/core";
 import {EffectScheduler} from "./core";
 
 export function loadEffect<TArgs extends unknown[], TReturn extends Observable<unknown>>(load: () => Promise<{ default: (...args: TArgs) => TReturn }>): (...args: TArgs) => TReturn {

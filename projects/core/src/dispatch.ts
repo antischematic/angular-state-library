@@ -1,5 +1,5 @@
 import {ChangeDetectorRef, ErrorHandler, inject} from "@angular/core";
-import {EventType, DispatchObserver} from "./interfaces";
+import {DispatchObserver, EventType} from "./interfaces";
 import {Observable, Subject, tap} from "rxjs";
 import {ACTION, CONTEXT, EffectError, EffectScheduler, EventScheduler} from "./core";
 import {isPlainObject, noop, wrap} from "./utils";

@@ -6,18 +6,11 @@ import {
    Injectable,
    InjectionToken,
    INJECTOR,
-   NgModule, Provider, Type
+   Provider,
+   Type
 } from "@angular/core";
 import {createProxy, popStack, pushStack, untrack} from "./proxy";
-import {
-   filter,
-   Observable,
-   ObservableInput,
-   OperatorFunction,
-   Subject,
-   Subscription,
-   switchAll
-} from "rxjs";
+import {filter, Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
 import {
    action,
    caught,

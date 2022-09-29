@@ -1,11 +1,11 @@
 import {
    Action,
+   Caught,
    dispatch,
    EVENTS,
-   Store,
    Invoke,
    Select,
-   Caught
+   Store
 } from "@antischematic/angular-state-library";
 import {ApplicationRef, Component, ElementRef, inject, Type} from "@angular/core";
 import {ComponentFixture, TestBed} from "@angular/core/testing";

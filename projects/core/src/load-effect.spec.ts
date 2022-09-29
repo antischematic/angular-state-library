@@ -4,8 +4,8 @@ import {Observable, of} from "rxjs";
 import {dispatch} from "./dispatch";
 import {fakeAsync, flushMicrotasks, TestBed} from "@angular/core/testing";
 import {EffectScheduler} from "./core";
-import createSpy = jasmine.createSpy;
 import {ErrorHandler} from "@angular/core";
+import createSpy = jasmine.createSpy;
 
 async function fakeImport(effect: (...args: any) => Observable<any>) {
    return {
