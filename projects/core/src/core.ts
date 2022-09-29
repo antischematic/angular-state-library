@@ -164,7 +164,7 @@ export function configureStore(config: StoreConfig) {
    }
 }
 
-export class ActionErrorHandler implements ErrorHandler {
+export class StoreErrorHandler implements ErrorHandler {
    handleError(error: unknown) {
       const errorHandlers = getErrorHandlers(this.prototype)
       for (const handler of errorHandlers) {
@@ -174,10 +174,10 @@ export class ActionErrorHandler implements ErrorHandler {
             error = e
          }
       }
-      this.parent.handleError(error)
+      throw error
    }
 
-   constructor(private prototype: any, private instance: {}, private parent: ErrorHandler) {}
+   constructor(private prototype: any, private instance: {}) {}
 }
 
 function getConfig() {
@@ -188,7 +188,7 @@ function setup(instance: {}, target: Function) {
    if (getMeta(injector, instance)) return
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
-   const errorHandler = new ActionErrorHandler(prototype, instance, parent.get(ErrorHandler))
+   const errorHandler = new StoreErrorHandler(prototype, instance)
    const storeInjector = createEnvironmentInjector([EventScheduler, { provide: ErrorHandler, useValue: errorHandler }], parent)
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
@@ -215,7 +215,7 @@ export function decorateFactory(target: any) {
 
 export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, untrack(context), key)
-   const errorHandler = getToken(ErrorHandler, untrack(context), key)
+   const errorHandler = injector.get(ErrorHandler)
    pushStack(deps)
    try {
       return injector.runInContext(() => fn.apply(context, args))

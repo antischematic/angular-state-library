@@ -4,7 +4,8 @@ import {
    EVENTS,
    Store,
    Invoke,
-   Select
+   Select,
+   Caught
 } from "@antischematic/angular-state-library";
 import {ApplicationRef, Component, ElementRef, inject, Type} from "@angular/core";
 import {ComponentFixture, TestBed} from "@angular/core/testing";
@@ -156,57 +157,210 @@ describe("Core", () => {
 
    describe("Select", () => {
       it("should only evaluate selectors once per change", () => {
-         const double = createSpy()
+         const multiply = createSpy()
          const plusOne = createSpy()
-         const doublePlusOne = createSpy()
+         const multiplyPlusOne = createSpy()
          @Store()
          @Component({ template: `` })
          class UITest {
             count = 10
-            @Select() get double() {
-               double()
-               return this.count * 2
+            multiplier = 2
+            @Select() get multiply() {
+               multiply()
+               return this.count * this.multiplier
             }
             @Select() get plusOne() {
                plusOne()
                return this.count + 1
             }
-            @Select() get doublePlusOne() {
-               doublePlusOne()
-               return this.double + this.plusOne
+            @Select() get multiplyPlusOne() {
+               multiplyPlusOne()
+               return this.multiply + this.plusOne
             }
          }
          const { componentInstance } = createComponent(UITest)
 
-         expect(double).not.toHaveBeenCalled()
+         expect(multiply).not.toHaveBeenCalled()
          expect(plusOne).not.toHaveBeenCalled()
-         expect(doublePlusOne).not.toHaveBeenCalled()
+         expect(multiplyPlusOne).not.toHaveBeenCalled()
 
-         expect(componentInstance.double).toBe(20)
+         expect(componentInstance.multiply).toBe(20)
          expect(componentInstance.plusOne).toBe(11)
-         expect(componentInstance.doublePlusOne).toBe(31)
+         expect(componentInstance.multiplyPlusOne).toBe(31)
 
-         expect(double).toHaveBeenCalledTimes(1)
+         expect(multiply).toHaveBeenCalledTimes(1)
+         expect(multiply).toHaveBeenCalledTimes(1)
          expect(plusOne).toHaveBeenCalledTimes(1)
-         expect(doublePlusOne).toHaveBeenCalledTimes(1)
+         expect(plusOne).toHaveBeenCalledTimes(1)
+         expect(multiplyPlusOne).toHaveBeenCalledTimes(1)
+         expect(multiplyPlusOne).toHaveBeenCalledTimes(1)
 
          componentInstance.count = 100
+         componentInstance.multiplier = 4
 
-         expect(double).toHaveBeenCalledTimes(1)
+         expect(multiply).toHaveBeenCalledTimes(1)
          expect(plusOne).toHaveBeenCalledTimes(1)
-         expect(doublePlusOne).toHaveBeenCalledTimes(1)
+         expect(multiplyPlusOne).toHaveBeenCalledTimes(1)
 
-         expect(componentInstance.double).toBe(200)
+         expect(componentInstance.multiply).toBe(400)
          expect(componentInstance.plusOne).toBe(101)
-         expect(componentInstance.doublePlusOne).toBe(301)
+         expect(componentInstance.multiplyPlusOne).toBe(501)
 
-         expect(double).toHaveBeenCalledTimes(2)
+         expect(multiplyPlusOne).toHaveBeenCalledTimes(2)
          expect(plusOne).toHaveBeenCalledTimes(2)
-         expect(doublePlusOne).toHaveBeenCalledTimes(2)
+         expect(multiply).toHaveBeenCalledTimes(2)
       })
    })
 
-   xdescribe("Caught", () => {
+   describe("Caught", () => {
+      it("should not catch action errors when decorator is not present", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iThrowErrors(error: unknown) {
+               throw error
+            }
+         }
+         spyOn(console, "error")
+         const fixture = createComponent(UITest)
 
+         try {
+            fixture.componentInstance.iThrowErrors(new Error("BOGUS"))
+         } catch (e) {
+            expect(e).toEqual(new Error("BOGUS"))
+         }
+         expect(console.error).not.toHaveBeenCalled()
+      })
+
+      it("should catch action errors", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iThrowErrors(error: unknown) {
+               throw error
+            }
+            @Caught() iCatchErrors(error: unknown) {
+               spy(error)
+            }
+         }
+         spyOn(console, "error")
+         const spy = createSpy()
+         const fixture = createComponent(UITest)
+
+         fixture.componentInstance.iThrowErrors(new Error("BOGUS"))
+
+         expect(spy).toHaveBeenCalledOnceWith(new Error("BOGUS"))
+         expect(console.error).not.toHaveBeenCalled()
+      })
+
+      it("should call error handlers in order until the error is handled", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iThrowErrors(error: unknown) {
+               throw error
+            }
+            @Caught() iAmCalledFirst(error: unknown) {
+               iAmCalledFirst(error)
+               throw error
+            }
+            @Caught() iAmCalledNext(error: unknown) {
+               iAmCalledNext(error)
+               throw error
+            }
+            @Caught() iCatchErrors(error: unknown) {
+               iCatchErrors(error)
+            }
+         }
+         spyOn(console, "error")
+         const iAmCalledFirst = createSpy()
+         const iAmCalledNext = createSpy()
+         const iCatchErrors = createSpy()
+         const error = new Error("BOGUS")
+         const fixture = createComponent(UITest)
+
+         fixture.componentInstance.iThrowErrors(error)
+
+         expect(iAmCalledFirst).toHaveBeenCalledOnceWith(error)
+         expect(iAmCalledFirst).toHaveBeenCalledBefore(iAmCalledNext)
+         expect(iAmCalledNext).toHaveBeenCalledOnceWith(error)
+         expect(iAmCalledNext).toHaveBeenCalledBefore(iCatchErrors)
+         expect(iCatchErrors).toHaveBeenCalledOnceWith(error)
+         expect(console.error).not.toHaveBeenCalled()
+      })
+
+      it("should rethrow if error isn't handled", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iThrowErrors(error: unknown) {
+               throw error
+            }
+            @Caught() iRethrowErrors(error: unknown) {
+               throw error
+            }
+            @Caught() iAlsoRethrowErrors(error: unknown) {
+               throw error
+            }
+         }
+         spyOn(console, "error")
+         const error = new Error("BOGUS")
+         const fixture = createComponent(UITest)
+
+         try {
+            fixture.componentInstance.iThrowErrors(error)
+         } catch (e) {
+            expect(e).toBe(error)
+         }
+         expect(console.error).not.toHaveBeenCalledOnceWith(error)
+      })
+
+      it("should catch errors from dispatched effects", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iDispatchEffectErrors(effect: Observable<any>) {
+               return dispatch(effect)
+            }
+            @Caught() iCatchErrors(error: unknown) {
+               iCatchErrors(error)
+            }
+         }
+         const iCatchErrors = createSpy()
+         const fixture = createComponent(UITest)
+         const result = fixture.componentInstance.iDispatchEffectErrors(throwError(() => new Error("BOGUS")))
+         const observerSpy = subscribeSpyTo(result, { expectErrors: true })
+
+         fixture.detectChanges()
+
+         expect(observerSpy.getError()).toEqual(new Error("BOGUS"))
+         expect(iCatchErrors).toHaveBeenCalledOnceWith(new Error("BOGUS"))
+      })
+
+      it("should not catch handled effect errors", () => {
+         @Store()
+         @Component({ template: `` })
+         class UITest {
+            @Action() iDispatchEffectErrors(effect: Observable<any>) {
+               return dispatch(effect, {
+                  error
+               })
+            }
+            @Caught() iCatchErrors(error: unknown) {
+               iCatchErrors(error)
+            }
+         }
+         const error = createSpy()
+         const iCatchErrors = createSpy()
+         const fixture = createComponent(UITest)
+         const result = fixture.componentInstance.iDispatchEffectErrors(throwError(() => new Error("BOGUS")))
+         const observerSpy = subscribeSpyTo(result, { expectErrors: true })
+
+         fixture.detectChanges()
+
+         expect(error).toHaveBeenCalledOnceWith(new Error("BOGUS"))
+         expect(observerSpy.getError()).toEqual(new Error("BOGUS"))
+         expect(iCatchErrors).not.toHaveBeenCalled()
+      })
    })
 })
