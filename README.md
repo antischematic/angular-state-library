@@ -542,7 +542,7 @@ Returns `true` if the value is a proxy object created with `track`
 ### Transitions
 
 Transitions use Zone.js to observe the JavaScript event loop. Transitions are a drop in replacement for `EventEmitter`. When used as an event emitter,
-any async activity is tracked in a special transition. The transition ends once all async activity has settled.
+any async activity is tracked in a transition zone. The transition ends once all async activity has settled.
 
 **Example: Button activity indicator**
 
