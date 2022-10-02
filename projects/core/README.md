@@ -241,11 +241,11 @@ Marks the decorated `Transition` as a store transition. This tracks async activi
 @Component()
 export class UITodos {
    @Input() userId: string
-
+   
    todos: Todo[] = []
-
+   
    @Status() status = new Transition()
-
+   
    @Action() loadTodos() {
       dispatch(loadTodos(this.userId), (todos) => {
          this.todos = todos
@@ -539,7 +539,7 @@ Unwraps a proxy object, returning the original object.
 
 Returns `true` if the value is a proxy object created with `track`
 
-## Transitions
+### Transitions
 
 Transitions use Zone.js to observe the JavaScript event loop. Transitions are a drop in replacement for `EventEmitter`. When used as an event emitter,
 any async activity is tracked in a special transition. The transition ends once all async activity has settled.
