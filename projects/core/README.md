@@ -44,7 +44,7 @@ This API is experimental.
          * [track (alias: `$`)](#track--alias---)
          * [untrack (alias: `$$`)](#untrack--alias---)
          * [isProxy](#isproxy)
-   * [Transitions](#transitions)
+      * [Transitions](#transitions)
    * [Testing Environment](#testing-environment)
 <!-- TOC -->
 

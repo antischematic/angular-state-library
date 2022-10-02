@@ -15,37 +15,37 @@ This API is experimental.
 
 <!-- TOC -->
 * [Angular State Library](#angular-state-library)
-  * [API](#api)
-    * [Core](#core)
-      * [Store](#store)
-      * [Action](#action)
-      * [Invoke](#invoke)
-      * [Before](#before)
-      * [Layout](#layout)
-      * [Select](#select)
-      * [Caught](#caught)
-      * [Status](#status)
-      * [configureStore](#configurestore)
-      * [fromStore](#fromstore)
-      * [EVENTS](#events)
-    * [Action Hooks](#action-hooks)
-      * [dispatch](#dispatch)
-      * [loadEffect](#loadeffect)
-      * [addTeardown](#addteardown)
-      * [useChanges](#usechanges)
-      * [useOperator](#useoperator)
-      * [useConcat](#useconcat)
-      * [useExhaust](#useexhaust)
-      * [useMerge](#usemerge)
-      * [useSwitch](#useswitch)
-    * [Reactivity](#reactivity)
-      * [TemplateProvider](#templateprovider)
-      * [select](#select)
-      * [track (alias: `$`)](#track--alias---)
-      * [untrack (alias: `$$`)](#untrack--alias---)
-      * [isProxy](#isproxy)
-  * [Transitions](#transitions)
-  * [Testing Environment](#testing-environment)
+   * [API](#api)
+      * [Core](#core)
+         * [Store](#store)
+         * [Action](#action)
+         * [Invoke](#invoke)
+         * [Before](#before)
+         * [Layout](#layout)
+         * [Select](#select)
+         * [Caught](#caught)
+         * [Status](#status)
+         * [configureStore](#configurestore)
+         * [fromStore](#fromstore)
+         * [EVENTS](#events)
+      * [Action Hooks](#action-hooks)
+         * [dispatch](#dispatch)
+         * [loadEffect](#loadeffect)
+         * [addTeardown](#addteardown)
+         * [useChanges](#usechanges)
+         * [useOperator](#useoperator)
+         * [useConcat](#useconcat)
+         * [useExhaust](#useexhaust)
+         * [useMerge](#usemerge)
+         * [useSwitch](#useswitch)
+      * [Reactivity](#reactivity)
+         * [TemplateProvider](#templateprovider)
+         * [select](#select)
+         * [track (alias: `$`)](#track--alias---)
+         * [untrack (alias: `$$`)](#untrack--alias---)
+         * [isProxy](#isproxy)
+      * [Transitions](#transitions)
+   * [Testing Environment](#testing-environment)
 <!-- TOC -->
 
 ### Core
@@ -241,11 +241,11 @@ Marks the decorated `Transition` as a store transition. This tracks async activi
 @Component()
 export class UITodos {
    @Input() userId: string
-   
+
    todos: Todo[] = []
-   
+
    @Status() status = new Transition()
-   
+
    @Action() loadTodos() {
       dispatch(loadTodos(this.userId), (todos) => {
          this.todos = todos
