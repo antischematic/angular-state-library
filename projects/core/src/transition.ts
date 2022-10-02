@@ -1,7 +1,7 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
 import {EMPTY, Subject} from "rxjs";
-import {ChangeDetectorRef, EventEmitter, inject} from "@angular/core";
+import {ChangeDetectorRef, EventEmitter, inject, NgZone} from "@angular/core";
 
 interface TransitionOptions {
    async?: boolean
@@ -11,17 +11,22 @@ function checkStable(zone: TransitionSpec) {
    if (!zone.microtasks && !zone.macroTasks && !zone.transition.stable) {
       zone.transition.stable = true
       zone.transition.onStable.next(-1)
-      zone.changeDetector.detectChanges()
+      zone.ngZone.run(() => {
+         zone.changeDetector.markForCheck()
+      })
    }
    if ((zone.microtasks || zone.macroTasks) && zone.transition.stable) {
       zone.transition.stable = false
       zone.transition.onUnstable.next(1)
-      zone.changeDetector.detectChanges()
+      zone.ngZone.run(() => {
+         zone.changeDetector.markForCheck()
+      })
    }
 }
 
 export class TransitionSpec implements ZoneSpec {
    changeDetector = inject(ChangeDetectorRef)
+   ngZone = inject(NgZone)
    microtasks = 0
    macroTasks = 0
 
