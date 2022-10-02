@@ -43,7 +43,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
       })
    }
 
-   effect.enqueue(source.pipe(tap(observer as {})))
+   effect.enqueue(source.pipe(tap(observer)))
 
    return signal as any
 }

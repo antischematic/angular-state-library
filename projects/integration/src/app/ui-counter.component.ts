@@ -1,12 +1,6 @@
-import {
-   ChangeDetectionStrategy,
-   Component,
-   EventEmitter,
-   Input,
-   Output,
-} from '@angular/core';
-import { dispatch, Invoke, Store } from '@antischematic/angular-state-library';
-import {Observable, timer} from 'rxjs';
+import {ChangeDetectionStrategy, Component, EventEmitter, Input, Output,} from '@angular/core';
+import {dispatch, Invoke, Store} from '@antischematic/angular-state-library';
+import {timer} from 'rxjs';
 
 @Store()
 @Component({
@@ -24,11 +18,11 @@ export class UICounter {
    @Input() count = 0;
    @Output() countChange = new EventEmitter<number>(true);
 
-   @Invoke() autoIncrement(): Observable<number> {
+   @Invoke() autoIncrement() {
       this.count++;
       this.countChange.emit(this.count);
 
-      return dispatch(timer(1000), {
+      dispatch(timer(1000), {
          next: this.autoIncrement,
       });
    }

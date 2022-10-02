@@ -6,7 +6,8 @@ import {
    Invoke,
    Layout, loadEffect,
    Select,
-   Store, useMerge,
+   Status,
+   Store, Transition, useMerge,
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
 import {Observable} from 'rxjs';
@@ -35,9 +36,10 @@ import {UITheme} from "./ui-theme";
 export class UITodos {
    @Input() userId!: string;
 
-   pending = false;
+   @Status() transition = new Transition();
 
    @ViewChildren(UITodo)
+
    uiTodos!: QueryList<UITodos>;
 
    todos: Todo[] = [];

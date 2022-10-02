@@ -17,11 +17,12 @@ export function loadEffect<TArgs extends unknown[], TReturn extends Observable<u
       return new Observable(subscriber => {
          promise
             .then(source => {
-               source.subscribe(subscriber)
+               subscriber.add(source.subscribe(subscriber))
             })
             .catch(e => {
                subscriber.error(e)
             })
+         return subscriber
       }) as TReturn
    }
 }

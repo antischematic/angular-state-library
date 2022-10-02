@@ -1,11 +1,12 @@
 import {
+   ChangeDetectorRef,
    createEnvironmentInjector,
    EnvironmentInjector,
    ErrorHandler,
    inject,
    Injectable,
    InjectionToken,
-   INJECTOR,
+   INJECTOR, NgZone,
    Provider,
    Type
 } from "@angular/core";
@@ -19,16 +20,17 @@ import {
    getErrorHandlers,
    getMeta,
    getMetaValues,
-   getSelectors,
+   getSelectors, getStatuses,
    getToken,
    injector,
    markDirty,
    selector,
-   setMeta,
+   setMeta, status,
    tracked
 } from "./metadata";
 import {EventType, StoreEvent} from "./interfaces";
 import {call, getId, wrap} from "./utils";
+import {noopTransition, Transition} from "./transition";
 
 const defaults = { track: true, immediate: true }
 
@@ -66,17 +68,25 @@ export interface CaughtMetadata {
    descriptor: PropertyDescriptor
 }
 
-export const Action = createDecorator<ActionMetadata>(action, { phase: "ngDoCheck" })
+export interface StatusMetadata {
+   key: string
+   action: string
+   descriptor: PropertyDescriptor
+}
 
-export const Invoke = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngDoCheck" })
+export const Action = createDecorator<ActionMetadata>(action, { phase: Phase.DoCheck })
 
-export const Before = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngAfterContentChecked" })
+export const Invoke = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.DoCheck })
 
-export const Layout = createDecorator<ActionMetadata>(action, { ...defaults, phase: "ngAfterViewChecked" })
+export const Before = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.AfterContentChecked })
+
+export const Layout = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.AfterViewChecked })
 
 export const Select = createDecorator<SelectMetadata>(selector)
 
 export const Caught = createDecorator(caught)
+
+export const Status = createDecorator<{ action?: string }>(status)
 
 function checkDeps(deps: DepMap) {
    let dirty = false
@@ -94,7 +104,6 @@ function checkDeps(deps: DepMap) {
 
 function decorateCheck(target: {}, name: Phase) {
    const actions = getActions(target, name)
-   if (actions.length === 0 && !("ngOnChanges" in target)) return
    wrap(target, name, function (fn) {
       const events = getToken(EventScheduler, this)
       for (const action of actions) {
@@ -181,16 +190,29 @@ function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
-function setup(instance: {}, target: Function) {
+function setup(instance: any, target: Function) {
    if (getMeta(injector, instance)) return
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
    const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
-   const storeInjector = createEnvironmentInjector([EventScheduler, Changes, { provide: ErrorHandler, useValue: errorHandler }], parent)
+   const storeInjector = createEnvironmentInjector([EventScheduler, Changes, {
+      provide: ErrorHandler,
+      useValue: errorHandler
+   }], parent)
+   const statusMap = getStatuses(prototype).reduce((map, next) => map.set(next.action, next), new Map<string | undefined, StatusMetadata>())
+   const storeStatus = statusMap.get(void 0)
+   const transition = storeStatus ? instance[storeStatus.key] : noopTransition
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
-      const actionInjector = createEnvironmentInjector([{ provide: ACTION, useValue: action }, { provide: CONTEXT, useValue: {instance} }, EffectScheduler, Teardown, storeConfig?.actionProviders ?? []], storeInjector)
+      const actionInjector = createEnvironmentInjector([
+         { provide: ACTION, useValue: action },
+         { provide: CONTEXT, useValue: {instance}},
+         { provide: Transition, useValue: transition },
+         EffectScheduler,
+         Teardown,
+         storeConfig?.actionProviders ?? []
+      ], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
 }
@@ -199,13 +221,17 @@ export const stores = new Set<any>()
 const decorated = new WeakSet()
 
 export function decorateFactory(target: any) {
+   const factory = target["ɵfac"]
    stores.add(target)
-   if (Object.getOwnPropertyDescriptor(target, "ɵfac")?.value && !decorated.has(target)) {
+   if (factory && !decorated.has(target)) {
       decorated.add(target)
-      wrap(target, "ɵfac", function (fn, ...args) {
-         const instance = fn(...args)
-         setup(instance, target)
-         return instance
+      Object.defineProperty(target, "ɵfac", {
+         configurable: true,
+         value: function (...args: any[]) {
+            const instance = factory(...args)
+            setup(instance, target)
+            return instance
+         }
       })
    }
 }
@@ -323,12 +349,13 @@ export class EventScheduler {
 @Injectable()
 export class EffectScheduler {
    source = new Subject<Observable<any>>()
-   queue: Observable<any>[] = []
+   queue: any[] = []
    operator?: OperatorFunction<Observable<any>, any>
    destination!: Subject<any>
    connected = false
    subscription = Subscription.EMPTY
    pending = new Set
+   transition = inject(Transition)
 
    next(source: Observable<any>) {
       if (!this.connected) {
@@ -337,15 +364,20 @@ export class EffectScheduler {
       this.source.next(source)
    }
 
-   enqueue(source: Observable<any>) {
-      this.queue.push(source)
+   enqueue( source: Observable<any>) {
+      this.queue.push([source, Zone.current])
    }
 
    dequeue() {
-      let source
+      let effect: any
       if (this.pending.size === 0) {
-         while (source = this.queue.shift()) {
-            this.next(source)
+         while (effect = this.queue.shift()) {
+            const [source, zone] = effect
+            zone.run(() => {
+               this.transition.run(() => {
+                  this.next(source)
+               })
+            })
          }
       }
    }
@@ -358,10 +390,12 @@ export class EffectScheduler {
    }
 
    addPending(promise: Promise<any>) {
-      this.pending.add(promise)
-      promise.finally(() => {
-         this.pending.delete(promise)
-         this.dequeue()
+      this.transition.run(() => {
+         this.pending.add(promise)
+         promise.finally(() => {
+            this.pending.delete(promise)
+            this.dequeue()
+         })
       })
    }
 
@@ -399,7 +433,7 @@ export class Teardown {
 }
 
 function teardown(context: {}, key: string) {
-   getToken(Teardown, context, key).unsubscribe()
+   getToken(Teardown, context, key)?.unsubscribe()
 }
 
 export class EffectError {

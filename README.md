@@ -8,41 +8,44 @@ Manage state in your Angular applications. **Status: in development**
 
 ## API
 
-Version: 0.2.0<br/>
-<small>Bundle size: ~11kb min. ~3.5kb gzip</small>
+Version: 0.3.0<br/>
+<small>Bundle size: ~12kb min. ~4kb gzip</small>
 
 This API is experimental.
 
 <!-- TOC -->
 * [Angular State Library](#angular-state-library)
-   * [API](#api)
-      * [Core](#core)
-         * [Store](#store)
-         * [Action](#action)
-         * [Invoke](#invoke)
-         * [Before](#before)
-         * [Layout](#layout)
-         * [Select](#select)
-         * [Caught](#caught)
-         * [configureStore](#configurestore)
-      * [Action Hooks](#action-hooks)
-         * [dispatch](#dispatch)
-         * [loadEffect](#loadeffect)
-         * [fromStore](#fromstore)
-         * [addTeardown](#addteardown)
-         * [useChanges](#usechanges)
-         * [useOperator](#useoperator)
-         * [useConcat](#useconcat)
-         * [useExhaust](#useexhaust)
-         * [useMerge](#usemerge)
-         * [useSwitch](#useswitch)
-      * [Reactivity](#reactivity)
-         * [TemplateProvider](#templateprovider)
-         * [select](#select)
-         * [track (alias: `$`)](#track--alias---)
-         * [untrack (alias: `$$`)](#untrack--alias---)
-         * [isProxy](#isproxy)
-   * [Testing Environment](#testing-environment)
+  * [API](#api)
+    * [Core](#core)
+      * [Store](#store)
+      * [Action](#action)
+      * [Invoke](#invoke)
+      * [Before](#before)
+      * [Layout](#layout)
+      * [Select](#select)
+      * [Caught](#caught)
+      * [Status](#status)
+      * [configureStore](#configurestore)
+      * [fromStore](#fromstore)
+      * [EVENTS](#events)
+    * [Action Hooks](#action-hooks)
+      * [dispatch](#dispatch)
+      * [loadEffect](#loadeffect)
+      * [addTeardown](#addteardown)
+      * [useChanges](#usechanges)
+      * [useOperator](#useoperator)
+      * [useConcat](#useconcat)
+      * [useExhaust](#useexhaust)
+      * [useMerge](#usemerge)
+      * [useSwitch](#useswitch)
+    * [Reactivity](#reactivity)
+      * [TemplateProvider](#templateprovider)
+      * [select](#select)
+      * [track (alias: `$`)](#track--alias---)
+      * [untrack (alias: `$$`)](#untrack--alias---)
+      * [isProxy](#isproxy)
+  * [Transitions](#transitions)
+  * [Testing Environment](#testing-environment)
 <!-- TOC -->
 
 ### Core
@@ -224,6 +227,39 @@ export class UITodos {
 }
 ```
 
+#### Status
+
+Marks the decorated `Transition` as a store transition. This tracks async activity across all actions and effects declared in the store.
+
+**Example: Store activity indicator**
+
+```html
+<ui-spinner *ngIf="status.unstable"></ui-spinner>
+```
+```ts
+@Store()
+@Component()
+export class UITodos {
+   @Input() userId: string
+   
+   todos: Todo[] = []
+   
+   @Status() status = new Transition()
+   
+   @Action() loadTodos() {
+      dispatch(loadTodos(this.userId), (todos) => {
+         this.todos = todos
+      })
+   }
+
+   @Action() toggleAll(error: unknown) {
+      dispatch(toggleAll(this.todos), {
+         finalize: this.loadTodos
+      })
+   }
+}
+```
+
 #### configureStore
 
 Add configuration for all stores, or override configuration for a particular store.
@@ -238,6 +274,44 @@ interface StoreConfig {
 `root` Set to true so stores inherit the configuration. Set to false to configure a specific store.
 
 `actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will receive a unique instance of each provider.
+
+
+#### fromStore
+
+Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an action for the type to be correctly inferred.
+
+**Example: Observe store events**
+
+```ts
+fromStore(UITodos).subscribe(event => {
+   switch (event.name) {
+      case "loadTodos": {
+         switch (event.type) {
+            case EventType.Next: {
+               console.log('todos loaded!', event.value)
+            }
+         }
+      }
+   }
+})
+```
+
+#### EVENTS
+
+Observe all events from all stores
+
+**Example: Log all store events in the application**
+
+```ts
+@Component()
+export class UIApp {
+   constructor() {
+      inject(EVENTS).subscribe((event) => {
+         console.log(event)
+      })
+   }
+}
+```
 
 ### Action Hooks
 
@@ -298,47 +372,6 @@ export class UITodos {
    @Invoke() loadTodos() {
       dispatch(loadTodos(this.userId), (todos) => {
          this.todos = todos
-      })
-   }
-}
-```
-
-#### fromStore
-
-Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an action for the type to be correctly inferred.
-
-**Example: Observe store events**
-
-```ts
-@Store()
-@Component()
-export class UITodos {
-   @Input() userId: string
-
-   todos: Todo[] = []
-
-   @Invoke() loadTodos() {
-      const endpoint = "https://jsonplaceholder.typicode.com/todos"
-      const loadTodos = inject(HttpClient).get(endpoint, {
-         params: { userId: this.userId }
-      })
-
-      return dispatch(loadTodos, (todos) => {
-         this.todos = todos
-      })
-   }
-
-   @Invoke() logEvents() {
-      dispatch(fromStore(UITodos), event => {
-         switch (event.name) {
-            case "loadTodos": {
-               switch (event.type) {
-                  case EventType.Next: {
-                     console.log('todos loaded!', event.value) // type: Todo[]
-                  }
-               }
-            }
-         }
       })
    }
 }
@@ -505,6 +538,44 @@ Unwraps a proxy object, returning the original object.
 #### isProxy
 
 Returns `true` if the value is a proxy object created with `track`
+
+## Transitions
+
+Transitions use Zone.js to observe the JavaScript event loop. Transitions are a drop in replacement for `EventEmitter`. When used as an event emitter,
+any async activity is tracked in a special transition. The transition ends once all async activity has settled.
+
+**Example: Button activity indicator**
+
+```ts
+@Component({
+   template: `
+      <div><ng-content></ng-content></div>
+      <ui-spinner *ngIf="press.unstable"></ui-spinner>
+   `
+})
+export class UIButton {
+   @Output() press = new Transition()
+
+   @HostListener("click", ["$event"])
+   handleClick(event) {
+      this.press.emit(event)
+   }
+}
+```
+
+**Example: Run code inside a transition**
+
+```ts
+const transition = new Transition()
+
+transition.run(() => {
+   setTimeout(() => {
+      console.log("transition complete")
+   }, 2000)
+})
+```
+
+
 
 ## Testing Environment
 

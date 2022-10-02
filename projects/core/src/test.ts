@@ -7,7 +7,7 @@ import {
    BrowserDynamicTestingModule,
    platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
-import {initStoreTestEnvironment} from "@antischematic/angular-state-library/testing";
+import {initStoreTestEnvironment} from "../testing/init-store-test-environment";
 
 
 declare const require: {

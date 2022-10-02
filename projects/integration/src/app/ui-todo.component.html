@@ -9,17 +9,17 @@
    type="checkbox"
    [hidden]="!value.id"
    [checked]="value.completed"
-   [disabled]="pending"
+   [disabled]="save.unstable"
    (click)="$event.preventDefault(); toggleComplete(checkbox.checked)"
    #checkbox
 />
 <input
    type="text"
-   [disabled]="value.completed || pending"
+   [disabled]="value.completed || save.unstable"
    [value]="value.title"
    (keydown.enter)="updateText(text.value)"
    #text
 />
 <button *ngIf="!value.id" (click)="updateText(text.value)">Create</button>
 
-<ui-spinner *ngIf="pending"></ui-spinner>
+<ui-spinner *ngIf="save.unstable"></ui-spinner>

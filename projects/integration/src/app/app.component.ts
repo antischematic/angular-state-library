@@ -2,11 +2,11 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {dispatch, Store, Invoke, Action} from "@antischematic/angular-state-library";
+import {Action, dispatch, Invoke, Store} from "@antischematic/angular-state-library";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
-import {Observable, timer} from "rxjs";
+import {timer} from "rxjs";
 import {UITheme} from "./ui-theme";
 
 @Store()
@@ -31,12 +31,12 @@ export class AppComponent {
 
    @Input() appStore: any
 
-   @Invoke() increment(): Observable<number> {
+   @Invoke() increment() {
       this.count++
 
       this.otherAction()
 
-      return dispatch(timer(1000), {
+      dispatch(timer(1000), {
          next: this.increment
       })
    }

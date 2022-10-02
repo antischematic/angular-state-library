@@ -1,5 +1,5 @@
 <div style="height: 40px; margin: 1em 0 0">
-   <ui-spinner *ngIf="pending"></ui-spinner>
+   <ui-spinner *ngIf="transition.unstable"></ui-spinner>
 </div>
 
 <h2>Add todo</h2>
@@ -14,7 +14,7 @@
 
 <button
    style="margin: 2em 0"
-   [disabled]="pending"
+   [disabled]="transition.unstable"
    (click)="toggleAll(remaining)"
 >
    Toggle All
@@ -29,7 +29,7 @@
 
 <button
    style="margin: 2em 0"
-   [disabled]="pending"
+   [disabled]="transition.unstable"
    (click)="toggleAll(completed)"
 >
    Toggle All

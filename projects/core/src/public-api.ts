@@ -9,6 +9,7 @@ export {
    Select,
    Caught,
    Store,
+   Status,
    configureStore,
    fromStore,
    stores as ɵɵstores,
@@ -27,3 +28,4 @@ export {useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, us
 export {select} from "./select"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
+export {Transition, noopTransition} from "./transition"
