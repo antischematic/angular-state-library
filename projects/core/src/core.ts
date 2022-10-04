@@ -1,99 +1,44 @@
 import {
-   ChangeDetectorRef,
    createEnvironmentInjector,
    EnvironmentInjector,
    ErrorHandler,
    inject,
-   Injectable,
-   InjectionToken,
-   INJECTOR, NgZone,
-   Provider,
-   Type
+   INJECTOR
 } from "@angular/core";
-import {createProxy, popStack, pushStack, track, untrack} from "./proxy";
-import {filter, Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
+import {createProxy, popStack, pushStack, untrack} from "./proxy";
 import {
-   action,
-   caught,
    getActions,
    getDeps,
-   getErrorHandlers,
    getMeta,
    getMetaValues,
-   getSelectors, getStatuses,
+   getSelectors,
+   getStatuses,
    getToken,
    injector,
    markDirty,
-   selector,
-   setMeta, status,
+   setMeta,
    tracked
 } from "./metadata";
-import {EventType, StoreEvent} from "./interfaces";
-import {call, getId, wrap} from "./utils";
+import {DepMap, EventType, Metadata, Phase, StatusMetadata} from "./interfaces";
+import {call, wrap} from "./utils";
 import {noopTransition, Transition} from "./transition";
-
-const defaults = { track: true, immediate: true }
-
-function createDecorator<T extends {}>(symbol: symbol, defaults = {}) {
-   return function decorate(options?: T) {
-      return function (target: {}, key: PropertyKey, descriptor?: PropertyDescriptor) {
-         setMeta(symbol, { ...defaults, ...options, key, descriptor }, target, key)
-      }
-   }
-}
-
-export const enum Phase {
-   DoCheck = "ngDoCheck",
-   AfterContentChecked = "ngAfterContentChecked",
-   AfterViewChecked = "ngAfterViewChecked"
-}
-
-export type DepMap = Map<Record<any, any>, Map<string, unknown>>
-
-export interface ActionMetadata {
-   key: string
-   descriptor: PropertyDescriptor
-   immediate?: boolean;
-   phase?: Phase
-   track?: boolean
-}
-
-export interface SelectMetadata {
-   key: string
-   descriptor: PropertyDescriptor
-}
-
-export interface CaughtMetadata {
-   key: string
-   descriptor: PropertyDescriptor
-}
-
-export interface StatusMetadata {
-   key: string
-   action: string
-   descriptor: PropertyDescriptor
-}
-
-export const Action = createDecorator<ActionMetadata>(action, { phase: Phase.DoCheck })
-
-export const Invoke = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.DoCheck })
-
-export const Before = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.AfterContentChecked })
-
-export const Layout = createDecorator<ActionMetadata>(action, { ...defaults, phase: Phase.AfterViewChecked })
-
-export const Select = createDecorator<SelectMetadata>(selector)
-
-export const Caught = createDecorator(caught)
-
-export const Status = createDecorator<{ action?: string }>(status)
+import {
+   ACTION,
+   Changes,
+   CONTEXT,
+   EffectScheduler,
+   EventScheduler,
+   ROOT_CONFIG,
+   STORE_CONFIG, StoreErrorHandler,
+   Teardown
+} from "./providers";
 
 function checkDeps(deps: DepMap) {
    let dirty = false
    for (const [object, keyValues] of deps) {
       for (const [key, previous] of keyValues) {
          const current = object[key]
-         if (current !== previous) {
+         if (!Object.is(current, previous)) {
             keyValues.set(key, current)
             dirty = true
          }
@@ -102,7 +47,7 @@ function checkDeps(deps: DepMap) {
    return dirty
 }
 
-function decorateCheck(target: {}, name: Phase) {
+export function decorateCheck(target: {}, name: Phase) {
    const actions = getActions(target, name)
    wrap(target, name, function (fn) {
       const events = getToken(EventScheduler, this)
@@ -110,7 +55,7 @@ function decorateCheck(target: {}, name: Phase) {
          if (action.track) {
             const deps = getDeps(this, action.key)
             const dirty = deps && checkDeps(deps)
-            if (action.descriptor.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
+            if (action.descriptor!.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
                markDirty(this)
                call(this, action.key)
             }
@@ -125,72 +70,11 @@ function decorateCheck(target: {}, name: Phase) {
    })
 }
 
-export const ACTION = new InjectionToken<ActionMetadata>("ACTION")
-export const CONTEXT = new InjectionToken<{ instance: unknown }>("CONTEXT")
-
-export const EVENTS = new InjectionToken("EVENTS", {
-   factory() {
-      return new Subject<StoreEvent>()
-   }
-})
-
-type ExtractEvents<T, U extends PropertyKey> = {
-   [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => infer R ? StoreEvent<key, P, R> : never : never
-}[U]
-
-export function fromStore<T>(type: Type<T>): Observable<ExtractEvents<T, keyof T>>
-export function fromStore<T>(type: T): Observable<ExtractEvents<T, keyof T>>
-export function fromStore(type: Type<any>): Observable<ExtractEvents<any, any>> {
-   const instance = typeof type === "function" ? inject(type) : type
-   return inject(EVENTS).pipe(
-      filter(event => event.context === instance)
-   ) as any
-}
-
-interface StoreConfig {
-   root?: boolean
-   actionProviders?: Provider[]
-}
-
-const STORE_CONFIG = new InjectionToken<StoreConfig>("STORE_CONFIG")
-const ROOT_CONFIG = new InjectionToken<StoreConfig>("ROOT_CONFIG", {
-   factory() {
-      return {}
-   }
-})
-
-export function configureStore(config: StoreConfig) {
-   return {
-      provide: config.root ? ROOT_CONFIG : STORE_CONFIG,
-      useValue: config
-   }
-}
-
-export class StoreErrorHandler implements ErrorHandler {
-   handleError(error: unknown) {
-      const errorHandlers = getErrorHandlers(this.prototype)
-      for (const handler of errorHandlers) {
-         try {
-            return handler.descriptor.value.call(this.instance, error)
-         } catch (e) {
-            error = e
-         }
-      }
-      if (error instanceof EffectError) {
-         this.parent.handleError(error.error)
-      } else {
-         throw error
-      }
-   }
-
-   constructor(private prototype: any, private instance: {}, private parent: ErrorHandler) {}
-}
-
 function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
-function setup(instance: any, target: Function) {
+function setup(instance: any, target: Function, statusMap: any) {
    if (getMeta(injector, instance)) return
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
@@ -199,7 +83,6 @@ function setup(instance: any, target: Function) {
       provide: ErrorHandler,
       useValue: errorHandler
    }], parent)
-   const statusMap = getStatuses(prototype).reduce((map, next) => map.set(next.action, next), new Map<string | undefined, StatusMetadata>())
    const storeStatus = statusMap.get(void 0)
    const transition = storeStatus ? instance[storeStatus.key] : noopTransition
    let storeConfig = getConfig()
@@ -222,6 +105,7 @@ const decorated = new WeakSet()
 
 export function decorateFactory(target: any) {
    const factory = target["ɵfac"]
+   const statusMap = getStatuses(target.prototype).reduce((map, next) => map.set(next.action, next), new Map<string | undefined, Metadata<StatusMetadata>>())
    stores.add(target)
    if (factory && !decorated.has(target)) {
       decorated.add(target)
@@ -229,14 +113,14 @@ export function decorateFactory(target: any) {
          configurable: true,
          value: function (...args: any[]) {
             const instance = factory(...args)
-            setup(instance, target)
+            setup(instance, target, statusMap)
             return instance
          }
       })
    }
 }
 
-export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
+function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, untrack(context), key)
    const errorHandler = injector.get(ErrorHandler)
    pushStack(deps)
@@ -255,7 +139,7 @@ function runAction(this: any, fn: any, key: any, ...args: any[]) {
    return fn.apply(this, args)
 }
 
-function decorateActions(target: {}) {
+export function decorateActions(target: {}) {
    for (const { key } of getActions(target)) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
@@ -267,7 +151,7 @@ function decorateActions(target: {}) {
    }
 }
 
-function decorateSelectors(target: {}) {
+export function decorateSelectors(target: {}) {
    for (const { key } of getSelectors(target)) {
       wrap(target, key, function (fn, ...args) {
          const cacheKey = key + JSON.stringify(args)
@@ -286,7 +170,7 @@ function decorateSelectors(target: {}) {
    }
 }
 
-function decorateChanges(target: {}) {
+export function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, value) {
       const events = getToken(EventScheduler, this)
       const changes = getToken(Changes, this)
@@ -296,7 +180,7 @@ function decorateChanges(target: {}) {
    })
 }
 
-function decorateDestroy(target: {}) {
+export function decorateDestroy(target: {}) {
    wrap(target, "ngOnDestroy", function (fn) {
       for (const environmentInjector of getMetaValues<EnvironmentInjector>(injector, this)) {
          environmentInjector.destroy()
@@ -305,137 +189,6 @@ function decorateDestroy(target: {}) {
    })
 }
 
-export function Store() {
-   return function (target: Function) {
-      const { prototype } = target
-
-      decorateFactory(target)
-      decorateChanges(prototype)
-      decorateDestroy(prototype)
-
-      decorateCheck(prototype, Phase.DoCheck)
-      decorateCheck(prototype, Phase.AfterContentChecked)
-      decorateCheck(prototype, Phase.AfterViewChecked)
-
-      decorateActions(prototype)
-      decorateSelectors(prototype)
-   }
-}
-
-@Injectable()
-export class EventScheduler {
-   events: StoreEvent[] = []
-   dispatcher = inject(EVENTS)
-
-   schedule(type: EventType, context: {}, name: string, value: unknown) {
-      this.events.push({
-         id: getId(),
-         timestamp: Date.now(),
-         type,
-         context,
-         name,
-         value,
-      } as StoreEvent)
-   }
-
-   flush() {
-      let event
-      while (event = this.events.shift()) {
-         this.dispatcher.next(event)
-      }
-   }
-}
-
-@Injectable()
-export class EffectScheduler {
-   source = new Subject<Observable<any>>()
-   queue: any[] = []
-   operator?: OperatorFunction<Observable<any>, any>
-   destination!: Subject<any>
-   connected = false
-   subscription = Subscription.EMPTY
-   pending = new Set
-   transition = inject(Transition)
-
-   next(source: Observable<any>) {
-      if (!this.connected) {
-         this.connect()
-      }
-      this.source.next(source)
-   }
-
-   enqueue( source: Observable<any>) {
-      this.queue.push([source, Zone.current])
-   }
-
-   dequeue() {
-      let effect: any
-      if (this.pending.size === 0) {
-         while (effect = this.queue.shift()) {
-            const [source, zone] = effect
-            zone.run(() => {
-               this.transition.run(() => {
-                  this.next(source)
-               })
-            })
-         }
-      }
-   }
-
-   connect() {
-      this.connected = true
-      this.destination = new Subject()
-      this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe(this.destination)
-      this.subscription.add(() => this.connected = false)
-   }
-
-   addPending(promise: Promise<any>) {
-      this.transition.run(() => {
-         this.pending.add(promise)
-         promise.finally(() => {
-            this.pending.delete(promise)
-            this.dequeue()
-         })
-      })
-   }
-
-   ngOnDestroy() {
-      this.subscription.unsubscribe()
-   }
-}
-
-export class Changes {
-   value = track({}) as any
-   setValue(value: any) {
-      for (const key in this.value) {
-         if (!(key in value)) {
-            delete this.value[key]
-         }
-      }
-      Object.assign(this.value, value)
-   }
-}
-
-@Injectable()
-export class Teardown {
-   subscriptions: Subscription[] = []
-
-   unsubscribe() {
-      let subscription
-      while (subscription = this.subscriptions.shift()) {
-         subscription.unsubscribe()
-      }
-   }
-
-   ngOnDestroy() {
-      this.unsubscribe()
-   }
-}
-
 function teardown(context: {}, key: string) {
    getToken(Teardown, context, key)?.unsubscribe()
-}
-
-export class EffectError {
-   constructor(public error: unknown) {}
 }

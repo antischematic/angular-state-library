@@ -1,5 +1,4 @@
 import {inject} from "@angular/core";
-import {Changes, CONTEXT, EffectScheduler, Teardown} from "./core";
 import {
    concatAll,
    exhaustAll,
@@ -7,12 +6,13 @@ import {
    MonoTypeOperatorFunction,
    Observable,
    OperatorFunction,
-   pipe, Subscription,
+   pipe,
+   Subscription,
    switchAll,
    TeardownLogic
 } from "rxjs";
-import {changes, getMeta} from "./metadata";
 import {TypedChanges} from "./interfaces";
+import {Changes, EffectScheduler, Teardown} from "./providers";
 
 export function useOperator<T extends OperatorFunction<Observable<unknown>, unknown>>(operator: T) {
    const effect = inject(EffectScheduler)

@@ -1,4 +1,5 @@
 import {Observable} from "rxjs";
+import {Provider} from "@angular/core";
 
 export interface EventData<K> {
    readonly id: number
@@ -54,3 +55,39 @@ export type TypedChanges<T> = {
       isFirstChange(): boolean;
    }
 }
+
+export const enum Phase {
+   DoCheck = "ngDoCheck",
+   AfterContentChecked = "ngAfterContentChecked",
+   AfterViewChecked = "ngAfterViewChecked"
+}
+
+export interface ActionMetadata {
+   immediate?: boolean;
+   phase?: Phase
+   track?: boolean
+}
+
+export interface SelectMetadata {}
+
+export interface CaughtMetadata {}
+
+export interface StatusMetadata {
+   action: string
+}
+
+export type Metadata<T> = T & {
+   key: string
+   descriptor?: PropertyDescriptor
+}
+
+export type ExtractEvents<T, U extends PropertyKey> = {
+   [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => infer R ? StoreEvent<key, P, R> : never : never
+}[U]
+
+export interface StoreConfig {
+   root?: boolean
+   actionProviders?: Provider[]
+}
+
+export type DepMap = Map<Record<any, any>, Map<string, unknown>>

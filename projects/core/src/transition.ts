@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
-import {EMPTY, Subject} from "rxjs";
+import {Subject} from "rxjs";
 import {ChangeDetectorRef, EventEmitter, inject, NgZone} from "@angular/core";
 
 interface TransitionOptions {

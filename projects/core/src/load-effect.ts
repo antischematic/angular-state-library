@@ -1,6 +1,6 @@
 import {Observable} from "rxjs";
 import {EnvironmentInjector, inject} from "@angular/core";
-import {EffectScheduler} from "./core";
+import {EffectScheduler} from "./providers";
 
 export function loadEffect<TArgs extends unknown[], TReturn extends Observable<unknown>>(load: () => Promise<{ default: (...args: TArgs) => TReturn }>): (...args: TArgs) => TReturn {
    return function (...args: any[]) {

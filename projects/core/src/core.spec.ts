@@ -2,12 +2,13 @@ import {ApplicationRef, Component, ElementRef, inject, Input, Type} from "@angul
 import {ComponentFixture, TestBed} from "@angular/core/testing";
 import {concat, finalize, from, NEVER, Observable, of, TeardownLogic, throwError} from "rxjs";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
+import {dispatch} from "./dispatch";
+import {addTeardown, useChanges} from "./hooks";
+import {EVENTS} from "./providers";
 import createSpy = jasmine.createSpy;
 import Spy = jasmine.Spy;
 import objectContaining = jasmine.objectContaining;
-import {Action, Caught, EVENTS, Invoke, Select, Store} from "./core";
-import {dispatch} from "./dispatch";
-import {addTeardown, useChanges} from "./hooks";
+import {Action, Caught, Invoke, Select, Store} from "./decorators";
 
 function createComponent<T>(type: Type<T>): ComponentFixture<T> {
    return TestBed.configureTestingModule({ declarations: [type] }).createComponent(type)

@@ -1,8 +1,8 @@
 import {dispatch} from "./dispatch";
 import {Observable, of} from "rxjs";
 import {fakeAsync, TestBed} from "@angular/core/testing";
-import {EffectScheduler} from "./core";
 import {runTestInAction} from "../test/test-utils";
+import {EffectScheduler} from "./providers";
 import createSpy = jasmine.createSpy;
 
 describe("dispatch", () => {

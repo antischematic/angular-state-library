@@ -1,7 +1,8 @@
 import {ChangeDetectorRef, Component, ErrorHandler} from "@angular/core";
-import {ACTION, ActionMetadata, CONTEXT, EffectScheduler, EventScheduler} from "../src/core";
 import {TestBed} from "@angular/core/testing";
 import {noopTransition, Transition} from "../src/transition";
+import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "../src/providers";
+import {ActionMetadata} from "../src/interfaces";
 
 @Component({
    template: ''

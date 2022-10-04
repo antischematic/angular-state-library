@@ -1,17 +1,5 @@
 // noinspection JSUnusedGlobalSymbols
 export {
-   ACTION,
-   EVENTS,
-   Action,
-   Before,
-   Layout,
-   Invoke,
-   Select,
-   Caught,
-   Store,
-   Status,
-   configureStore,
-   fromStore,
    stores as ɵɵstores,
    decorateFactory as ɵɵdecorateFactory
 } from "./core"
@@ -29,3 +17,6 @@ export {select} from "./select"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
 export {Transition, noopTransition} from "./transition"
+export {EVENTS, ACTION} from "./providers";
+export {configureStore, fromStore} from "./utils";
+export {Store, Status, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";

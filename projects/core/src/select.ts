@@ -1,7 +1,7 @@
 import {ChangeDetectorRef, ElementRef, inject, ProviderToken, ViewRef} from "@angular/core";
 import {track} from "./proxy";
-import {EVENTS} from "./core";
 import {getMeta, selector, setMeta} from "./metadata";
+import {EVENTS} from "./providers";
 
 export function select<T extends {}>(token: ProviderToken<T>): T {
    // There is only one change detector per host element, so this is close enough

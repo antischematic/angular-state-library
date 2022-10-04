@@ -1,5 +1,5 @@
 import {Directive, ElementRef, inject, Input} from "@angular/core";
-import {Store} from "./core";
+import {Store} from "./decorators";
 
 @Store()
 @Directive()

@@ -45,11 +45,12 @@ export class UITodos {
    todos: Todo[] = [];
 
    @Select() get remaining() {
-      return this.todos.filter((todo) => !todo.completed);
+      // Use "$" to track nested objects or array mutations
+      return $(this.todos).filter((todo) => !todo.completed);
    }
 
    @Select() get completed() {
-      return this.todos.filter((todo) => todo.completed);
+      return $(this.todos).filter((todo) => todo.completed);
    }
 
    @Invoke() loadTodos() {
@@ -60,7 +61,6 @@ export class UITodos {
    }
 
    @Layout() countElements() {
-      // Use "$" to track arbitrary objects
       const { length } = $(this.uiTodos);
       console.log(
          `There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${

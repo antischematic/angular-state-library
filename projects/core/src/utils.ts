@@ -1,4 +1,8 @@
 import {untrack} from "./proxy";
+import {inject, Type} from "@angular/core";
+import {filter, Observable} from "rxjs";
+import {ExtractEvents, StoreConfig} from "./interfaces";
+import {EVENTS, ROOT_CONFIG, STORE_CONFIG} from "./providers";
 
 export function isPlainObject(obj: object) {
    const proto = Object.getPrototypeOf(obj)
@@ -32,3 +36,25 @@ let id = 0
 export function getId() {
    return id++
 }
+
+export function fromStore<T>(type: Type<T>): Observable<ExtractEvents<T, keyof T>>
+export function fromStore<T>(type: T): Observable<ExtractEvents<T, keyof T>>
+export function fromStore(type: Type<any>): Observable<ExtractEvents<any, any>> {
+   const instance = typeof type === "function" ? inject(type) : type
+   return inject(EVENTS).pipe(
+      filter(event => event.context === instance)
+   ) as any
+}
+
+export function configureStore(config: StoreConfig) {
+   return {
+      provide: config.root ? ROOT_CONFIG : STORE_CONFIG,
+      useValue: config
+   }
+}
+
+export class EffectError {
+   constructor(public error: unknown) {
+   }
+}
+
