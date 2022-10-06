@@ -360,10 +360,10 @@ inside an injection context. Emits a shallow copy of the stores own properties.
 **Example: Select full store state**
 
 ```ts
-const {todos} = select(UITodos)
+const store = select(UITodos)
 
-todos.subscribe(current => {
-   console.log("todos", current)
+store.subscribe(current => {
+   console.log("store", current)
 })
 ```
 
