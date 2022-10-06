@@ -13,42 +13,44 @@ Version: 0.3.0<br/>
 
 This API is experimental.
 
-<!-- TOC -->
-* [Angular State Library](#angular-state-library)
-   * [API](#api)
-      * [Core](#core)
-         * [Store](#store)
-         * [Action](#action)
-         * [Invoke](#invoke)
-         * [Before](#before)
-         * [Layout](#layout)
-         * [Select](#select)
-         * [Caught](#caught)
-         * [Status](#status)
-         * [configureStore](#configurestore)
-         * [fromStore](#fromstore)
-         * [EVENTS](#events)
-      * [Action Hooks](#action-hooks)
-         * [dispatch](#dispatch)
-         * [loadEffect](#loadeffect)
-         * [addTeardown](#addteardown)
-         * [useChanges](#usechanges)
-         * [useOperator](#useoperator)
-         * [useConcat](#useconcat)
-         * [useExhaust](#useexhaust)
-         * [useMerge](#usemerge)
-         * [useSwitch](#useswitch)
-      * [Reactivity](#reactivity)
-         * [TemplateProvider](#templateprovider)
-         * [select](#select)
-         * [track (alias: `$`)](#track--alias---)
-         * [untrack (alias: `$$`)](#untrack--alias---)
-         * [isProxy](#isproxy)
-      * [Transitions](#transitions)
-   * [Testing Environment](#testing-environment)
-<!-- TOC -->
+* [Core](#core)
+   * [Store](#store)
+   * [Action](#action)
+   * [Invoke](#invoke)
+   * [Before](#before)
+   * [Layout](#layout)
+   * [Select](#select)
+   * [Caught](#caught)
+   * [Status](#status)
+   * [configureStore](#configurestore)
+* [Observables](#observables)
+   * [events](#events)
+   * [EVENTS](#events)
+   * [select](#select)
+   * [selectStore](#selectstore)
+* [Action Hooks](#action-hooks)
+   * [dispatch](#dispatch)
+   * [loadEffect](#loadeffect)
+   * [addTeardown](#addteardown)
+   * [useChanges](#usechanges)
+   * [useOperator](#useoperator)
+   * [useConcat](#useconcat)
+   * [useExhaust](#useexhaust)
+   * [useMerge](#usemerge)
+   * [useSwitch](#useswitch)
+* [Reactivity](#reactivity)
+   * [TemplateProvider](#templateprovider)
+   * [attach](#attach)
+   * [track (alias: `$`)](#track--alias---)
+   * [untrack (alias: `$$`)](#untrack--alias---)
+   * [isTracked](#istracked)
+* [Extensions](#extensions)
+   * [Transition](#transition)
+* [Testing Environment](#testing-environment)
 
 ### Core
+
+Angular State Library is built around class decorators.
 
 #### Store
 
@@ -67,7 +69,8 @@ export class UICounter {}
 
 #### Action
 
-Marks the decorated method as an action. Each action runs in its own `EnvironmentInjector` context. When the action is called it automatically schedules a `Dispatch` event for the next change detection cycle.
+Marks the decorated method as an action. Each action runs in its own `EnvironmentInjector` context. When the action is
+called it automatically schedules a `Dispatch` event for the next change detection cycle.
 
 **Example: Basic action**
 
@@ -104,7 +107,8 @@ export class UITodos {
 
 #### Invoke
 
-See `Action`. The method receives a reactive `this` context that tracks dependencies. The action is called automatically during `ngDoCheck` on the first change detection cycle and again each time its reactive dependencies change.
+See `Action`. The method receives a reactive `this` context that tracks dependencies. The action is called automatically
+during `ngDoCheck` on the first change detection cycle and again each time its reactive dependencies change.
 
 **Example: Reactive actions**
 
@@ -128,7 +132,8 @@ export class UICounter {
 
 #### Before
 
-See `Invoke`. Dependencies are checked during `ngAfterContentChecked`. Use this when an action depends on `ContentChild` or `ContentChildren`.
+See `Invoke`. Dependencies are checked during `ngAfterContentChecked`. Use this when an action depends on `ContentChild`
+or `ContentChildren`.
 
 **Example: Reactive content query**
 
@@ -152,8 +157,8 @@ export class UIDynamic {
 
 #### Layout
 
-See `Invoke`. Dependencies are checked during `ngAfterViewChecked`. Use this when an action depends on `ViewChild` or `ViewChildren`.
-
+See `Invoke`. Dependencies are checked during `ngAfterViewChecked`. Use this when an action depends on `ViewChild`
+or `ViewChildren`.
 
 **Example: Reactive view query**
 
@@ -167,7 +172,7 @@ export class UIParent {
    viewChildren?: QueryList<UIChild>
 
    @Layout() countElements() {
-      const { length } = $(this.viewChildren)
+      const {length} = $(this.viewChildren)
       console.log(`There are ${length} elements on the page`)
    }
 }
@@ -175,7 +180,10 @@ export class UIParent {
 
 #### Select
 
-Marks the decorated accessor or method as a selector. Use selectors to derive state from other class properties. Can be chained with other selectors. Selectors receive a reactive `this` context that tracks dependencies. Selectors are memoized until its dependencies change. Selectors are not evaluated until its value is read. The memoization cache is purged each time reactive dependencies change.
+Marks the decorated accessor or method as a selector. Use selectors to derive state from other class properties. Can be
+chained with other selectors. Selectors receive a reactive `this` context that tracks dependencies. Selectors are
+memoized until its dependencies change. Selectors are not evaluated until its value is read. The memoization cache is
+purged each time reactive dependencies change.
 
 For method selectors, arguments must be serializable with `JSON.stringify`.
 
@@ -209,7 +217,10 @@ export class UITodos {
 
 #### Caught
 
-Marks the decorated method as an error handler. Unhandled exceptions inside `Action`, `Invoke`, `Before`, `Layout` and `Select` are forwarded to the first error handler. Unhandled exceptions from dispatched effects are also captured. If the class has multiple error handlers, rethrown errors will propagate to the next error handler in the chain from top to bottom. If the last error handler rethrows an error it is propagated to the `ErrorHandler` service.
+Marks the decorated method as an error handler. Unhandled exceptions inside `Action`, `Invoke`, `Before`, `Layout`
+and `Select` are forwarded to the first error handler. Unhandled exceptions from dispatched effects are also captured.
+If the class has multiple error handlers, rethrown errors will propagate to the next error handler in the chain from top
+to bottom. If the last error handler rethrows an error it is propagated to the `ErrorHandler` service.
 
 **Example: Handling exceptions**
 
@@ -229,13 +240,16 @@ export class UITodos {
 
 #### Status
 
-Marks the decorated `Transition` as a store transition. This tracks async activity across all actions and effects declared in the store.
+Marks the decorated `Transition` as a store transition. This tracks async activity across all actions and effects
+declared in the store.
 
 **Example: Store activity indicator**
 
 ```html
+
 <ui-spinner *ngIf="status.unstable"></ui-spinner>
 ```
+
 ```ts
 @Store()
 @Component()
@@ -273,17 +287,23 @@ interface StoreConfig {
 
 `root` Set to true so stores inherit the configuration. Set to false to configure a specific store.
 
-`actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will receive a unique instance of each provider.
+`actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will
+receive a unique instance of each provider.
 
+### Observables
 
-#### fromStore
+Every store can be observed through its event stream.
 
-Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called. The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an action for the type to be correctly inferred.
+#### events
+
+Returns an observable stream of events emitted from a store. Actions automatically dispatch events when they are called.
+The next, error and complete events from dispatched effects can also be observed. Effects must be returned from an
+action for the type to be correctly inferred. This method must be called inside an injection context.
 
 **Example: Observe store events**
 
 ```ts
-fromStore(UITodos).subscribe(event => {
+events(UITodos).subscribe(event => {
    switch (event.name) {
       case "loadTodos": {
          switch (event.type) {
@@ -298,7 +318,7 @@ fromStore(UITodos).subscribe(event => {
 
 #### EVENTS
 
-Observe all events from all stores
+Injects the global event observer. Use this to observe all store events in the application.
 
 **Example: Log all store events in the application**
 
@@ -313,13 +333,48 @@ export class UIApp {
 }
 ```
 
+#### select
+
+Observe changes to individual store properties. Values are updated after actions have run. This method must be called
+inside an injection context.
+
+**Example: Select **
+
+```ts
+const {todos, userId} = select(UITodos)
+
+todos.subscribe(current => {
+   console.log("todos", current)
+})
+
+userId.subscribe(current => {
+   console.log("userId", current)
+})
+```
+
+#### selectStore
+
+Observe when any store property has changed. Values are updated after actions have run. This method must be called
+inside an injection context.
+
+**Example: Observable state**
+
+```ts
+const {todos} = select(UITodos)
+
+todos.subscribe(current => {
+   console.log("todos", current)
+})
+```
+
 ### Action Hooks
 
-Use action hooks to configure the behaviour of actions and effects.
+Use action hooks to configure the behaviour of actions and effects. Action hooks can only be called inside a method
+decorated with `@Action`, `@Invoke`, `@Before` or `@Layout`.
 
 #### dispatch
 
-Dispatch an effect from an action. Dispatch can only be called inside the stack frame of a method decorated with `@Action`, `@Invoke`, `@Before` or `@Layout`. Observer callbacks are bound to the directive instance.
+Dispatch an effect from an action. Observer callbacks are bound to the directive instance.
 
 **Example: Dispatching effects**
 
@@ -334,7 +389,7 @@ export class UITodos {
    @Invoke() loadTodos() {
       const endpoint = "https://jsonplaceholder.typicode.com/todos"
       const loadTodos = inject(HttpClient).get(endpoint, {
-         params: { userId: this.userId }
+         params: {userId: this.userId}
       })
 
       dispatch(loadTodos, (todos) => {
@@ -346,7 +401,7 @@ export class UITodos {
 
 #### loadEffect
 
-Returns a function that lazy loads an effect. The effect is loaded the first time it is called inside an action.
+Creates an action hook that lazy loads an effect. The effect is loaded the first time it is called inside an action.
 
 **Example: Lazy load effects**
 
@@ -355,10 +410,11 @@ Returns a function that lazy loads an effect. The effect is loaded the first tim
 export default function loadTodos(userId: string) {
    const endpoint = "https://jsonplaceholder.typicode.com/todos"
    return inject(HttpClient).get(endpoint, {
-      params: { userId }
+      params: {userId}
    })
 }
 ```
+
 ```ts
 const loadTodos = loadEffect(() => import("./load-todos"))
 
@@ -388,7 +444,7 @@ Adds a teardown function or subscription to be executed the next time an action 
 @Component()
 export class UIPlugin {
    @Layout() mount() {
-      const { nativeElement } = inject(ElementRef)
+      const {nativeElement} = inject(ElementRef)
       const teardown = new ThirdPartyDOMPlugin(nativeElement)
 
       addTeardown(teardown)
@@ -411,7 +467,7 @@ export class UITodos {
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
-      const { userId } = useChanges<UITodos>()
+      const {userId} = useChanges<UITodos>()
 
       dispatch(loadTodos(userId.currentValue), (todos) => {
          this.todos = todos
@@ -422,7 +478,8 @@ export class UITodos {
 
 #### useOperator
 
-Sets the merge strategy for effects dispatched from an action. The default strategy is `switchAll`. Once `useOperator` is called, the operator is locked and cannot be changed.
+Sets the merge strategy for effects dispatched from an action. The default strategy is `switchAll`. Once `useOperator`
+is called, the operator is locked and cannot be changed.
 
 **Example: Debounce effects**
 
@@ -461,7 +518,7 @@ export class UITodos {
 export default function loadTodos(userId: string) {
    useSwitchDebounce(1000)
    return inject(HttpClient).get(endpoint, {
-      params: { userId }
+      params: {userId}
    })
 }
 ```
@@ -484,9 +541,14 @@ Synonym for `useOperator(switchAll())`. This is the default behaviour.
 
 ### Reactivity
 
+Reactivity is enabled through the use of proxy objects. The reactivity API makes it possible to run actions and change
+detection automatically when data dependencies change.
+
 #### TemplateProvider
 
-Provide values from a component template reactively. Template providers are styled with `display: contents` so they don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `select` to keep dependant views in sync.
+Provide values from a component template reactively. Template providers are styled with `display: contents` so they
+don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `attach` to
+keep dependant views in sync.
 
 **Example: Theme Provider**
 
@@ -501,6 +563,7 @@ export class UITheme extends TemplateProvider {
 ```
 
 ```html
+
 <ui-theme>
    <ui-theme-button>Red button</ui-theme-button>
    <ui-theme [value]="{ color: 'green' }">
@@ -509,16 +572,17 @@ export class UITheme extends TemplateProvider {
 </ui-theme>
 ```
 
-#### select
+#### attach
 
-Inject a store and run change detection whenever the store emits an event. Use this instead of `inject` to keep views in sync with store state.
+Inject a store and run change detection whenever the store emits an event. Use this instead of `inject` to keep views in
+sync with store state.
 
 **Example: Select Theme**
 
 ```ts
 @Component()
 export class UIThemeButton {
-   theme = select(UITheme)
+   theme = attach(UITheme)
 
    @HostBinding("style.color") get color() {
       return this.theme.color
@@ -526,22 +590,44 @@ export class UIThemeButton {
 }
 ```
 
-
 #### track (alias: `$`)
 
-Track arbitrary objects inside reactive actions and selectors.
+Track arbitrary objects or array mutations inside reactive actions and selectors.
+
+**Example: Track array mutations**
+
+```ts
+@Component()
+export class UIThemeButton {
+   todos: Todo[] = []
+
+   @Select() remaining() {
+      return $(this.todos).filter(todo => !todo.completed)
+   }
+
+   @Action() addTodo(todo) {
+      this.todos.push(todo)
+   }
+}
+```
 
 #### untrack (alias: `$$`)
 
-Unwraps a proxy object, returning the original object.
+Unwraps a proxy object, returning the original object. Use this to avoid object identity hazards or when accessing
+private fields.
 
-#### isProxy
+#### isTracked
 
 Returns `true` if the value is a proxy object created with `track`
 
-### Transitions
+### Extensions
 
-Transitions use Zone.js to observe the JavaScript event loop. Transitions are a drop in replacement for `EventEmitter`. When used as an event emitter,
+These APIs integrate with Angular State Library, but they can also be used on their own.
+
+#### Transition
+
+Transitions use Zone.js to observe the JavaScript event loop. Transitions are a drop in replacement for `EventEmitter`.
+When used as an event emitter,
 any async activity is tracked in a transition zone. The transition ends once all async activity has settled.
 
 **Example: Button activity indicator**
@@ -575,16 +661,16 @@ transition.run(() => {
 })
 ```
 
-
-
 ## Testing Environment
 
-For Angular State Library to function correctly in unit tests, some additional setup is required. For a default Angular CLI setup, import the ` initStoreTestEnvironment` from `@antischematic/angular-state-library/testing` and call it just after the test environment is initialized. Sample code is provided below.
+For Angular State Library to function correctly in unit tests, some additional setup is required. For a default Angular
+CLI setup, import the ` initStoreTestEnvironment` from `@antischematic/angular-state-library/testing` and call it just
+after the test environment is initialized. Sample code is provided below.
 
 ```ts
 // test.ts (or your test setup file)
 
-import { initStoreTestEnvironment } from "@antischematic/angular-state-library/testing"; // <--------- ADD THIS LINE
+import {initStoreTestEnvironment} from "@antischematic/angular-state-library/testing"; // <--------- ADD THIS LINE
 
 // First, initialize the Angular testing environment.
 getTestBed().initTestEnvironment(

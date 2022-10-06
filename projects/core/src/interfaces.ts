@@ -1,37 +1,37 @@
 import {Observable} from "rxjs";
 import {Provider} from "@angular/core";
 
-export interface EventData<K> {
+export interface EventData<ActionName, ActionContext = unknown> {
    readonly id: number
-   readonly name: K
-   readonly context: object
+   readonly name: ActionName
+   readonly context: ActionContext
    readonly timestamp: number
 }
 
-export interface DispatchEvent<K = PropertyKey, T = unknown> extends EventData<K> {
+export interface DispatchEvent<ActionName = PropertyKey, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
    readonly type: EventType.Dispatch
-   readonly value: T
+   readonly value: ActionValue
 }
 
-export interface NextEvent<K = PropertyKey, T = unknown> extends EventData<K> {
-   readonly value: T extends Observable<infer R> ? R : never
+export interface NextEvent<ActionName = PropertyKey, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
+   readonly value: ActionValue extends Observable<infer R> ? R : never
    readonly type: EventType.Next
 }
 
-export interface ErrorEvent<K = PropertyKey> extends EventData<K> {
+export interface ErrorEvent<ActionName = PropertyKey, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
    readonly value: unknown
    readonly type: EventType.Error
 }
 
-export interface CompleteEvent<K = PropertyKey> extends EventData<K> {
+export interface CompleteEvent<ActionName = PropertyKey, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
    readonly type: EventType.Complete
 }
 
-export type StoreEvent<ActionName = PropertyKey, ActionType = unknown, EffectType = unknown> =
-   | DispatchEvent<ActionName, ActionType>
-   | NextEvent<ActionName, EffectType>
-   | ErrorEvent<ActionName>
-   | CompleteEvent<ActionName>
+export type StoreEvent<ActionName = PropertyKey, ActionContext = unknown, ActionType = unknown, EffectType = unknown> =
+   | DispatchEvent<ActionName, ActionContext, ActionType>
+   | NextEvent<ActionName, ActionContext, EffectType>
+   | ErrorEvent<ActionName, ActionContext>
+   | CompleteEvent<ActionName, ActionContext>
 
 export enum EventType {
    Dispatch = "dispatch",
@@ -82,7 +82,7 @@ export type Metadata<T> = T & {
 }
 
 export type ExtractEvents<T, U extends PropertyKey> = {
-   [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => infer R ? StoreEvent<key, P, R> : never : never
+   [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => infer R ? StoreEvent<key, T, P, R> : never : never
 }[U]
 
 export interface StoreConfig {

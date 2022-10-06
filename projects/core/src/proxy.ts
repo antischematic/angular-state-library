@@ -11,14 +11,14 @@ export function popStack() {
    deps.pop()
 }
 
-function isTracked() {
+function isTracking() {
    return deps.length > 0
 }
 
 export const changes = new WeakMap()
 
 function addDep(object: object, key: PropertyKey, value: any, previous: any = value, update = false) {
-   if (isTracked()) {
+   if (isTracking()) {
       for (const dep of deps) {
          const keyValues = dep.get(object) ?? new Map
          dep.set(object, keyValues)
@@ -70,7 +70,7 @@ export function createProxy(object: object) {
    return proxy
 }
 
-export function isProxy(object: object) {
+export function isTracked(object: object) {
    return proxies.has(object)
 }
 

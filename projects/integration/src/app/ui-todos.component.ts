@@ -8,6 +8,8 @@ import {
    Select,
    Status,
    Store, Transition, useMerge,
+   events,
+   useChanges
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
 import {Observable} from 'rxjs';
@@ -91,10 +93,10 @@ export class UITodos {
       });
    }
 
-   // trackInputChanges() {
-   //    const { userId } = onChanges<UITodos>()
-   //    console.log("inputs changed!", userId)
-   // }
+   @Invoke() trackInputChanges() {
+      const { userId } = useChanges<UITodos>()
+      console.log("inputs changed!", userId)
+   }
 
    // create a todo then toggle complete to trigger an error
    @Caught() handleError(error: unknown) {
@@ -102,13 +104,13 @@ export class UITodos {
       throw error;
    }
 
-   // @Invoke() logEvents() {
-   //    // observe events from a store
-   //    fromStore(UITodos).subscribe((event) => {
-   //       const name = Object.getPrototypeOf(event.context).constructor.name;
-   //       console.log(`${name}:${event.name as string}:${event.type}`, event);
-   //    });
-   // }
+   @Invoke() logEvents() {
+      // observe events from a store
+      events(UITodos).subscribe((event) => {
+         const name = Object.getPrototypeOf(event.context).constructor.name;
+         console.log(`${name}:${event.name as string}:${event.type}`, event);
+      });
+   }
 
    trackById(_: number, value: Todo) {
       return value.id;

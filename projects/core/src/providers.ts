@@ -20,28 +20,39 @@ export const EVENTS = new InjectionToken("EVENTS", {
    }
 })
 
-@Injectable()
-export class EventScheduler {
-   events: StoreEvent[] = []
-   dispatcher = inject(EVENTS)
+export const FLUSHED = new InjectionToken("FLUSH", {
+   factory() {
+      return new Subject<unknown>()
+   }
+})
 
-   schedule(type: EventType, context: {}, name: string, value: unknown) {
+export class EventScheduler {
+   events: StoreEvent<any, any, any, any>[] = []
+   dispatcher = inject(EVENTS)
+   flushed = inject(FLUSHED)
+
+   schedule(type: EventType, name: string, value: unknown) {
       this.events.push({
          id: getId(),
          timestamp: Date.now(),
          type,
-         context,
+         context: this.context,
          name,
          value,
-      } as StoreEvent)
+      })
    }
 
    flush() {
       let event
-      while (event = this.events.shift()) {
-         this.dispatcher.next(event)
+      if (this.events.length) {
+         while (event = this.events.shift()) {
+            this.dispatcher.next(event)
+         }
+         this.flushed.next(this.context)
       }
    }
+
+   constructor(private context: {}) {}
 }
 
 @Injectable()

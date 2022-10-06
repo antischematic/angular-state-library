@@ -1,4 +1,4 @@
-import {createProxy, isProxy, popStack, pushStack, track} from "./proxy";
+import {createProxy, isTracked, popStack, pushStack, track} from "./proxy";
 
 function createProxyTest<T extends object>(object: T): [T, T] {
   const proxy = createProxy(object)
@@ -20,7 +20,7 @@ describe("proxy", () => {
     runInContext(deps, () => {
       const object = {}
       const proxy = createProxy(object)
-      expect(isProxy(proxy)).toBeTrue()
+      expect(isTracked(proxy)).toBeTrue()
     })
   })
 

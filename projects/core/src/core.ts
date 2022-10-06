@@ -29,7 +29,8 @@ import {
    EffectScheduler,
    EventScheduler,
    ROOT_CONFIG,
-   STORE_CONFIG, StoreErrorHandler,
+   STORE_CONFIG,
+   StoreErrorHandler,
    Teardown
 } from "./providers";
 
@@ -52,13 +53,11 @@ export function decorateCheck(target: {}, name: Phase) {
    wrap(target, name, function (fn) {
       const events = getToken(EventScheduler, this)
       for (const action of actions) {
-         if (action.track) {
-            const deps = getDeps(this, action.key)
-            const dirty = deps && checkDeps(deps)
-            if (action.descriptor!.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
-               markDirty(this)
-               call(this, action.key)
-            }
+         const deps = getDeps(this, action.key)
+         const dirty = action.track && deps && checkDeps(deps)
+         if (action.descriptor!.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
+            markDirty(this)
+            call(this, action.key)
          }
       }
       for (const action of actions) {
@@ -79,10 +78,10 @@ function setup(instance: any, target: Function, statusMap: any) {
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
    const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
-   const storeInjector = createEnvironmentInjector([EventScheduler, Changes, {
-      provide: ErrorHandler,
-      useValue: errorHandler
-   }], parent)
+   const storeInjector = createEnvironmentInjector([Changes,
+      { provide: ErrorHandler, useValue: errorHandler},
+      { provide: EventScheduler, useValue: new EventScheduler(instance) }
+   ], parent)
    const storeStatus = statusMap.get(void 0)
    const transition = storeStatus ? instance[storeStatus.key] : noopTransition
    let storeConfig = getConfig()
@@ -135,7 +134,7 @@ function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, cont
 
 function runAction(this: any, fn: any, key: any, ...args: any[]) {
    const event = inject(EventScheduler)
-   event.schedule(EventType.Dispatch, untrack(this), key, args)
+   event.schedule(EventType.Dispatch, key, args)
    return fn.apply(this, args)
 }
 
@@ -174,7 +173,7 @@ export function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, value) {
       const events = getToken(EventScheduler, this)
       const changes = getToken(Changes, this)
-      events.schedule(EventType.Dispatch, this, "ngOnChanges", value)
+      events.schedule(EventType.Dispatch, "ngOnChanges", value)
       changes.setValue(value)
       fn.call(this, value)
    })

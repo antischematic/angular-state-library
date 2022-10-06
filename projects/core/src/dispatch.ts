@@ -24,7 +24,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
       wrap(observer!, key, function (fn, value) {
          const isAction = key !== "finalize"
          try {
-            isAction && event.schedule(key, context, action.key, value)
+            isAction && event.schedule(key, action.key, value)
             changeDetector.markForCheck()
             if (key === "error" && fn === noop) {
                errorHandler.handleError(value)

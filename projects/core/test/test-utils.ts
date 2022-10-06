@@ -2,7 +2,7 @@ import {ChangeDetectorRef, Component, ErrorHandler} from "@angular/core";
 import {TestBed} from "@angular/core/testing";
 import {noopTransition, Transition} from "../src/transition";
 import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "../src/providers";
-import {ActionMetadata} from "../src/interfaces";
+import {ActionMetadata, Metadata} from "../src/interfaces";
 
 @Component({
    template: ''
@@ -10,21 +10,22 @@ import {ActionMetadata} from "../src/interfaces";
 export class UIComponent {}
 
 export function runInAction(fn: Function, doneFn?: any) {
-   const action: ActionMetadata = {
+   const action: Metadata<ActionMetadata> = {
       key: "test",
       immediate: false,
       descriptor: {}
    }
+   const context = {}
    TestBed.configureTestingModule({
       providers: [
          { provide: ACTION, useValue: action },
-         { provide: CONTEXT, useValue: {} },
+         { provide: CONTEXT, useValue: context },
          { provide: ChangeDetectorRef, useValue: { markForCheck() {} }},
          { provide: ErrorHandler, useValue: { handleError() {} }},
          { provide: UIComponent, useValue: new UIComponent },
          { provide: fn, useFactory: () => fn(doneFn) },
          { provide: Transition, useValue: noopTransition },
-         EventScheduler,
+         { provide: EventScheduler, useFactory: () => new EventScheduler(context) },
          EffectScheduler,
       ]
    })

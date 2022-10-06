@@ -2,7 +2,14 @@ import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
-import {Action, dispatch, Invoke, Store} from "@antischematic/angular-state-library";
+import {
+   Action,
+   dispatch,
+   Invoke,
+   select,
+   selectStore,
+   Store, useMerge
+} from "@antischematic/angular-state-library";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
@@ -21,7 +28,6 @@ import {UITheme} from "./ui-theme";
 export class AppComponent {
    userId = '1';
    count = 0
-   interval: any
    blueTheme = {
       color: "blue"
    }
@@ -42,6 +48,21 @@ export class AppComponent {
    }
 
    @Action() otherAction() {}
+
+   @Invoke({ track: false }) observeState() {
+      const { count } = select(AppComponent)
+      const store = selectStore(AppComponent)
+
+      useMerge()
+
+      dispatch(count, (current) => {
+         console.log("count", current)
+      })
+
+      dispatch(store, (current) => {
+         console.log("store updated", current)
+      })
+   }
 
    swapThemes() {
       const { blueTheme, greenTheme } = this

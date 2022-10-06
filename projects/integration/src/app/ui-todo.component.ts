@@ -1,6 +1,6 @@
 import {CommonModule} from '@angular/common';
 import {ChangeDetectionStrategy, Component, Input, Output,} from '@angular/core';
-import {Action, select, Store, Transition} from '@antischematic/angular-state-library';
+import {Action, attach, Store, Transition} from '@antischematic/angular-state-library';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
 import {AppComponent} from "./app.component";
@@ -17,7 +17,7 @@ export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
    @Output() save = new Transition<Todo>({});
 
-   root = select(AppComponent)
+   root = attach(AppComponent)
 
    trackCount() {
       console.log("reactive parent", this.root.count)
