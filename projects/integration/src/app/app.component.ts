@@ -56,11 +56,11 @@ export class AppComponent {
       useMerge()
 
       dispatch(count, (current) => {
-         console.log("count", current)
+         // console.log("count", current)
       })
 
       dispatch(store, (current) => {
-         console.log("store updated", current)
+         // console.log("store updated", current)
       })
    }
 
