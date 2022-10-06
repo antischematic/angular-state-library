@@ -335,7 +335,7 @@ export class UIApp {
 
 #### select
 
-Observe changes to individual store properties. Values are updated after actions have run. This method must be called
+Observe changes to individual store properties. Values are checked after actions have run. This method must be called
 inside an injection context.
 
 **Example: Select partial store state**
@@ -354,8 +354,8 @@ userId.subscribe(current => {
 
 #### selectStore
 
-Observe when any store property has changed. Values are updated after actions have run. This method must be called
-inside an injection context. Emits a shallow copy of the stores own properties.
+Observe when any store property has changed. Values are checked after actions have run. This method must be called
+inside an injection context.
 
 **Example: Select full store state**
 
