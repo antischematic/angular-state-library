@@ -1,5 +1,14 @@
 import {inject, KeyValueDiffers, ProviderToken} from "@angular/core";
-import {defer, distinctUntilChanged, filter, map, Observable, share, startWith} from "rxjs";
+import {
+   defer,
+   distinctUntilChanged,
+   filter,
+   map,
+   Observable,
+   share,
+   shareReplay,
+   startWith, tap
+} from "rxjs";
 import {FLUSHED} from "./providers";
 import {getMeta, selector, setMeta} from "./metadata";
 
@@ -22,8 +31,7 @@ export function select<T extends {}>(token: ProviderToken<T>): Selector<T> {
                map(() => store[property as keyof T]),
                startWith(store[property as keyof T]),
                distinctUntilChanged(Object.is),
-               share()
-            ))
+            )).pipe(shareReplay(1))
             setMeta(selector, source, store, property)
             return source
          }
@@ -34,6 +42,7 @@ export function select<T extends {}>(token: ProviderToken<T>): Selector<T> {
 export function selectStore<T extends {}>(token: ProviderToken<T>): Observable<T> {
    const store = inject(token)
    const cache = getMeta(selector, store) as Observable<T>
+   console.log('cache', cache)
    if (cache) {
       return cache
    } else {
@@ -43,7 +52,7 @@ export function selectStore<T extends {}>(token: ProviderToken<T>): Observable<T
          filter((context): context is T => context === store),
          startWith(store),
          distinctUntilChanged((value) => differ.diff(value) === null),
-         share()
+         shareReplay(1)
       )
       setMeta(selector, source, store)
       return source

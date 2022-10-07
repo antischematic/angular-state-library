@@ -56,11 +56,30 @@ export class AppComponent {
       useMerge()
 
       dispatch(count, (current) => {
-         // console.log("count", current)
+         // console.log("count updated", current)
+      })
+      dispatch(store, (current) => {
+         // console.log("store updated", current)
+      })
+
+      setTimeout(() => {
+         this.delayedAction()
+      }, 500)
+
+   }
+
+   @Action() delayedAction() {
+      const { count } = select(AppComponent)
+      const store = selectStore(AppComponent)
+
+      useMerge()
+
+      dispatch(count, (current) => {
+         // console.log("count updated 2", current)
       })
 
       dispatch(store, (current) => {
-         // console.log("store updated", current)
+         // console.log("store updated 2", current)
       })
    }
 
