@@ -12,7 +12,7 @@ export {
    untrack as $$,
 } from "./proxy"
 export {dispatch} from "./dispatch";
-export {useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges} from "./hooks"
+export {useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges, action, snapshot} from "./hooks"
 export {attach} from "./attach"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
@@ -20,4 +20,4 @@ export {Transition, noopTransition} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events} from "./utils";
 export {Store, Status, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
-export { select, selectStore, Selector, snapshot } from "./select"
+export { select, selectStore, Selector } from "./select"

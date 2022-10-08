@@ -1,7 +1,7 @@
 import {inject} from "@angular/core";
 import {
    concatAll,
-   exhaustAll,
+   exhaustAll, filter, map,
    mergeAll,
    MonoTypeOperatorFunction,
    Observable,
@@ -11,8 +11,18 @@ import {
    switchAll,
    TeardownLogic
 } from "rxjs";
-import {TypedChanges} from "./interfaces";
-import {Changes, EffectScheduler, Teardown} from "./providers";
+import {
+   EventType,
+   Metadata,
+   NextEvent,
+   SelectMetadata,
+   StoreEvent,
+   TypedChanges
+} from "./interfaces";
+import {ACTION, Changes, CONTEXT, EffectScheduler, Teardown} from "./providers";
+import {events} from "./utils";
+import {getMeta, selector, setMeta} from "./metadata";
+import {dispatch} from "./dispatch";
 
 export function useOperator<T extends OperatorFunction<Observable<unknown>, unknown>>(operator: T) {
    const effect = inject(EffectScheduler)
@@ -48,4 +58,35 @@ export function addTeardown(teardown: TeardownLogic) {
 
 export function useChanges<T>(): TypedChanges<T> {
    return inject(Changes).value
+}
+
+export function action<T>(action: (...args: any) => Observable<T>, instance: unknown = inject(CONTEXT).instance): Observable<T> {
+   return events(instance).pipe(
+      filter((event: StoreEvent): event is NextEvent => event.name === action.name && event.type === EventType.Next),
+      map((event) => event.value)
+   )
+}
+
+export function snapshot<T>(source: (...args: any[]) => Observable<T>): T | undefined
+export function snapshot<T>(source: Observable<T>): T | undefined
+export function snapshot<T>(source: Observable<T> | ((...args: any[]) => Observable<T>)): T | undefined {
+   const select = inject(ACTION) as Metadata<SelectMetadata>
+   const { instance } = inject(CONTEXT) as any
+   const scheduler = inject(EffectScheduler)
+   const cacheKey = getMeta(selector, instance) as SelectMetadata
+   let current = getMeta(cacheKey, instance, select.key) as T
+
+   source = typeof source !== "function"
+      ? source
+      : action(source)
+
+   dispatch(source, (value) => {
+      current = value
+      setMeta(cacheKey, value, instance, select.key)
+   })
+   const frame = requestAnimationFrame(() => {
+      cancelAnimationFrame(frame)
+      scheduler.dequeue()
+   })
+   return current
 }

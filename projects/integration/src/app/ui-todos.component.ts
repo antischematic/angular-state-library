@@ -1,15 +1,20 @@
 import {
    $,
    Action,
+   action,
    Caught,
    dispatch,
-   Invoke,
-   Layout, loadEffect,
-   Select,
-   Status,
-   Store, Transition, useMerge,
    events,
-   useChanges, snapshot
+   Invoke,
+   Layout,
+   loadEffect,
+   Select,
+   snapshot,
+   Status,
+   Store,
+   Transition,
+   useChanges,
+   useMerge
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
 import {Observable} from 'rxjs';
@@ -45,7 +50,7 @@ export class UITodos {
    uiTodos!: QueryList<UITodos>;
 
    @Select() get todos(): Todo[] {
-      return snapshot(this.loadTodos) ?? []
+      return snapshot(action(this.loadTodos)) ?? []
    }
 
    @Select() get remaining() {
@@ -63,7 +68,7 @@ export class UITodos {
    }
 
    @Layout() countElements() {
-      const { length } = $(this.uiTodos);
+      const {length} = $(this.uiTodos);
       console.log(
          `There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${
             length === 1 ? '' : 's'
@@ -94,7 +99,7 @@ export class UITodos {
    }
 
    @Invoke() trackInputChanges() {
-      const { userId } = useChanges<UITodos>()
+      const {userId} = useChanges<UITodos>()
       console.log("inputs changed!", userId)
    }
 
@@ -127,7 +132,7 @@ export class UITodos {
 function loadTodos(userId: string): Observable<Todo[]> {
    return inject(HttpClient).get<Todo[]>(
       `https://jsonplaceholder.typicode.com/todos`,
-      { params: { userId } }
+      {params: {userId}}
    );
 }
 
@@ -135,7 +140,7 @@ function createTodo(userId: string, title: string): Observable<Todo> {
    useMerge()
    return inject(HttpClient).post<Todo>(
       'https://jsonplaceholder.typicode.com/todos',
-      { userId, title }
+      {userId, title}
    )
 }
 
