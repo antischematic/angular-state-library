@@ -9,7 +9,7 @@ import {
    Status,
    Store, Transition, useMerge,
    events,
-   useChanges
+   useChanges, snapshot
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
 import {Observable} from 'rxjs';
@@ -44,7 +44,9 @@ export class UITodos {
 
    uiTodos!: QueryList<UITodos>;
 
-   todos: Todo[] = [];
+   @Select() get todos(): Todo[] {
+      return snapshot(this.loadTodos) ?? []
+   }
 
    @Select() get remaining() {
       // Use "$" to track nested objects or array mutations
@@ -57,9 +59,7 @@ export class UITodos {
 
    @Invoke() loadTodos() {
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId), (todos) => {
-         this.todos = todos;
-      });
+      return dispatch(loadTodos(this.userId));
    }
 
    @Layout() countElements() {

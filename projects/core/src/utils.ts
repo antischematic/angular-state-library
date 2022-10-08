@@ -18,12 +18,14 @@ export function wrap(target: { [key: PropertyKey]: any }, property: PropertyKey,
    const object = descriptor ? descriptor : target
    const getOrValue = descriptor?.get ? "get" : "value"
    const originalFunction = (descriptor ? descriptor[getOrValue] : object[property]) ?? noop
+   function wrapped(this: unknown, ...args: any[]) {
+      return fn.call(untrack(this), originalFunction, ...args)
+   }
 
+   Object.defineProperty(wrapped, "name", { value: property })
    Object.defineProperty(target, property, {
       configurable: true,
-      [getOrValue]: function (this: unknown, ...args: any[]) {
-         return fn.call(untrack(this), originalFunction, ...args)
-      }
+      [getOrValue]: wrapped
    })
 
    return originalFunction === noop

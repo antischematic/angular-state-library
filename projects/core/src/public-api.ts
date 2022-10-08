@@ -20,4 +20,4 @@ export {Transition, noopTransition} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events} from "./utils";
 export {Store, Status, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
-export { select, selectStore, Selector } from "./select"
+export { select, selectStore, Selector, snapshot } from "./select"

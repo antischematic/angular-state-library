@@ -15,11 +15,19 @@ import {
    getStatuses,
    getToken,
    injector,
-   markDirty,
+   markDirty, selector,
    setMeta,
    tracked
 } from "./metadata";
-import {DepMap, EventType, Metadata, Phase, StatusMetadata} from "./interfaces";
+import {
+   ActionMetadata,
+   DepMap,
+   EventType,
+   Metadata,
+   Phase,
+   StatusMetadata,
+   StoreConfig
+} from "./interfaces";
 import {call, wrap} from "./utils";
 import {noopTransition, Transition} from "./transition";
 import {
@@ -73,6 +81,18 @@ function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
+function createInjector(meta: Metadata<ActionMetadata>, instance: {}, transition: Transition, config: StoreConfig, parent: EnvironmentInjector) {
+   const actionInjector = createEnvironmentInjector([
+      { provide: ACTION, useValue: meta },
+      { provide: CONTEXT, useValue: {instance}},
+      { provide: Transition, useValue: transition },
+      EffectScheduler,
+      Teardown,
+      config?.actionProviders ?? []
+   ], parent)
+   setMeta(injector, actionInjector, instance, meta.key)
+}
+
 function setup(instance: any, target: Function, statusMap: any) {
    if (getMeta(injector, instance)) return
    const prototype = target.prototype
@@ -84,18 +104,13 @@ function setup(instance: any, target: Function, statusMap: any) {
    ], parent)
    const storeStatus = statusMap.get(void 0)
    const transition = storeStatus ? instance[storeStatus.key] : noopTransition
-   let storeConfig = getConfig()
+   let config = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
-      const actionInjector = createEnvironmentInjector([
-         { provide: ACTION, useValue: action },
-         { provide: CONTEXT, useValue: {instance}},
-         { provide: Transition, useValue: transition },
-         EffectScheduler,
-         Teardown,
-         storeConfig?.actionProviders ?? []
-      ], storeInjector)
-      setMeta(injector, actionInjector, instance, action.key)
+      createInjector(action, instance, transition, config, storeInjector)
+   }
+   for (const selector of getSelectors(prototype)) {
+      createInjector(selector, instance, transition, config, storeInjector)
    }
 }
 
@@ -157,12 +172,18 @@ export function decorateSelectors(target: {}) {
          const proxy = createProxy(this)
          const deps = getDeps(this, cacheKey)
          const dirty = deps ? checkDeps(deps) : true
+         const previous = getMeta(selector, this, key)
          let result = getMeta(cacheKey, this, key)
          if (dirty) {
-            const newDeps = new Map()
-            result = runInContext(newDeps, fn, proxy, void 0, ...args)
-            setMeta(cacheKey, result, this, key)
-            setMeta(tracked, newDeps, this, cacheKey)
+            try {
+               const newDeps = new Map()
+               setMeta(selector, cacheKey, this)
+               result = runInContext(newDeps, fn, proxy, key, ...args)
+               setMeta(cacheKey, result, this, key)
+               setMeta(tracked, newDeps, this, cacheKey)
+            } finally {
+               setMeta(selector, previous, this, key)
+            }
          }
          return result
       })
