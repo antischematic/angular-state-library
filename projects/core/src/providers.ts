@@ -1,4 +1,4 @@
-import {ErrorHandler, inject, Injectable, InjectionToken} from "@angular/core";
+import {ErrorHandler, EventEmitter, inject, Injectable, InjectionToken} from "@angular/core";
 import {Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
 import {ActionMetadata, EventType, StoreConfig, StoreEvent} from "./interfaces";
 import {track} from "./proxy";
@@ -16,7 +16,7 @@ export const ROOT_CONFIG = new InjectionToken<StoreConfig>("ROOT_CONFIG", {
 })
 export const EVENTS = new InjectionToken("EVENTS", {
    factory() {
-      return new Subject<StoreEvent>()
+      return new EventEmitter<StoreEvent>(true)
    }
 })
 
