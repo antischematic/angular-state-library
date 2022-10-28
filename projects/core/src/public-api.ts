@@ -19,5 +19,5 @@ export {loadEffect} from "./load-effect"
 export {Transition, noopTransition} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events} from "./utils";
-export {Store, Status, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
+export {Store, Status, Caught, Select, Layout, Before, Invoke, Action, Attach} from "./decorators";
 export { select, selectStore, Selector } from "./select"

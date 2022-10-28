@@ -7,7 +7,7 @@ declare var beforeEach: any, afterEach: any
 function processStores() {
    for (const store of stores) {
       Object.defineProperty(store, "ɵfac", {configurable: true, value: store["ɵfac"]})
-      decorateFactory(store)
+      // decorateFactory(store)
    }
 }
 
