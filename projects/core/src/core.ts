@@ -73,8 +73,8 @@ function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
-function setup(instance: any, target: Function, statusMap: any) {
-   if (getMeta(injector, instance)) return
+export function setup(target: any, factory: any, statusMap: any, ...args: any[]) {
+   const instance = factory(...args)
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
    const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
@@ -97,23 +97,19 @@ function setup(instance: any, target: Function, statusMap: any) {
       ], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
+   return instance
 }
 
 export const stores = new Set<any>()
 const decorated = new WeakSet()
 
-export function decorateFactory(target: any) {
+export function decorateFactory(target: any, fn: (this: any, ...args: any[]) => any, ...additionalArgs: any[]) {
    const factory = target["ɵfac"]
-   const statusMap = getStatuses(target.prototype).reduce((map, next) => map.set(next.action, next), new Map<string | undefined, Metadata<StatusMetadata>>())
-   stores.add(target)
-   if (factory && !decorated.has(target)) {
-      decorated.add(target)
+   if (factory) {
       Object.defineProperty(target, "ɵfac", {
          configurable: true,
          value: function (...args: any[]) {
-            const instance = factory(...args)
-            setup(instance, target, statusMap)
-            return instance
+            return fn(target, factory, ...additionalArgs, ...args)
          }
       })
    }

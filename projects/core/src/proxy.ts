@@ -17,7 +17,7 @@ function isTracking() {
 
 export const changes = new WeakMap()
 
-function addDep(object: object, key: PropertyKey, value: any, previous: any = value, update = false) {
+export function addDep(object: object, key: PropertyKey, value: any, previous: any = value, update = false) {
    if (isTracking()) {
       for (const dep of deps) {
          const keyValues = dep.get(object) ?? new Map

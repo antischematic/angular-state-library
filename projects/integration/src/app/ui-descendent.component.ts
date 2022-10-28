@@ -1,8 +1,9 @@
 import {ChangeDetectionStrategy, Component, ElementRef, inject} from '@angular/core';
 import {UITheme} from "./ui-theme";
 import {UICounter} from "./ui-counter.component";
-import {attach} from "@antischematic/angular-state-library";
+import {attach, Attach, Invoke, Select, Store} from "@antischematic/angular-state-library";
 
+@Store()
 @Component({
    changeDetection: ChangeDetectionStrategy.OnPush,
    selector: 'ui-descendent',
@@ -12,6 +13,14 @@ import {attach} from "@antischematic/angular-state-library";
   `,
 })
 export class UIDescendent {
-   counter = attach(UICounter);
-   theme = attach(UITheme)
+   @Attach(UICounter) counter!: UICounter
+   @Attach(UITheme) theme!: UITheme
+
+   @Invoke() logTheme() {
+      console.log('current theme color: ', attach(UITheme))
+   }
+
+   constructor() {
+      console.log(this)
+   }
 }
