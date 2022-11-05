@@ -1,6 +1,5 @@
 import {ChangeDetectorRef, Component, ErrorHandler} from "@angular/core";
 import {TestBed} from "@angular/core/testing";
-import {noopTransition, Transition} from "../src/transition";
 import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "../src/providers";
 import {ActionMetadata, Metadata} from "../src/interfaces";
 
@@ -24,7 +23,6 @@ export function runInAction(fn: Function, doneFn?: any) {
          { provide: ErrorHandler, useValue: { handleError() {} }},
          { provide: UIComponent, useValue: new UIComponent },
          { provide: fn, useFactory: () => fn(doneFn) },
-         { provide: Transition, useValue: noopTransition },
          { provide: EventScheduler, useFactory: () => new EventScheduler(context) },
          EffectScheduler,
       ]

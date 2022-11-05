@@ -7,8 +7,8 @@ import {
    decorateSelectors,
    setup
 } from "./core";
-import {ActionMetadata, Metadata, Phase, SelectMetadata, StatusMetadata} from "./interfaces";
-import {action, caught, getStatuses, selector, setMeta, status} from "./metadata";
+import {ActionMetadata, Phase, SelectMetadata} from "./interfaces";
+import {action, caught, selector, setMeta} from "./metadata";
 
 const defaults = {track: true, immediate: true}
 
@@ -23,9 +23,8 @@ export function createDecorator<T extends {}>(symbol: symbol, defaults = {}) {
 export function Store() {
    return function (target: Function) {
       const {prototype} = target
-      const statuses = getStatuses(target.prototype).reduce((map, next) => map.set(next.action, next), new Map<string | undefined, Metadata<StatusMetadata>>())
 
-      decorateFactory(target, setup, statuses)
+      decorateFactory(target, setup)
       decorateChanges(prototype)
       decorateDestroy(prototype)
 
@@ -44,4 +43,3 @@ export const Before = createDecorator<ActionMetadata>(action, {...defaults, phas
 export const Layout = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterViewChecked})
 export const Select = createDecorator<SelectMetadata>(selector)
 export const Caught = createDecorator(caught)
-export const Status = createDecorator<{ action?: string }>(status)

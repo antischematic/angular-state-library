@@ -1,6 +1,6 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
-import {Subject} from "rxjs";
+import {MonoTypeOperatorFunction, Observable, Subject, SubjectLike} from "rxjs";
 import {ChangeDetectorRef, EventEmitter, inject, NgZone} from "@angular/core";
 
 interface TransitionOptions {
@@ -89,10 +89,8 @@ export class Transition<T = unknown> extends EventEmitter<T> {
    }
 }
 
-export class NoopTransition {
-   run(fn: Function, applyThis?: {}, ...applyArgs: any[]) {
-      return fn.apply(applyThis, applyArgs)
-   }
+export function withTransition<T>(transition: Transition): MonoTypeOperatorFunction<T> {
+   return source => new Observable(subscriber => {
+      return transition.run(() => source.subscribe(subscriber))
+   })
 }
-
-export const noopTransition = new NoopTransition()

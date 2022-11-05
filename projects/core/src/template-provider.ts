@@ -14,7 +14,7 @@ export class TemplateProvider {
    }
 }
 
-const values = new WeakMap
+export const values = new WeakMap
 
 export function getValue(instance: any) {
    return values.get(instance)

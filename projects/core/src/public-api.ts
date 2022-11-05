@@ -16,8 +16,9 @@ export {useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, us
 export {attach, Attach} from "./attach"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
-export {Transition, noopTransition} from "./transition"
+export {Transition, withTransition} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events} from "./utils";
-export {Store, Status, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
+export {Store, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
 export { select, selectStore, Selector } from "./select"
+export { useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions } from "./data"

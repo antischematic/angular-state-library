@@ -5,7 +5,6 @@ import {
    DepMap, Metadata,
    Phase,
    SelectMetadata,
-   StatusMetadata
 } from "./interfaces";
 
 export const meta = new WeakMap()
@@ -15,7 +14,6 @@ export const selector = Symbol("selector")
 export const tracked = Symbol("track")
 export const injector = Symbol("injector")
 export const caught = Symbol("caught")
-export const status = Symbol("status")
 
 function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
@@ -47,10 +45,6 @@ export function getSelectors(target: {}) {
 
 export function getErrorHandlers(target: {}) {
    return getMetaValues<CaughtMetadata>(caught, target)
-}
-
-export function getStatuses(target: {}) {
-   return getMetaValues<StatusMetadata>(status, target)
 }
 
 export function getDeps(target: {}, key: PropertyKey): DepMap | undefined {

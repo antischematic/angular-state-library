@@ -2,7 +2,6 @@ import {ErrorHandler, inject, Injectable, InjectionToken} from "@angular/core";
 import {Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
 import {ActionMetadata, EventType, StoreConfig, StoreEvent} from "./interfaces";
 import {track} from "./proxy";
-import {Transition} from "./transition";
 import {EffectError, getId} from "./utils";
 import {getErrorHandlers} from "./metadata";
 
@@ -64,7 +63,6 @@ export class EffectScheduler {
    connected = false
    subscription = Subscription.EMPTY
    pending = new Set
-   transition = inject(Transition)
 
    next(source: Observable<any>) {
       if (!this.connected) {
@@ -74,19 +72,14 @@ export class EffectScheduler {
    }
 
    enqueue(source: Observable<any>) {
-      this.queue.push([source, Zone.current])
+      this.queue.push(source)
    }
 
    dequeue() {
       let effect: any
       if (this.pending.size === 0) {
          while (effect = this.queue.shift()) {
-            const [source, zone] = effect
-            zone.run(() => {
-               this.transition.run(() => {
-                  this.next(source)
-               })
-            })
+            this.next(effect)
          }
       }
    }
@@ -99,12 +92,10 @@ export class EffectScheduler {
    }
 
    addPending(promise: Promise<any>) {
-      this.transition.run(() => {
-         this.pending.add(promise)
-         promise.finally(() => {
-            this.pending.delete(promise)
-            this.dequeue()
-         })
+      this.pending.add(promise)
+      promise.finally(() => {
+         this.pending.delete(promise)
+         this.dequeue()
       })
    }
 
