@@ -72,10 +72,6 @@ export interface SelectMetadata {}
 
 export interface CaughtMetadata {}
 
-export interface StatusMetadata {
-   action: string
-}
-
 export type Metadata<T> = T & {
    key: string
    descriptor?: PropertyDescriptor

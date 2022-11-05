@@ -12,16 +12,14 @@ import {
    getMeta,
    getMetaValues,
    getSelectors,
-   getStatuses,
    getToken,
    injector,
    markDirty,
    setMeta,
    tracked
 } from "./metadata";
-import {DepMap, EventType, Metadata, Phase, StatusMetadata} from "./interfaces";
+import {DepMap, EventType, Phase} from "./interfaces";
 import {call, wrap} from "./utils";
-import {noopTransition, Transition} from "./transition";
 import {
    ACTION,
    Changes,
@@ -73,7 +71,7 @@ function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
-export function setup(target: any, factory: any, statusMap: any, ...args: any[]) {
+export function setup(target: any, factory: any, ...args: any[]) {
    const instance = factory(...args)
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
@@ -82,15 +80,12 @@ export function setup(target: any, factory: any, statusMap: any, ...args: any[])
       { provide: ErrorHandler, useValue: errorHandler},
       { provide: EventScheduler, useValue: new EventScheduler(instance) }
    ], parent)
-   const storeStatus = statusMap.get(void 0)
-   const transition = storeStatus ? instance[storeStatus.key] : noopTransition
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
       const actionInjector = createEnvironmentInjector([
          { provide: ACTION, useValue: action },
          { provide: CONTEXT, useValue: {instance}},
-         { provide: Transition, useValue: transition },
          EffectScheduler,
          Teardown,
          storeConfig?.actionProviders ?? []

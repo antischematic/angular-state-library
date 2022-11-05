@@ -6,10 +6,9 @@ import {
    Invoke,
    Layout, loadEffect,
    Select,
-   Status,
    Store, Transition, useMerge,
    events,
-   useChanges
+   useChanges, useQuery, useMutation, withTransition
 } from '@antischematic/angular-state-library';
 import {UITodo} from './ui-todo.component';
 import {Observable} from 'rxjs';
@@ -38,27 +37,31 @@ import {UITheme} from "./ui-theme";
 export class UITodos {
    @Input() userId!: string;
 
-   @Status() transition = new Transition();
+   transition = new Transition();
 
    @ViewChildren(UITodo)
 
    uiTodos!: QueryList<UITodos>;
 
-   todos: Todo[] = [];
+   todos: Todo[] = []
 
    @Select() get remaining() {
       // Use "$" to track nested objects or array mutations
-      return $(this.todos).filter((todo) => !todo.completed);
+      return $(this.todos).filter((todo) => !todo.completed) ?? [];
    }
 
    @Select() get completed() {
-      return $(this.todos).filter((todo) => todo.completed);
+      return $(this.todos).filter((todo) => todo.completed) ?? [];
+   }
+
+   @Action() setTodos(todos: Todo[]) {
+      this.todos = todos
    }
 
    @Invoke() loadTodos() {
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId), (todos) => {
-         this.todos = todos;
+      return dispatch(loadTodos(this.userId, this.transition), {
+         next: this.setTodos
       });
    }
 
@@ -72,9 +75,7 @@ export class UITodos {
    }
 
    @Action() createTodo(todo: Todo) {
-      return dispatch(createTodo(this.userId, todo.title), {
-         finalize: this.loadTodos,
-      });
+      return dispatch(createTodo(this.userId, todo.title));
    }
 
    @Action() updateTodo(todo: Todo) {
@@ -83,14 +84,11 @@ export class UITodos {
             console.log('error observed, rethrowing', error);
             throw error;
          },
-         finalize: this.loadTodos,
       });
    }
 
    @Action() toggleAll(todos: Todo[]) {
-      return dispatch(toggleAll(todos), {
-         finalize: this.loadTodos,
-      });
+      return dispatch(toggleAll(todos));
    }
 
    @Invoke() trackInputChanges() {
@@ -124,18 +122,24 @@ export class UITodos {
    }
 }
 
-function loadTodos(userId: string): Observable<Todo[]> {
-   return inject(HttpClient).get<Todo[]>(
-      `https://jsonplaceholder.typicode.com/todos`,
-      { params: { userId } }
-   );
+const endpoint = `https://jsonplaceholder.typicode.com/todos`
+
+function loadTodos(userId: string, loading: Transition): Observable<Todo[]> {
+   return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId } }).pipe(
+      withTransition(loading),
+      useQuery({
+         key: [endpoint, userId],
+         // refreshInterval: 10000,
+         // refreshIfStale: true,
+         // staleTime: 10000,
+      }),
+   )
 }
 
 function createTodo(userId: string, title: string): Observable<Todo> {
    useMerge()
-   return inject(HttpClient).post<Todo>(
-      'https://jsonplaceholder.typicode.com/todos',
-      { userId, title }
+   return inject(HttpClient).post<Todo>(endpoint, { userId, title }).pipe(
+      useMutation({ invalidate: [endpoint, userId] })
    )
 }
 
