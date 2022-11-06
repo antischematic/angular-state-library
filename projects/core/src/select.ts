@@ -1,16 +1,7 @@
 import {inject, KeyValueDiffers, ProviderToken} from "@angular/core";
-import {
-   defer,
-   distinctUntilChanged,
-   filter,
-   map,
-   Observable,
-   share,
-   shareReplay,
-   startWith, tap
-} from "rxjs";
-import {FLUSHED} from "./providers";
+import {defer, distinctUntilChanged, filter, map, Observable, shareReplay, startWith} from "rxjs";
 import {getMeta, selector, setMeta} from "./metadata";
+import {FLUSHED} from "./providers";
 
 export type Selector<T> = {
    [key in keyof T]: Observable<T[key]>
@@ -42,7 +33,6 @@ export function select<T extends {}>(token: ProviderToken<T>): Selector<T> {
 export function selectStore<T extends {}>(token: ProviderToken<T>): Observable<T> {
    const store = inject(token)
    const cache = getMeta(selector, store) as Observable<T>
-   console.log('cache', cache)
    if (cache) {
       return cache
    } else {

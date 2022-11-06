@@ -1,47 +1,24 @@
-import {ChangeDetectorRef, ElementRef, inject, ProviderToken, ViewRef} from "@angular/core";
-import {decorateFactory} from "./core";
-import {getMeta, selector, setMeta} from "./metadata";
-import {EVENTS} from "./providers";
-import {addDep, track} from "./proxy";
-import {getValue} from "./template-provider";
+import {ChangeDetectorRef, inject, ProviderToken, ViewRef} from "@angular/core";
+import {Subscribable} from "rxjs";
+import {track} from "./proxy";
 
-export function attach<T extends {}>(token: ProviderToken<T>, directive?: any, key?: string): T {
-   // There is only one change detector per host element, so this is close enough
-   const { nativeElement } = inject(ElementRef)
-   const instance = inject(token)
-   if (!getMeta(selector, token, nativeElement)) {
-      setMeta(selector, token, nativeElement)
-      const cdr = inject(ChangeDetectorRef) as ViewRef
-      const subscription = inject(EVENTS).subscribe((event) => {
+export function attach<T extends {}>(token: Subscribable<T>, directive?: any, key?: string): never
+export function attach<T extends {}>(token: ProviderToken<T>, directive: any, key: string): T
+export function attach<T extends {}>(token: ProviderToken<T> | Subscribable<T>, directive?: any, key?: string): unknown {
+   const subscribable = token as any
+   const instance = inject(subscribable)
+   const cdr = inject(ChangeDetectorRef) as ViewRef
+   const subscription = Object.getPrototypeOf(instance).constructor.subscribe({
+      next(value: any) {
          if (cdr.destroyed) subscription.unsubscribe()
-         if (event.context === instance) {
+         else {
             if (directive && key) {
-               directive[key] = track(getValue(instance) ?? instance)
+               directive[key] = track(value)
             }
             cdr.markForCheck()
          }
-      })
-   }
-   const value = getValue(instance) ?? instance
-   const obj = {
-      get check() {
-         return getValue(instance)
       }
-   }
-   if (directive && key) {
-      directive[key] = value
-   }
-   addDep(obj, "check", value)
-   return track(value)
-}
-
-export function Attach(token: ProviderToken<any>) {
-   return function (target: any, key: string) {
-      decorateFactory(target.constructor, function (target: any, factory: Function, ...args: any[]) {
-         const instance = factory(...args)
-         attach(token, instance, key)
-         return instance
-      })
-   }
+   })
+   return track(instance)
 }
 

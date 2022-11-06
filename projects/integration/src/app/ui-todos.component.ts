@@ -1,17 +1,4 @@
-import {
-   $,
-   Action,
-   Caught,
-   dispatch,
-   Invoke,
-   Layout, loadEffect,
-   Select,
-   Store, Transition, useMerge,
-   events,
-   useChanges, useQuery, useMutation, withTransition
-} from '@antischematic/angular-state-library';
-import {UITodo} from './ui-todo.component';
-import {Observable} from 'rxjs';
+import {CommonModule} from '@angular/common';
 import {HttpClient} from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
@@ -21,10 +8,29 @@ import {
    QueryList,
    ViewChildren,
 } from '@angular/core';
+import {
+   $,
+   Action,
+   Caught,
+   dispatch,
+   events,
+   Invoke,
+   Layout,
+   loadEffect,
+   Select,
+   Store,
+   Transition,
+   useChanges,
+   useMerge,
+   useMutation,
+   useQuery,
+   useTransition
+} from '@antischematic/angular-state-library';
+import {Observable} from 'rxjs';
 import {Todo} from './interfaces';
-import {CommonModule} from '@angular/common';
 import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
+import {UITodo} from './ui-todo.component';
 
 @Store()
 @Component({
@@ -37,11 +43,9 @@ import {UITheme} from "./ui-theme";
 export class UITodos {
    @Input() userId!: string;
 
-   transition = new Transition();
+   transition = new Transition<Todo[]>()
 
-   @ViewChildren(UITodo)
-
-   uiTodos!: QueryList<UITodos>;
+   @ViewChildren(UITodo) uiTodos!: QueryList<UITodos>;
 
    todos: Todo[] = []
 
@@ -66,7 +70,7 @@ export class UITodos {
    }
 
    @Layout() countElements() {
-      const { length } = $(this.uiTodos);
+      const {length} = $(this.uiTodos);
       console.log(
          `There ${length === 1 ? 'is' : 'are'} now ${length} <ui-todo> element${
             length === 1 ? '' : 's'
@@ -88,11 +92,11 @@ export class UITodos {
    }
 
    @Action() toggleAll(todos: Todo[]) {
-      return dispatch(toggleAll(todos));
+      return dispatch(toggleAll(todos, this.transition));
    }
 
    @Invoke() trackInputChanges() {
-      const { userId } = useChanges<UITodos>()
+      const {userId} = useChanges<UITodos>()
       console.log("inputs changed!", userId)
    }
 
@@ -124,22 +128,22 @@ export class UITodos {
 
 const endpoint = `https://jsonplaceholder.typicode.com/todos`
 
-function loadTodos(userId: string, loading: Transition): Observable<Todo[]> {
-   return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId } }).pipe(
-      withTransition(loading),
+function loadTodos(userId: string, loading?: Transition<Todo[]>): Observable<Todo[]> {
+   return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
+      useTransition(loading, { emit: true }),
       useQuery({
          key: [endpoint, userId],
-         // refreshInterval: 10000,
-         // refreshIfStale: true,
-         // staleTime: 10000,
+         refreshInterval: 5000,
+         refreshOnFocus: true,
+         staleTime: 4950,
       }),
    )
 }
 
 function createTodo(userId: string, title: string): Observable<Todo> {
    useMerge()
-   return inject(HttpClient).post<Todo>(endpoint, { userId, title }).pipe(
-      useMutation({ invalidate: [endpoint, userId] })
+   return inject(HttpClient).post<Todo>(endpoint, {userId, title}).pipe(
+      useMutation({invalidate: [endpoint, userId]})
    )
 }
 
