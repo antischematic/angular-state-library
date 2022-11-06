@@ -2,7 +2,8 @@ import {ChangeDetectorRef, Injector, ProviderToken} from "@angular/core";
 import {
    ActionMetadata,
    CaughtMetadata,
-   DepMap, Metadata,
+   DepMap,
+   Metadata,
    Phase,
    SelectMetadata,
 } from "./interfaces";
@@ -14,6 +15,7 @@ export const selector = Symbol("selector")
 export const tracked = Symbol("track")
 export const injector = Symbol("injector")
 export const caught = Symbol("caught")
+export const attach = Symbol("attach")
 
 function ensureKey(target: WeakMap<any, any>, key: any) {
    return target.has(key) ? target.get(key)! : target.set(key, new Map()).get(key)!
@@ -59,3 +61,6 @@ export function markDirty(context: {}) {
    getToken(ChangeDetectorRef, context).markForCheck()
 }
 
+export function getAttachments(target: {}) {
+   return getMetaValues<{ token: ProviderToken<any> }>(attach, target)
+}

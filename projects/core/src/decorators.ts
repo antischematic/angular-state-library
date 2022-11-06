@@ -1,3 +1,4 @@
+import {ProviderToken} from "@angular/core";
 import {
    decorateActions,
    decorateChanges,
@@ -5,10 +6,11 @@ import {
    decorateDestroy,
    decorateFactory,
    decorateSelectors,
+   decorateSubscribe,
    setup
 } from "./core";
 import {ActionMetadata, Phase, SelectMetadata} from "./interfaces";
-import {action, caught, selector, setMeta} from "./metadata";
+import {action, attach, caught, selector, setMeta} from "./metadata";
 
 const defaults = {track: true, immediate: true}
 
@@ -34,6 +36,7 @@ export function Store() {
 
       decorateActions(prototype)
       decorateSelectors(prototype)
+      decorateSubscribe(target)
    }
 }
 
@@ -43,3 +46,9 @@ export const Before = createDecorator<ActionMetadata>(action, {...defaults, phas
 export const Layout = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterViewChecked})
 export const Select = createDecorator<SelectMetadata>(selector)
 export const Caught = createDecorator(caught)
+
+export function Attach(token: ProviderToken<any>) {
+   return function (target: {}, key: PropertyKey) {
+      setMeta(attach, { key, token }, target, key)
+   }
+}

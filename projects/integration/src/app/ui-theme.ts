@@ -1,10 +1,16 @@
-import {TemplateProvider} from "@antischematic/angular-state-library";
 import {Directive} from "@angular/core";
+import {TemplateProvider} from "@antischematic/angular-state-library";
+
+export interface Theme {
+   color: string
+}
 
 @Directive({
    standalone: true,
    selector: "ui-theme"
 })
 export class UITheme extends TemplateProvider {
-   color = "red"
+   value: Theme = {
+      color: "red"
+   }
 }

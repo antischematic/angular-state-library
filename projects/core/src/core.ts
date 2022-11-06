@@ -5,9 +5,12 @@ import {
    inject,
    INJECTOR
 } from "@angular/core";
-import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {filter, map} from "rxjs";
+import {attach} from "./attach";
+import {DepMap, EventType, Phase} from "./interfaces";
 import {
    getActions,
+   getAttachments,
    getDeps,
    getMeta,
    getMetaValues,
@@ -18,19 +21,20 @@ import {
    setMeta,
    tracked
 } from "./metadata";
-import {DepMap, EventType, Phase} from "./interfaces";
-import {call, wrap} from "./utils";
 import {
    ACTION,
    Changes,
    CONTEXT,
    EffectScheduler,
+   EVENTS,
    EventScheduler,
    ROOT_CONFIG,
    STORE_CONFIG,
    StoreErrorHandler,
    Teardown
 } from "./providers";
+import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {call, wrap} from "./utils";
 
 function checkDeps(deps: DepMap) {
    let dirty = false
@@ -104,13 +108,19 @@ export function decorateFactory(target: any, fn: (this: any, ...args: any[]) => 
       Object.defineProperty(target, "ɵfac", {
          configurable: true,
          value: function (...args: any[]) {
-            return fn(target, factory, ...additionalArgs, ...args)
+            const instance = fn(target, factory, ...additionalArgs, ...args)
+
+            for (const attachment of getAttachments(target.prototype)) {
+               attach(attachment.token, instance, attachment.key)
+            }
+
+            return instance
          }
       })
    }
 }
 
-function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
+export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, untrack(context), key)
    const errorHandler = injector.get(ErrorHandler)
    pushStack(deps)
@@ -138,6 +148,16 @@ export function decorateActions(target: {}) {
          teardown(this, key)
          return runInContext(deps, runAction, proxy, key, fn, key, ...args)
       })
+   }
+}
+
+export function decorateSubscribe(target: any) {
+   target.subscribe = function (observer: any) {
+      const context = inject(target)
+      return inject(EVENTS).pipe(
+         filter(event => event.context === context),
+         map(() => context)
+      ).subscribe(observer)
    }
 }
 

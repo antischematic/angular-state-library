@@ -8,11 +8,12 @@ Manage state in your Angular applications. **Status: in development**
 
 ## API
 
-Version: 0.4.0<br/>
-<small>Bundle size: ~12kb min. ~4kb gzip</small>
+Version: 0.5.0<br/>
+<small>Bundle size: ~15kb min. ~5kb gzip</small>
 
 This API is experimental.
 
+<!-- TOC -->
 * [Core](#core)
    * [Store](#store)
    * [Action](#action)
@@ -21,7 +22,6 @@ This API is experimental.
    * [Layout](#layout)
    * [Select](#select)
    * [Caught](#caught)
-   * [Status](#status)
    * [configureStore](#configurestore)
 * [Observables](#observables)
    * [events](#events)
@@ -46,7 +46,11 @@ This API is experimental.
    * [isTracked](#istracked)
 * [Extensions](#extensions)
    * [Transition](#transition)
+   * [useTransition](#usetransition)
+   * [useQuery](#usequery)
+   * [useMutation](#usemutation)
 * [Testing Environment](#testing-environment)
+<!-- TOC -->
 
 ### Core
 
@@ -234,42 +238,6 @@ export class UITodos {
 
    @Caught() handleError(error: unknown) {
       console.debug("Error caught", error)
-   }
-}
-```
-
-#### Status
-
-Marks the decorated `Transition` as a store transition. This tracks async activity across all actions and effects
-declared in the store.
-
-**Example: Store activity indicator**
-
-```html
-
-<ui-spinner *ngIf="status.unstable"></ui-spinner>
-```
-
-```ts
-@Store()
-@Component()
-export class UITodos {
-   @Input() userId: string
-
-   todos: Todo[] = []
-
-   @Status() status = new Transition()
-
-   @Action() loadTodos() {
-      dispatch(loadTodos(this.userId), (todos) => {
-         this.todos = todos
-      })
-   }
-
-   @Action() toggleAll(error: unknown) {
-      dispatch(toggleAll(this.todos), {
-         finalize: this.loadTodos
-      })
    }
 }
 ```
@@ -547,32 +515,38 @@ detection automatically when data dependencies change.
 #### TemplateProvider
 
 Provide values from a component template reactively. Template providers are styled with `display: contents` so they
-don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `attach` to
+don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `Attach` to
 keep dependant views in sync.
 
 **Example: Theme Provider**
 
 ```ts
+export interface Theme {
+   color: string
+}
+
 @Directive({
    standalone: true,
    selector: "ui-theme"
 })
 export class UITheme extends TemplateProvider {
-   color = "red"
+   value: Theme = {
+      color: "red"
+   }
 }
 ```
 
 ```html
 
 <ui-theme>
-   <ui-theme-button>Red button</ui-theme-button>
+   <ui-button>Red button</ui-button>
    <ui-theme [value]="{ color: 'green' }">
-      <ui-theme-button>Green button</ui-theme-button>
+      <ui-button>Green button</ui-button>
    </ui-theme>
 </ui-theme>
 ```
 
-#### attach
+#### Attach
 
 Inject a store and run change detection whenever the store emits an event. Use this instead of `inject` to keep views in
 sync with store state.
@@ -581,8 +555,8 @@ sync with store state.
 
 ```ts
 @Component()
-export class UIThemeButton {
-   theme = attach(UITheme)
+export class UIButton {
+   @Attach(UITheme) theme!: Theme
 
    @HostBinding("style.color") get color() {
       return this.theme.color
@@ -598,7 +572,7 @@ Track arbitrary objects or array mutations inside reactive actions and selectors
 
 ```ts
 @Component()
-export class UIThemeButton {
+export class UIButton {
    todos: Todo[] = []
 
    @Select() remaining() {
@@ -659,6 +633,159 @@ transition.run(() => {
       console.log("transition complete")
    }, 2000)
 })
+```
+
+#### useTransition
+
+Runs the piped observable in a transition.
+
+**Example: Observe the loading state of todos**
+
+```ts
+
+const endpoint = "https://jsonplaceholder.typicode.com/todos"
+
+function loadTodos(userId: string, loading: Transition<Todo[]>) {
+   return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId }}).pipe(
+      useTransition(loading),
+      useQuery({
+         key: [endpoint, userId],
+         refreshInterval: 10000,
+         refreshOnFocus: true,
+         refreshOnReconnect: true
+      })
+   )
+}
+
+@Store()
+@Component({
+   template: `
+      <ui-spinner *ngIf="loading.unstable"></ui-spinner>
+      <ui-todo *ngFor="let todo of todos" [value]="todo"></ui-todo>
+   `
+})
+export class UITodos {
+   @Input() userId!: string
+
+   todos: Todo[] = []
+   loading = new Transition<Todo[]>()
+
+   @Action() setTodos(todos: Todo[]) {
+      this.todos = todos
+   }
+
+   @Invoke() loadTodos() {
+      dispatch(loadTodos(this.userId, this.loading), {
+         next: this.setTodos
+      })
+   }
+}
+```
+
+#### useQuery
+
+Caches an observable based on a query key, with various options to refresh data. Returns a shared observable with the query result.
+
+**Example: Fetch todos with a query
+
+```ts
+const endpoint = "https://jsonplaceholder.typicode.com/todos"
+
+function loadTodos(userId: string) {
+   return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId }}).pipe(
+      useQuery({ 
+         key: [endpoint, userId],
+         refreshInterval: 10000,
+         refreshOnFocus: true,
+         refreshOnReconnect: true
+      })
+   )
+}
+
+@Store()
+@Component({
+   template: `
+      <ui-spinner *ngIf="loading.unstable"></ui-spinner>
+      <ui-todo *ngFor="let todo of todos" [value]="todo"></ui-todo>
+   `
+})
+export class UITodos {
+   @Input() userId!: string
+   
+   todos: Todo[] = []
+   loading = new Transition<Todo[]>()
+   
+   @Action() setTodos(todos: Todo[]) {
+      this.todos = todos
+   }
+   
+   @Invoke() loadTodos() {
+      dispatch(loadTodos(this.userId, this.loading), {
+         next: this.setTodos
+      })
+   }
+}
+```
+
+#### useMutation
+
+Subscribes to a source observable and invalidates a list of query keys when the observable has settled. In-flight queries are cancelled.
+
+**Example: Create a todo and refresh the data
+
+```ts
+const endpoint = "https://jsonplaceholder.typicode.com/todos"
+
+function loadTodos(userId: string) {
+   return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId }}).pipe(
+      useQuery({
+         key: [endpoint, userId],
+         refreshInterval: 10000,
+         refreshOnFocus: true,
+         refreshOnReconnect: true,
+         resource: inject(ResourceManager) // optional when called from an action
+      })
+   )
+}
+
+function createTodo(userId: string, todo: Todo) {
+   return inject(HttpClient).post(endpoint, todo).pipe(
+      useMutation({
+         invalidate: [endpoint, userId],
+         resource: inject(ResourceManager) // optional when called from an action
+      })
+   )
+}
+
+@Store()
+@Component({
+   template: `
+      <ui-spinner *ngIf="loading.unstable"></ui-spinner>
+      <ui-todo (save)="createTodo($event)"></ui-todo>
+      <hr>
+      <ui-todo *ngFor="let todo of todos" [value]="todo"></ui-todo>
+   `
+})
+export class UITodos {
+   @Input() userId!: string
+
+   todos: Todo[] = []
+   loading = new Transition<Todo[]>()
+
+   @Action() setTodos(todos: Todo[]) {
+      this.todos = todos
+   }
+
+   @Invoke() loadTodos() {
+      dispatch(loadTodos(this.userId, this.loading), {
+         next: this.setTodos
+      })
+   }
+
+   @Action() createTodo(todo: Todo) {
+      dispatch(createTodo(this.userId, todo))
+   }
+}
 ```
 
 ## Testing Environment
