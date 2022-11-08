@@ -699,7 +699,7 @@ export class UITodos {
 
 Caches an observable based on a query key, with various options to refresh data. Returns a shared observable with the query result.
 
-**Example: Fetch todos with a query
+**Example: Fetch todos with a query**
 
 ```ts
 const endpoint = "https://jsonplaceholder.typicode.com/todos"
@@ -744,7 +744,7 @@ export class UITodos {
 
 Subscribes to a source observable and invalidates a list of query keys when the observable has settled. In-flight queries are cancelled.
 
-**Example: Create a todo and refresh the data
+**Example: Create a todo and refresh the data**
 
 ```ts
 const endpoint = "https://jsonplaceholder.typicode.com/todos"

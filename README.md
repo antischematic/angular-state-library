@@ -14,7 +14,7 @@ Version: 0.5.0<br/>
 This API is experimental.
 
 <!-- TOC -->
- * [Core](#core)
+* [Core](#core)
    * [Store](#store)
    * [Action](#action)
    * [Invoke](#invoke)
@@ -23,12 +23,12 @@ This API is experimental.
    * [Select](#select)
    * [Caught](#caught)
    * [configureStore](#configurestore)
- * [Observables](#observables)
+* [Observables](#observables)
    * [events](#events)
    * [EVENTS](#events)
    * [select](#select)
    * [selectStore](#selectstore)
- * [Action Hooks](#action-hooks)
+* [Action Hooks](#action-hooks)
    * [dispatch](#dispatch)
    * [loadEffect](#loadeffect)
    * [addTeardown](#addteardown)
@@ -38,13 +38,13 @@ This API is experimental.
    * [useExhaust](#useexhaust)
    * [useMerge](#usemerge)
    * [useSwitch](#useswitch)
- * [Reactivity](#reactivity)
+* [Reactivity](#reactivity)
    * [TemplateProvider](#templateprovider)
    * [attach](#attach)
    * [track (alias: `$`)](#track--alias---)
    * [untrack (alias: `$$`)](#untrack--alias---)
    * [isTracked](#istracked)
- * [Extensions](#extensions)
+* [Extensions](#extensions)
    * [Transition](#transition)
    * [useTransition](#usetransition)
    * [useQuery](#usequery)
@@ -699,7 +699,7 @@ export class UITodos {
 
 Caches an observable based on a query key, with various options to refresh data. Returns a shared observable with the query result.
 
-**Example: Fetch todos with a query
+**Example: Fetch todos with a query**
 
 ```ts
 const endpoint = "https://jsonplaceholder.typicode.com/todos"
@@ -744,7 +744,7 @@ export class UITodos {
 
 Subscribes to a source observable and invalidates a list of query keys when the observable has settled. In-flight queries are cancelled.
 
-**Example: Create a todo and refresh the data
+**Example: Create a todo and refresh the data**
 
 ```ts
 const endpoint = "https://jsonplaceholder.typicode.com/todos"
@@ -794,7 +794,7 @@ export class UITodos {
          next: this.setTodos
       })
    }
-   
+
    @Action() createTodo(todo: Todo) {
       dispatch(createTodo(this.userId, todo))
    }
