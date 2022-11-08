@@ -21,8 +21,8 @@ export abstract class TemplateProvider implements OnInit, OnAttach {
       }
    }
 
-   ngOnAttach<T extends TemplateProvider>(instance: T, observer: PartialObserver<T['value']>) {
-      return instance._subject.subscribe(observer)
+   ngOnAttach<T extends TemplateProvider>(observer: PartialObserver<T['value']>) {
+      return this._subject.subscribe(observer)
    }
 
    constructor() {

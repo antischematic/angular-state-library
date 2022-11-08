@@ -90,8 +90,8 @@ export class Transition<T = unknown> extends EventEmitter<T> implements OnAttach
       return zone.run(fn, applyThis, applyArgs)
    }
 
-   ngOnAttach(instance: Transition, observer: PartialObserver<any>) {
-      return instance.onUnstable.pipe(map(() => instance)).subscribe(observer)
+   ngOnAttach(observer: PartialObserver<any>) {
+      return this.onUnstable.pipe(map(() => this)).subscribe(observer)
    }
 
    constructor(options: TransitionOptions = {}) {

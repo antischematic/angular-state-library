@@ -5,7 +5,7 @@ import {
    inject,
    INJECTOR
 } from "@angular/core";
-import {filter, map, startWith} from "rxjs";
+import {filter, map} from "rxjs";
 import {attach} from "./attach";
 import {DepMap, EventType, Phase} from "./interfaces";
 import {
@@ -152,11 +152,10 @@ export function decorateActions(target: {}) {
 }
 
 export function decorateSubscribe(target: any) {
-   target.ngOnAttach = function (instance: any, observer: any) {
+   target.ngOnAttach = function (observer: any) {
       return inject(EVENTS).pipe(
-         filter(event => event.context === instance),
-         map(() => instance),
-         startWith(instance)
+         filter(event => event.context === this),
+         map(() => this),
       ).subscribe(observer)
    }
 }
