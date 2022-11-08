@@ -6,15 +6,6 @@ import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "./providers";
 
 const observers = [EventType.Next, EventType.Error, EventType.Complete, "finalize"] as const
 
-class ZonedObservable extends Observable<any> {
-   constructor(source: Observable<any>) {
-      const zone = Zone.current
-      super((subscriber) => {
-         return zone.run(() => source.subscribe(subscriber))
-      });
-   }
-}
-
 export function dispatch<TValue>(source: Observable<TValue>): Observable<TValue>
 export function dispatch<TValue>(source: Observable<TValue>, observer: DispatchObserver<TValue>): Observable<TValue>
 export function dispatch<TValue>(source: Observable<TValue>, next: (value: TValue) => void): Observable<TValue>
