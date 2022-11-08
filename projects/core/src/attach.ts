@@ -8,6 +8,8 @@ class AttachObserver {
       this.target[this.key] = track(value)
       this.cdr.markForCheck()
    }
+   error() {}
+   complete() {}
    constructor(private target: any, private key: any, private cdr: ChangeDetectorRef) {}
 }
 
