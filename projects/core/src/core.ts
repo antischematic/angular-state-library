@@ -5,7 +5,7 @@ import {
    inject,
    INJECTOR
 } from "@angular/core";
-import {filter, map} from "rxjs";
+import {filter, map, startWith} from "rxjs";
 import {attach} from "./attach";
 import {DepMap, EventType, Phase} from "./interfaces";
 import {
@@ -82,7 +82,8 @@ export function setup(target: any, factory: any, ...args: any[]) {
    const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
    const storeInjector = createEnvironmentInjector([Changes,
       { provide: ErrorHandler, useValue: errorHandler},
-      { provide: EventScheduler, useValue: new EventScheduler(instance) }
+      { provide: EventScheduler, useValue: new EventScheduler(instance) },
+      Teardown
    ], parent)
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
@@ -96,6 +97,11 @@ export function setup(target: any, factory: any, ...args: any[]) {
       ], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
+   for (const attachment of getAttachments(target.prototype)) {
+      storeInjector.runInContext(() => {
+         attach(attachment.token, instance, attachment.key)
+      })
+   }
    return instance
 }
 
@@ -108,13 +114,7 @@ export function decorateFactory(target: any, fn: (this: any, ...args: any[]) => 
       Object.defineProperty(target, "ɵfac", {
          configurable: true,
          value: function (...args: any[]) {
-            const instance = fn(target, factory, ...additionalArgs, ...args)
-
-            for (const attachment of getAttachments(target.prototype)) {
-               attach(attachment.token, instance, attachment.key)
-            }
-
-            return instance
+            return fn(target, factory, ...additionalArgs, ...args)
          }
       })
    }
@@ -152,11 +152,11 @@ export function decorateActions(target: {}) {
 }
 
 export function decorateSubscribe(target: any) {
-   target.subscribe = function (observer: any) {
-      const context = inject(target)
+   target.ngOnAttach = function (instance: any, observer: any) {
       return inject(EVENTS).pipe(
-         filter(event => event.context === context),
-         map(() => context)
+         filter(event => event.context === instance),
+         map(() => instance),
+         startWith(instance)
       ).subscribe(observer)
    }
 }

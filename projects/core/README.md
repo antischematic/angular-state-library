@@ -556,7 +556,7 @@ sync with store state.
 ```ts
 @Component()
 export class UIButton {
-   @Attach(UITheme) theme!: Theme
+   @Attach(UITheme) theme = getValue(UITheme)
 
    @HostBinding("style.color") get color() {
       return this.theme.color
@@ -614,7 +614,7 @@ any async activity is tracked in a transition zone. The transition ends once all
    `
 })
 export class UIButton {
-   @Output() press = new Transition()
+   @Attach() @Output() press = new Transition()
 
    @HostListener("click", ["$event"])
    handleClick(event) {
@@ -633,6 +633,19 @@ transition.run(() => {
       console.log("transition complete")
    }, 2000)
 })
+```
+
+#### TransitionToken
+
+Creates an injection token that injects a transition.
+
+```ts
+const Loading = new TransitionToken("Loading")
+
+@Component()
+export class UITodos {
+   @Attach() loading = inject(Loading)
+}
 ```
 
 #### useTransition

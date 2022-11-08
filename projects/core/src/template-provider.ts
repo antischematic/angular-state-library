@@ -1,22 +1,21 @@
-import {Directive, ElementRef, inject, Input, OnInit, Type} from "@angular/core";
-import {BehaviorSubject, PartialObserver} from "rxjs";
+import {Directive, ElementRef, inject, Input, OnInit, ProviderToken} from "@angular/core";
+import {PartialObserver, ReplaySubject} from "rxjs";
+import {track} from "./proxy";
 
 @Directive()
 export abstract class TemplateProvider implements OnInit {
-   private _subject = new BehaviorSubject<this["value"]>(void 0)
+   private _subject = new ReplaySubject<this["value"]>(1)
+   private _firstValue = false
 
    abstract value: unknown
 
    @Input("value") set __value(value: this["value"]) {
+      this._firstValue = true
       this._subject.next(value)
    }
 
-   static subscribe<T extends TemplateProvider>(this: Type<T>, observer: PartialObserver<T['value']>) {
-      return inject(this)._subject.subscribe(observer)
-   }
-
    ngOnInit() {
-      if (this._subject.value === undefined) {
+      if (!this._firstValue) {
          this._subject.next(this.value)
       }
    }
@@ -25,4 +24,12 @@ export abstract class TemplateProvider implements OnInit {
       const style = inject(ElementRef).nativeElement?.style
       if (style) style.display = "contents"
    }
+
+   static ngOnAttach<T extends TemplateProvider>(instance: T, observer: PartialObserver<T['value']>) {
+      return instance._subject.subscribe(observer)
+   }
+}
+
+export function getValue<T extends { value: unknown }>(token: ProviderToken<T>): T["value"] {
+   return track(inject(token).value)
 }

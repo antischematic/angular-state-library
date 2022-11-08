@@ -1,7 +1,13 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
-import {ChangeDetectorRef, EventEmitter, inject} from "@angular/core";
-import {MonoTypeOperatorFunction, Observable, Subject} from "rxjs";
+import {EventEmitter, inject, Injectable, InjectionToken} from "@angular/core";
+import {
+   BehaviorSubject, map,
+   MonoTypeOperatorFunction,
+   Observable,
+   PartialObserver,
+   Subject
+} from "rxjs";
 
 interface TransitionOptions {
    async?: boolean
@@ -9,19 +15,18 @@ interface TransitionOptions {
    timeoutMs?: number // todo: add implementation
 }
 
-function checkStable(zone: TransitionSpec) {
-   if (!zone.microtasks && !zone.macroTasks && !zone.transition.stable) {
-      zone.transition.stable = true
-      zone.parentZone.run(() => {
-         zone.transition.viewRef?.markForCheck()
-         zone.transition.onStable.next(-1)
+function checkStable({ transition, microtasks, macroTasks, parentZone }: TransitionSpec) {
+   const unstable = (transition.onUnstable as BehaviorSubject<boolean>)
+   if (!microtasks && !macroTasks && !transition.stable) {
+      transition.stable = true
+      parentZone.run(() => {
+         unstable.next(false)
       })
    }
-   if ((zone.microtasks || zone.macroTasks) && zone.transition.stable) {
-      zone.transition.stable = false
-      zone.parentZone.run(() => {
-         zone.transition.viewRef?.markForCheck()
-         zone.transition.onUnstable.next(1)
+   if ((microtasks || macroTasks) && transition.stable) {
+      transition.stable = false
+      parentZone.run(() => {
+         unstable.next(true)
       })
    }
 }
@@ -55,9 +60,7 @@ export class TransitionSpec implements ZoneSpec {
 export class Transition<T = unknown> extends EventEmitter<T> {
    private spec: ZoneSpec = new TransitionSpec("transition", this)
 
-   viewRef = inject(ChangeDetectorRef)
-   onStable = new Subject<-1>()
-   onUnstable = new Subject<1>()
+   onUnstable: Observable<boolean> = new BehaviorSubject<boolean>(true)
    onError = new Subject<unknown>()
    stable = true
 
@@ -89,6 +92,10 @@ export class Transition<T = unknown> extends EventEmitter<T> {
    constructor(options: TransitionOptions = {}) {
       super(options.async)
    }
+
+   static ngOnAttach(instance: Transition, observer: PartialObserver<any>) {
+      return instance.onUnstable.pipe(map(() => instance)).subscribe(observer)
+   }
 }
 
 export interface UseTransitionOptions {
@@ -107,4 +114,18 @@ export function useTransition<T>(transition?: Transition, options: UseTransition
          return subscriber
       })
    }) : source
+}
+
+interface TransitionToken {
+   new<T>(name: string, options?: TransitionOptions): InjectionToken<Transition<T>>
+}
+
+export const TransitionToken: TransitionToken = class TransitionToken<T> extends InjectionToken<Transition<T>> {
+   constructor(name: string, options?: TransitionOptions) {
+      super(name, {
+         factory() {
+            return new Transition(options)
+         }
+      })
+   }
 }

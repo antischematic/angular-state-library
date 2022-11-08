@@ -47,7 +47,7 @@ export const Layout = createDecorator<ActionMetadata>(action, {...defaults, phas
 export const Select = createDecorator<SelectMetadata>(selector)
 export const Caught = createDecorator(caught)
 
-export function Attach(token: ProviderToken<any>) {
+export function Attach(token?: ProviderToken<any>) {
    return function (target: {}, key: PropertyKey) {
       setMeta(attach, { key, token }, target, key)
    }

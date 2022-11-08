@@ -1,5 +1,6 @@
-import {ChangeDetectionStrategy, Component} from '@angular/core';
+import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
 import {Attach, Invoke, Store} from "@antischematic/angular-state-library";
+import {getValue} from "../../../core/src/template-provider";
 import {UICounter} from "./ui-counter.component";
 import {Theme, UITheme} from "./ui-theme";
 
@@ -13,8 +14,8 @@ import {Theme, UITheme} from "./ui-theme";
   `,
 })
 export class UIDescendent {
-   @Attach(UICounter) counter!: UICounter
-   @Attach(UITheme) theme!: Theme
+   @Attach() counter = inject(UICounter)
+   @Attach(UITheme) theme = getValue(UITheme)
 
    @Invoke() logTheme() {
       console.log('current theme color: ', this.theme)

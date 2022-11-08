@@ -1,24 +1,30 @@
 import {ChangeDetectorRef, inject, ProviderToken, ViewRef} from "@angular/core";
 import {Subscribable} from "rxjs";
+import {addTeardown} from "./hooks";
 import {track} from "./proxy";
 
-export function attach<T extends {}>(token: Subscribable<T>, directive?: any, key?: string): never
+export function attach<T extends {}>(token: Subscribable<T>, directive: any, key: string): never
 export function attach<T extends {}>(token: ProviderToken<T>, directive: any, key: string): T
-export function attach<T extends {}>(token: ProviderToken<T> | Subscribable<T>, directive?: any, key?: string): unknown {
+export function attach<T extends {}>(token: ProviderToken<T> | Subscribable<T> | undefined, directive: any, key: string): any {
    const subscribable = token as any
-   const instance = inject(subscribable)
    const cdr = inject(ChangeDetectorRef) as ViewRef
-   const subscription = Object.getPrototypeOf(instance).constructor.subscribe({
-      next(value: any) {
-         if (cdr.destroyed) subscription.unsubscribe()
-         else {
-            if (directive && key) {
-               directive[key] = track(value)
-            }
+   if (subscribable) {
+      const instance = inject(subscribable)
+      const subscription = Object.getPrototypeOf(instance).constructor.ngOnAttach(instance, {
+         next(value: any) {
+            directive[key] = track(value)
             cdr.markForCheck()
          }
-      }
-   })
-   return track(instance)
+      })
+      addTeardown(subscription)
+   } else {
+      const instance = directive[key]
+      const subscription = Object.getPrototypeOf(instance).constructor.ngOnAttach(instance, {
+         next() {
+            cdr.markForCheck()
+         }
+      })
+      addTeardown(subscription)
+      directive[key] = track(instance)
+   }
 }
-

@@ -3,14 +3,14 @@ import {HttpClient} from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
    Component,
-   inject,
+   inject, InjectionToken,
    Input,
    QueryList,
    ViewChildren,
 } from '@angular/core';
 import {
    $,
-   Action,
+   Action, Attach,
    Caught,
    dispatch,
    events,
@@ -19,7 +19,7 @@ import {
    loadEffect,
    Select,
    Store,
-   Transition,
+   TransitionToken,
    useChanges,
    useMerge,
    useMutation,
@@ -43,7 +43,7 @@ import {UITodo} from './ui-todo.component';
 export class UITodos {
    @Input() userId!: string;
 
-   transition = new Transition<Todo[]>()
+   @Attach() transition = inject(Loading)
 
    @ViewChildren(UITodo) uiTodos!: QueryList<UITodos>;
 
@@ -64,7 +64,7 @@ export class UITodos {
 
    @Invoke() loadTodos() {
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId, this.transition), {
+      return dispatch(loadTodos(this.userId), {
          next: this.setTodos
       });
    }
@@ -128,7 +128,10 @@ export class UITodos {
 
 const endpoint = `https://jsonplaceholder.typicode.com/todos`
 
-function loadTodos(userId: string, loading?: Transition<Todo[]>): Observable<Todo[]> {
+const Loading = new TransitionToken<Todo[]>("loading")
+
+function loadTodos(userId: string): Observable<Todo[]> {
+   const loading = inject(Loading)
    return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
       useTransition(loading, { emit: true }),
       useQuery({

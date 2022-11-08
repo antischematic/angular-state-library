@@ -15,7 +15,7 @@ import {UISpinner} from './spinner.component';
 })
 export class UITodo {
    @Input() value: Todo = UITodo.defaultValue;
-   @Output() save = new Transition<Todo>({});
+   @Attach() @Output() save = new Transition<Todo>({});
 
    @Attach(forwardRef(() => AppComponent)) root!: AppComponent
 

@@ -6,7 +6,7 @@ import {Todo} from "../interfaces";
 
 const endpoint = `https://jsonplaceholder.typicode.com/todos`
 
-export default function toggleAll(todos: Todo[], transition: Transition<any>): Observable<Todo[]> {
+export default function toggleAll(todos: Todo[], transition: Transition<Todo[]>): Observable<Todo[]> {
    const http = inject(HttpClient)
    return forkJoin(todos.map(todo => http.put<Todo>(`${endpoint}/${todo.id}`, { ...todo, completed: !todo.completed}))).pipe(
       useTransition(transition),

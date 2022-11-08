@@ -15,9 +15,9 @@ export {dispatch} from "./dispatch";
 export {
    useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges
 } from "./hooks"
-export {TemplateProvider} from "./template-provider"
+export {TemplateProvider, getValue} from "./template-provider"
 export {loadEffect} from "./load-effect"
-export {Transition, useTransition} from "./transition"
+export {Transition, useTransition, TransitionToken} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events} from "./utils";
 export {Store, Caught, Select, Layout, Before, Invoke, Action, Attach} from "./decorators";
