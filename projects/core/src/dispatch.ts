@@ -1,10 +1,19 @@
 import {ChangeDetectorRef, ErrorHandler, inject} from "@angular/core";
 import {ActionMetadata, DispatchObserver, EventType, Metadata} from "./interfaces";
 import {Observable, Subject, tap} from "rxjs";
-import {EffectError, isPlainObject, noop, wrap} from "./utils";
+import {EffectError, isPlainObject, noop, observeInZone, wrap} from "./utils";
 import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "./providers";
 
 const observers = [EventType.Next, EventType.Error, EventType.Complete, "finalize"] as const
+
+class ZonedObservable extends Observable<any> {
+   constructor(source: Observable<any>) {
+      const zone = Zone.current
+      super((subscriber) => {
+         return zone.run(() => source.subscribe(subscriber))
+      });
+   }
+}
 
 export function dispatch<TValue>(source: Observable<TValue>): Observable<TValue>
 export function dispatch<TValue>(source: Observable<TValue>, observer: DispatchObserver<TValue>): Observable<TValue>
@@ -18,7 +27,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
    const changeDetector = inject(ChangeDetectorRef)
    const signal = new Subject<any>()
 
-   observer = typeof observer === "function" ? { next: observer } : Object.create(observer ?? null)
+   observer = typeof observer === "function" ? {next: observer} : Object.create(observer ?? null)
 
    for (const key of observers) {
       wrap(observer!, key, function (fn, value) {
@@ -43,7 +52,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
       })
    }
 
-   effect.enqueue(source.pipe(tap(observer)))
+   effect.enqueue(observeInZone(source.pipe(tap(observer)), Zone.current))
 
    return signal as any
 }

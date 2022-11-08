@@ -3,7 +3,7 @@ import {HttpClient} from '@angular/common/http';
 import {
    ChangeDetectionStrategy,
    Component,
-   inject, InjectionToken,
+   inject,
    Input,
    QueryList,
    ViewChildren,
@@ -27,6 +27,7 @@ import {
    useTransition
 } from '@antischematic/angular-state-library';
 import {Observable} from 'rxjs';
+import updateTodo from './effects/update-todo';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
@@ -150,5 +151,4 @@ function createTodo(userId: string, title: string): Observable<Todo> {
    )
 }
 
-const updateTodo = loadEffect(() => import("./effects/update-todo"))
 const toggleAll = loadEffect(() => import("./effects/toggle-all"))

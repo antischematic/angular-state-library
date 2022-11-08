@@ -1,5 +1,5 @@
 import {DOCUMENT} from "@angular/common";
-import {inject, Injectable, NgZone} from "@angular/core";
+import {inject, Injectable} from "@angular/core";
 import {
    BehaviorSubject,
    debounce,
@@ -24,6 +24,7 @@ import {
    throttle,
    timer,
 } from "rxjs";
+import {observeInZone} from "./utils";
 
 export interface QueryOptions<T = any> {
    key: unknown[]
@@ -56,12 +57,6 @@ function onReconnect(document: Document, refCount: BehaviorSubject<any>) {
    }
 }
 
-function observeInRootZone(source: Observable<any>, zone: NgZone) {
-   return new Observable(subscriber => {
-      return zone.runOutsideAngular(() => source.subscribe(subscriber))
-   })
-}
-
 function toggle(refCount: BehaviorSubject<number>, source: Observable<any>) {
    const delay = refCount.pipe(
       filter((count) => count > 0)
@@ -76,7 +71,6 @@ function toggle(refCount: BehaviorSubject<number>, source: Observable<any>) {
 export class ResourceManager {
    cache = new Map()
    document = inject(DOCUMENT)
-   ngZone = inject(NgZone)
 
    query<T>(source: Observable<T>, options: QueryOptions): Observable<T> {
       const key = this.keygen(options.key)
@@ -105,7 +99,7 @@ export class ResourceManager {
       }
 
       if (options.refreshInterval) {
-         const nativeInterval = observeInRootZone(interval(options.refreshInterval), this.ngZone)
+         const nativeInterval = observeInZone(interval(options.refreshInterval), Zone.root)
          invalidators.push(toggle(refCount, nativeInterval))
       }
       const errors = new Subject<never>()
@@ -115,7 +109,7 @@ export class ResourceManager {
             takeUntil(cancel)
          )),
          takeUntil(cancel),
-         throttle(() => observeInRootZone(timer(options.staleTime ?? 0), this.ngZone)),
+         throttle(() => observeInZone(timer(options.staleTime ?? 0), Zone.root)),
       )
 
       const resource: Observable<T> = invalidate.pipe(

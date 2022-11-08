@@ -9,6 +9,7 @@ import {
    Subject
 } from "rxjs";
 import {OnAttach} from "./attach";
+import {observeInZone} from "./utils";
 
 interface TransitionOptions {
    async?: boolean
@@ -61,7 +62,7 @@ export class TransitionSpec implements ZoneSpec {
 export class Transition<T = unknown> extends EventEmitter<T> implements OnAttach {
    private spec: ZoneSpec = new TransitionSpec("transition", this)
 
-   onUnstable: Observable<boolean> = new BehaviorSubject<boolean>(true)
+   onUnstable: Observable<boolean> = new BehaviorSubject<boolean>(false)
    onError = new Subject<unknown>()
    stable = true
 
@@ -106,7 +107,7 @@ export interface UseTransitionOptions {
 export function useTransition<T>(transition?: Transition<T>, options?: { emit: true }): MonoTypeOperatorFunction<T>
 export function useTransition<T>(transition?: Transition, options?: { emit: false }): MonoTypeOperatorFunction<T>
 export function useTransition<T>(transition?: Transition, options: UseTransitionOptions = { emit: false }): MonoTypeOperatorFunction<T> {
-   return source => transition ? new Observable(subscriber => {
+   return source => observeInZone(transition ? new Observable(subscriber => {
       return transition.run(() => {
          if (options.emit) {
             subscriber.add(transition.subscribe(subscriber))
@@ -114,7 +115,7 @@ export function useTransition<T>(transition?: Transition, options: UseTransition
          subscriber.add(source.subscribe(subscriber))
          return subscriber
       })
-   }) : source
+   }) : source, Zone.current)
 }
 
 interface TransitionToken {
