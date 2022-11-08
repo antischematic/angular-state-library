@@ -681,7 +681,8 @@ export class UITodos {
    @Input() userId!: string
 
    todos: Todo[] = []
-   loading = new Transition<Todo[]>()
+
+   @Attach() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
@@ -726,7 +727,7 @@ export class UITodos {
    @Input() userId!: string
    
    todos: Todo[] = []
-   loading = new Transition<Todo[]>()
+   @Attach() loading = new Transition<Todo[]>()
    
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
@@ -783,7 +784,8 @@ export class UITodos {
    @Input() userId!: string
 
    todos: Todo[] = []
-   loading = new Transition<Todo[]>()
+
+   @Attach() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
