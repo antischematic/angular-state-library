@@ -8,6 +8,7 @@ import {
    PartialObserver,
    Subject
 } from "rxjs";
+import {OnAttach} from "./attach";
 
 interface TransitionOptions {
    async?: boolean
@@ -57,7 +58,7 @@ export class TransitionSpec implements ZoneSpec {
    constructor(public name: string, public transition: Transition<any>) {}
 }
 
-export class Transition<T = unknown> extends EventEmitter<T> {
+export class Transition<T = unknown> extends EventEmitter<T> implements OnAttach {
    private spec: ZoneSpec = new TransitionSpec("transition", this)
 
    onUnstable: Observable<boolean> = new BehaviorSubject<boolean>(true)
@@ -89,12 +90,12 @@ export class Transition<T = unknown> extends EventEmitter<T> {
       return zone.run(fn, applyThis, applyArgs)
    }
 
-   constructor(options: TransitionOptions = {}) {
-      super(options.async)
+   ngOnAttach(instance: Transition, observer: PartialObserver<any>) {
+      return instance.onUnstable.pipe(map(() => instance)).subscribe(observer)
    }
 
-   static ngOnAttach(instance: Transition, observer: PartialObserver<any>) {
-      return instance.onUnstable.pipe(map(() => instance)).subscribe(observer)
+   constructor(options: TransitionOptions = {}) {
+      super(options.async)
    }
 }
 

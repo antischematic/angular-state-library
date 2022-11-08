@@ -36,7 +36,7 @@ export function Store() {
 
       decorateActions(prototype)
       decorateSelectors(prototype)
-      decorateSubscribe(target)
+      decorateSubscribe(prototype)
    }
 }
 

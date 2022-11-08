@@ -25,3 +25,4 @@ export {select, selectStore, Selector} from "./select"
 export {
    useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions, QueryError
 } from "./data"
+export { OnAttach } from "./attach"
