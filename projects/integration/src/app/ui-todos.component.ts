@@ -26,7 +26,7 @@ import {
    useQuery,
    useTransition
 } from '@antischematic/angular-state-library';
-import {Observable} from 'rxjs';
+import {Observable, tap} from 'rxjs';
 import updateTodo from './effects/update-todo';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
@@ -87,7 +87,6 @@ export class UITodos {
       return dispatch(updateTodo(todo), {
          error(error) {
             console.log('error observed, rethrowing', error);
-            throw error;
          },
       });
    }
@@ -137,9 +136,9 @@ function loadTodos(userId: string): Observable<Todo[]> {
       useTransition(loading, { emit: true }),
       useQuery({
          key: [endpoint, userId],
-         refreshInterval: 5000,
-         refreshOnFocus: true,
-         staleTime: 4950,
+         // refreshInterval: 5000,
+         // refreshOnFocus: true,
+         // staleTime: 4950,
       }),
    )
 }

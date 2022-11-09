@@ -2,7 +2,7 @@ import {ErrorHandler, inject, Injectable, InjectionToken} from "@angular/core";
 import {Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
 import {ActionMetadata, EventType, StoreConfig, StoreEvent} from "./interfaces";
 import {track} from "./proxy";
-import {EffectError, getId} from "./utils";
+import {getId} from "./utils";
 import {getErrorHandlers} from "./metadata";
 
 export const ACTION = new InjectionToken<ActionMetadata>("ACTION")
@@ -87,7 +87,7 @@ export class EffectScheduler {
    connect() {
       this.connected = true
       this.destination = new Subject()
-      this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe(this.destination)
+      this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe()
       this.subscription.add(() => this.connected = false)
    }
 
@@ -138,17 +138,14 @@ export class StoreErrorHandler implements ErrorHandler {
       const errorHandlers = getErrorHandlers(this.prototype)
       for (const handler of errorHandlers) {
          try {
-            return handler.descriptor!.value.call(this.instance, error)
+            handler.descriptor!.value.call(this.instance, error)
+            break
          } catch (e) {
             error = e
          }
       }
-      if (error instanceof EffectError) {
-         this.parent.handleError(error.error)
-      } else {
-         throw error
-      }
+      throw error
    }
 
-   constructor(private prototype: any, private instance: {}, private parent: ErrorHandler) {}
+   constructor(private prototype: any, private instance: {}) {}
 }

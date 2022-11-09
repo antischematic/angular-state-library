@@ -79,7 +79,7 @@ export function setup(target: any, factory: any, ...args: any[]) {
    const instance = factory(...args)
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
-   const errorHandler = new StoreErrorHandler(prototype, instance, parent.get(ErrorHandler))
+   const errorHandler = new StoreErrorHandler(prototype, instance)
    const storeInjector = createEnvironmentInjector([Changes,
       { provide: ErrorHandler, useValue: errorHandler},
       { provide: EventScheduler, useValue: new EventScheduler(instance) },

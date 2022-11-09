@@ -3,23 +3,30 @@
       display: flex;
       margin: 0.2em 0;
    }
+   .oops {
+      margin-left: 0.5em;
+      font-variant: all-small-caps;
+      color: red;
+   }
 </style>
 
 <input
    type="checkbox"
-   [hidden]="!value.id"
-   [checked]="value.completed"
+   [hidden]="!model.id"
+   [(ngModel)]="model.completed"
    [disabled]="save.unstable"
-   (click)="$event.preventDefault(); toggleComplete(checkbox.checked)"
+   (ngModelChange)="saveTodo()"
    #checkbox
 />
 <input
    type="text"
-   [disabled]="value.completed || save.unstable"
-   [value]="value.title"
-   (keydown.enter)="updateText(text.value)"
+   [disabled]="model.completed || save.unstable"
+   [(ngModel)]="model.title"
+   (keydown.enter)="saveTodo()"
    #text
 />
-<button *ngIf="!value.id" (click)="updateText(text.value)">Create</button>
+<button *ngIf="!model.id" (click)="saveTodo()">Create</button>
+
+<div class="oops" *ngIf="save.failed">Oops!</div>
 
 <ui-spinner *ngIf="save.unstable"></ui-spinner>

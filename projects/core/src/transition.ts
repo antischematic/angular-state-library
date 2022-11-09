@@ -1,15 +1,16 @@
 /// <reference path="../../../node_modules/zone.js/zone.d.ts" />
 
-import {EventEmitter, inject, Injectable, InjectionToken} from "@angular/core";
+import {EventEmitter, InjectionToken} from "@angular/core";
 import {
-   BehaviorSubject, map,
+   BehaviorSubject,
+   map,
    MonoTypeOperatorFunction,
    Observable,
    PartialObserver,
-   Subject
+   Subject,
+   takeWhile
 } from "rxjs";
 import {OnAttach} from "./attach";
-import {observeInZone} from "./utils";
 
 interface TransitionOptions {
    async?: boolean
@@ -27,6 +28,7 @@ function checkStable({ transition, microtasks, macroTasks, parentZone }: Transit
    }
    if ((microtasks || macroTasks) && transition.stable) {
       transition.stable = false
+      transition.failed = false
       parentZone.run(() => {
          unstable.next(true)
       })
@@ -48,12 +50,14 @@ export class TransitionSpec implements ZoneSpec {
             checkStable(this)
          }
       }
+      return parentZoneDelegate.hasTask(targetZone, hasTaskState)
    }
 
    onHandleError(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, error: any) {
-      parentZoneDelegate.handleError(targetZone, error)
+      const handled = parentZoneDelegate.handleError(targetZone, error)
+      this.transition.failed = true
       this.transition.onError.next(error)
-      return false
+      return handled
    }
 
    constructor(public name: string, public transition: Transition<any>) {}
@@ -64,6 +68,7 @@ export class Transition<T = unknown> extends EventEmitter<T> implements OnAttach
 
    onUnstable: Observable<boolean> = new BehaviorSubject<boolean>(false)
    onError = new Subject<unknown>()
+   failed = false
    stable = true
 
    get unstable() {
@@ -84,6 +89,9 @@ export class Transition<T = unknown> extends EventEmitter<T> implements OnAttach
 
    override emit(value: T) {
       this.run(super.emit, this, value)
+      return this.onUnstable.pipe(
+         takeWhile(Boolean)
+      )
    }
 
    run<T extends (...args: any[]) => any>(fn: Function, applyThis?: {}, ...applyArgs: Parameters<T>): ReturnType<T> {
@@ -107,7 +115,7 @@ export interface UseTransitionOptions {
 export function useTransition<T>(transition?: Transition<T>, options?: { emit: true }): MonoTypeOperatorFunction<T>
 export function useTransition<T>(transition?: Transition, options?: { emit: false }): MonoTypeOperatorFunction<T>
 export function useTransition<T>(transition?: Transition, options: UseTransitionOptions = { emit: false }): MonoTypeOperatorFunction<T> {
-   return source => observeInZone(transition ? new Observable(subscriber => {
+   return source => transition ? new Observable(subscriber => {
       return transition.run(() => {
          if (options.emit) {
             subscriber.add(transition.subscribe(subscriber))
@@ -115,7 +123,7 @@ export function useTransition<T>(transition?: Transition, options: UseTransition
          subscriber.add(source.subscribe(subscriber))
          return subscriber
       })
-   }) : source, Zone.current)
+   }) : source
 }
 
 interface TransitionToken {

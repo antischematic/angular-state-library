@@ -226,7 +226,7 @@ export class UITodos {
 Marks the decorated method as an error handler. Unhandled exceptions inside `Action`, `Invoke`, `Before`, `Layout`
 and `Select` are forwarded to the first error handler. Unhandled exceptions from dispatched effects are also captured.
 If the class has multiple error handlers, rethrown errors will propagate to the next error handler in the chain from top
-to bottom. If the last error handler rethrows an error it is propagated to the `ErrorHandler` service.
+to bottom.
 
 **Example: Handling exceptions**
 

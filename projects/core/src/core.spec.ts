@@ -1,5 +1,5 @@
 import {ApplicationRef, Component, ElementRef, inject, Input, Type} from "@angular/core";
-import {ComponentFixture, TestBed} from "@angular/core/testing";
+import {ComponentFixture, fakeAsync, flush, TestBed} from "@angular/core/testing";
 import {concat, finalize, from, NEVER, Observable, of, TeardownLogic, throwError} from "rxjs";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {dispatch} from "./dispatch";
@@ -57,8 +57,7 @@ describe("Core", () => {
          expect(app).toBeInstanceOf(ApplicationRef)
       })
 
-      it("should dispatch effects", () => {
-         spyOn(console, "error")
+      it("should dispatch effects", fakeAsync(() => {
          const fixture = createComponent(UITest)
          const result = fixture.componentInstance.dispatchEffects(of(1), from([10, 20, 30]), throwError(() => new Error("BOGUS")))
          const observerSpy = subscribeSpyTo(result, { expectErrors: true });
@@ -68,11 +67,11 @@ describe("Core", () => {
          expect(observerSpy.receivedComplete()).toBeFalse()
 
          fixture.detectChanges()
+         expect(() => flush()).toThrow()
 
          expect(observerSpy.getValues()).toEqual([1, 10, 20, 30])
          expect(observerSpy.getError()).toEqual(new Error("BOGUS"))
-         expect(console.error).toHaveBeenCalledOnceWith("ERROR", new Error("BOGUS"))
-      })
+      }))
 
       it("should cleanup effects on destroy", () => {
          const spy = createSpy()
@@ -341,7 +340,6 @@ describe("Core", () => {
                throw error
             }
          }
-         spyOn(console, "error")
          const fixture = createComponent(UITest)
 
          try {
@@ -349,7 +347,6 @@ describe("Core", () => {
          } catch (e) {
             expect(e).toEqual(new Error("BOGUS"))
          }
-         expect(console.error).not.toHaveBeenCalled()
       })
 
       it("should catch action errors", () => {
@@ -363,14 +360,12 @@ describe("Core", () => {
                spy(error)
             }
          }
-         spyOn(console, "error")
          const spy = createSpy()
          const fixture = createComponent(UITest)
 
-         fixture.componentInstance.iThrowErrors(new Error("BOGUS"))
+         expect(() => fixture.componentInstance.iThrowErrors(new Error("BOGUS"))).toThrow()
 
          expect(spy).toHaveBeenCalledOnceWith(new Error("BOGUS"))
-         expect(console.error).not.toHaveBeenCalled()
       })
 
       it("should call error handlers in order until the error is handled", () => {
@@ -392,21 +387,20 @@ describe("Core", () => {
                iCatchErrors(error)
             }
          }
-         spyOn(console, "error")
          const iAmCalledFirst = createSpy()
          const iAmCalledNext = createSpy()
          const iCatchErrors = createSpy()
          const error = new Error("BOGUS")
          const fixture = createComponent(UITest)
 
-         fixture.componentInstance.iThrowErrors(error)
+         expect(() => fixture.componentInstance.iThrowErrors(error)).toThrow()
 
          expect(iAmCalledFirst).toHaveBeenCalledOnceWith(error)
          expect(iAmCalledFirst).toHaveBeenCalledBefore(iAmCalledNext)
          expect(iAmCalledNext).toHaveBeenCalledOnceWith(error)
          expect(iAmCalledNext).toHaveBeenCalledBefore(iCatchErrors)
          expect(iCatchErrors).toHaveBeenCalledOnceWith(error)
-         expect(console.error).not.toHaveBeenCalled()
+         TestBed.resetTestingModule()
       })
 
       it("should rethrow if error isn't handled", () => {
@@ -423,7 +417,6 @@ describe("Core", () => {
                throw error
             }
          }
-         spyOn(console, "error")
          const error = new Error("BOGUS")
          const fixture = createComponent(UITest)
 
@@ -432,10 +425,9 @@ describe("Core", () => {
          } catch (e) {
             expect(e).toBe(error)
          }
-         expect(console.error).not.toHaveBeenCalledOnceWith(error)
       })
 
-      it("should catch errors from dispatched effects", () => {
+      it("should catch errors from dispatched effects", fakeAsync(() => {
          @Store()
          @Component({ template: `` })
          class UITest {
@@ -452,12 +444,13 @@ describe("Core", () => {
          const observerSpy = subscribeSpyTo(result, { expectErrors: true })
 
          fixture.detectChanges()
+         expect(() => flush()).toThrow()
 
          expect(observerSpy.getError()).toEqual(new Error("BOGUS"))
          expect(iCatchErrors).toHaveBeenCalledOnceWith(new Error("BOGUS"))
-      })
+      }))
 
-      it("should not catch handled effect errors", () => {
+      it("should also catch effects with error observers", fakeAsync(() => {
          @Store()
          @Component({ template: `` })
          class UITest {
@@ -477,10 +470,12 @@ describe("Core", () => {
          const observerSpy = subscribeSpyTo(result, { expectErrors: true })
 
          fixture.detectChanges()
+         expect(() => flush()).toThrow()
 
          expect(error).toHaveBeenCalledOnceWith(new Error("BOGUS"))
          expect(observerSpy.getError()).toEqual(new Error("BOGUS"))
-         expect(iCatchErrors).not.toHaveBeenCalled()
-      })
+         expect(iCatchErrors).toHaveBeenCalled()
+
+      }))
    })
 })
