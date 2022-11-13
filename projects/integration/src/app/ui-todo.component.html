@@ -36,7 +36,7 @@
 <div class="oops" *ngIf="save.failed">
    <span>Oops!</span>
    <span *ngIf="save.retryCount">Retried: {{ save.retryCount }}</span>
-   <span *ngIf="save.timeout">Timed out after {{save.options.timeoutMs}}ms</span>
+   <span *ngIf="save.timeout">Timed out after {{save.timeoutMs}}ms</span>
 </div>
 
 <div class="slow" *ngIf="save.slow">Please wait</div>

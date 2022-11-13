@@ -23,21 +23,22 @@ interface TransitionOptions {
 function handleError(transition: Transition) {
    if (transition.failed) {
       transition.onError.next(transition.thrownError)
-   } else if (transition.options.resetOnSuccess) {
+   } else if (transition.resetOnSuccess) {
       transition.retryCount = 0
    }
 }
 
 function checkStable({ transition, microtasks, macroTasks, parentZone, timeout }: TransitionSpec) {
    const { isUnstable } = transition
-   const { slowMs, timeoutMs } = transition.options
+   const { slowMs, timeoutMs, slow, isSlow } = transition
    if (!microtasks && !macroTasks && !transition.stable) {
       clearTimeout(timeout.timeoutId)
       clearTimeout(timeout.slowId)
-      transition.stable = true
-      transition.slow = false
-      handleError(transition)
       parentZone.run(() => {
+         handleError(transition)
+         if (slow) {
+            isSlow.next(false)
+         }
          isUnstable.next(false)
       })
    }
@@ -45,16 +46,13 @@ function checkStable({ transition, microtasks, macroTasks, parentZone, timeout }
       if (transition.failed) {
          transition.retryCount++
       }
-      transition.stable = false
       transition.failed = false
       transition.timeout = false
-      transition.slow = false
       transition.thrownError = null
       parentZone.run(() => {
          isUnstable.next(true)
          if (slowMs) {
             timeout.slowId = setTimeout(() => {
-               transition.slow = true
                transition.isSlow.next(true)
             }, slowMs)
          }
@@ -129,18 +127,28 @@ export class Transition<T = unknown> implements OnAttach {
    private readonly spec: TransitionSpec = new TransitionSpec("transition", this)
    private readonly emitter: EventEmitter<T>
 
-   isUnstable = new BehaviorSubject<boolean>(false)
-   isSlow = new BehaviorSubject<boolean>(false)
-   onError = new Subject<unknown>()
-   slow = false
+   readonly timeoutMs: number
+   readonly slowMs: number
+   readonly resetOnSuccess: boolean
+   readonly isUnstable = new BehaviorSubject<boolean>(false)
+   readonly isSlow = new BehaviorSubject<boolean>(false)
+   readonly onError = new Subject<unknown>()
+
    timeout = false
    failed = false
-   stable = true
    retryCount = 0
    thrownError: unknown = null
 
+   get stable() {
+      return !this.unstable
+   }
+
    get unstable() {
-      return !this.stable
+      return this.isUnstable.value
+   }
+
+   get slow() {
+      return this.isSlow.value
    }
 
    next(value: T) {
@@ -184,8 +192,11 @@ export class Transition<T = unknown> implements OnAttach {
       return merge(this.isUnstable, this.isSlow).pipe(map(() => this)).subscribe(observer)
    }
 
-   constructor(readonly options: TransitionOptions = {}) {
+   constructor(private options: TransitionOptions = {}) {
       this.emitter = new EventEmitter<T>(options.async)
+      this.slowMs = options.slowMs ?? 0
+      this.timeoutMs = options.timeoutMs ?? 0
+      this.resetOnSuccess = options.resetOnSuccess ?? false
    }
 }
 
