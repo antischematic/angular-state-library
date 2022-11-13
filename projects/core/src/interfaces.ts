@@ -87,3 +87,7 @@ export interface StoreConfig {
 }
 
 export type DepMap = Map<Record<any, any>, Map<string, unknown>>
+
+export interface ZoneCompatible {
+   run(fn: Function, applyThis?: {}, ...applyArgs: any[]): any
+}

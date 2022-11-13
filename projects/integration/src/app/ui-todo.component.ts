@@ -25,7 +25,9 @@ import {UISpinner} from './spinner.component';
 export class UITodo {
    @Input() value: Todo = { ...UITodo.defaultValue };
 
-   @Attach() @Output() save = new Transition<Todo>({});
+   @Attach() @Output() save = new Transition<Todo>({
+      resetOnSuccess: true,
+   });
 
    @Select() get model() {
       return { ...this.value }

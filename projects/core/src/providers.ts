@@ -134,18 +134,24 @@ export class Changes {
 }
 
 export class StoreErrorHandler implements ErrorHandler {
+   isHandlingError = false
+
    handleError(error: unknown) {
-      const errorHandlers = getErrorHandlers(this.prototype)
-      for (const handler of errorHandlers) {
-         try {
-            handler.descriptor!.value.call(this.instance, error)
-            break
-         } catch (e) {
-            error = e
+      if (!this.isHandlingError) {
+         this.isHandlingError = true
+         const errorHandlers = getErrorHandlers(this.prototype)
+         for (const handler of errorHandlers) {
+            try {
+               this.instance[handler.key].call(this.instance, error)
+               break
+            } catch (e) {
+               error = e
+            }
          }
+         this.isHandlingError = false
+         throw error
       }
-      throw error
    }
 
-   constructor(private prototype: any, private instance: {}) {}
+   constructor(private prototype: any, private instance: any) {}
 }

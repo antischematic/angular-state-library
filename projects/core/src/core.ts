@@ -57,7 +57,7 @@ export function decorateCheck(target: {}, name: Phase) {
       for (const action of actions) {
          const deps = getDeps(this, action.key)
          const dirty = action.track && deps && checkDeps(deps)
-         if (action.descriptor!.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
+         if (this[action.key].length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
             markDirty(this)
             call(this, action.key)
          }
@@ -151,8 +151,8 @@ export function decorateActions(target: {}) {
    }
 }
 
-export function decorateSubscribe(target: any) {
-   target.ngOnAttach = function (observer: any) {
+export function decorateAttachment(target: any) {
+   target.ngOnAttach ??= function (this: any, observer: any) {
       return inject(EVENTS).pipe(
          filter(event => event.context === this),
          map(() => this),

@@ -3,30 +3,42 @@
       display: flex;
       margin: 0.2em 0;
    }
-   .oops {
+   .oops, .slow {
       margin-left: 0.5em;
       font-variant: all-small-caps;
       color: red;
+   }
+   .oops > span {
+      margin: 0 1ch;
+   }
+   .slow {
+      color: orange
    }
 </style>
 
 <input
    type="checkbox"
+   [disabled]="save.unstable"
    [hidden]="!model.id"
    [(ngModel)]="model.completed"
-   [disabled]="save.unstable"
    (ngModelChange)="saveTodo()"
-   #checkbox
 />
+
 <input
    type="text"
    [disabled]="model.completed || save.unstable"
    [(ngModel)]="model.title"
    (keydown.enter)="saveTodo()"
-   #text
 />
+
 <button *ngIf="!model.id" (click)="saveTodo()">Create</button>
 
-<div class="oops" *ngIf="save.failed">Oops!</div>
+<div class="oops" *ngIf="save.failed">
+   <span>Oops!</span>
+   <span *ngIf="save.retryCount">Retried: {{ save.retryCount }}</span>
+   <span *ngIf="save.timeout">Timed out after {{save.options.timeoutMs}}ms</span>
+</div>
+
+<div class="slow" *ngIf="save.slow">Please wait</div>
 
 <ui-spinner *ngIf="save.unstable"></ui-spinner>

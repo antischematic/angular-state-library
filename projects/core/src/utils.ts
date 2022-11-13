@@ -1,7 +1,7 @@
-import {untrack} from "./proxy";
+import {track, untrack} from "./proxy";
 import {inject, ProviderToken} from "@angular/core";
 import {filter, Observable} from "rxjs";
-import {ExtractEvents, StoreConfig} from "./interfaces";
+import {ExtractEvents, StoreConfig, ZoneCompatible} from "./interfaces";
 import {EVENTS, ROOT_CONFIG, STORE_CONFIG} from "./providers";
 
 export function isPlainObject(obj: object) {
@@ -53,10 +53,14 @@ export function configureStore(config: StoreConfig) {
    }
 }
 
-export function observeInZone<T>(source: Observable<T>, zone: Zone): Observable<T> {
+export function observeInZone<T>(source: Observable<T>, zone: ZoneCompatible): Observable<T> {
    return new Observable(subscriber => {
       return zone.run(() => {
          return source.subscribe(subscriber)
       })
    })
+}
+
+export function get<T extends { value: unknown }>(token: ProviderToken<T>): T["value"] {
+   return track(inject(token).value)
 }

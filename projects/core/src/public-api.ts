@@ -15,11 +15,11 @@ export {dispatch} from "./dispatch";
 export {
    useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges
 } from "./hooks"
-export {TemplateProvider, getValue} from "./template-provider"
+export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
 export {Transition, useTransition, TransitionToken} from "./transition"
 export {EVENTS, ACTION} from "./providers";
-export {configureStore, events} from "./utils";
+export {configureStore, events, get} from "./utils";
 export {Store, Caught, Select, Layout, Before, Invoke, Action, Attach} from "./decorators";
 export {select, selectStore, Selector} from "./select"
 export {

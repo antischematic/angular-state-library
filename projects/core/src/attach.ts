@@ -16,7 +16,14 @@ class AttachObserver {
 export function attach<T extends {}>(token: ProviderToken<T> | undefined, directive: any, key: string): any {
    const cdr = inject(ChangeDetectorRef) as ViewRef
    const instance =  token ? inject(token) : directive[key]
-   const subscription = instance.ngOnAttach(new AttachObserver(directive, key, cdr))
+   const observer = new AttachObserver(directive, key, cdr)
+   const subscription = instance.ngOnAttach?.(observer) ?? instance.subscribe?.(observer)
+   if (!subscription) {
+      console.error('Directive:', directive)
+      console.error('Key:', key)
+      console.error('Object:', instance)
+      throw new Error(`Object does not implement OnAttach or Subscribable interfaces`)
+   }
    addTeardown(subscription)
 }
 

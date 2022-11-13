@@ -18,7 +18,7 @@ import {
    Layout,
    loadEffect,
    Select,
-   Store,
+   Store, Transition,
    TransitionToken,
    useChanges,
    useMerge,
@@ -26,7 +26,7 @@ import {
    useQuery,
    useTransition
 } from '@antischematic/angular-state-library';
-import {Observable, tap} from 'rxjs';
+import {Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
@@ -63,7 +63,10 @@ export class UITodos {
       this.todos = todos
    }
 
+   @Action() signal!: Action
+
    @Invoke() loadTodos() {
+      this.signal() // test empty action
       // Invoke, Before and Layout react to changes on "this"
       return dispatch(loadTodos(this.userId), {
          next: this.setTodos
@@ -102,8 +105,10 @@ export class UITodos {
 
    // create a todo then toggle complete to trigger an error
    @Caught() handleError(error: unknown) {
-      console.log('error caught, rethrowing', error);
-      throw error;
+      console.log('error handled', error);
+      dispatch(timer(1000), () => {
+         console.info('uh oh')
+      }, { zone: "noop" })
    }
 
    @Invoke() logEvents() {
@@ -128,7 +133,9 @@ export class UITodos {
 
 const endpoint = `https://jsonplaceholder.typicode.com/todos`
 
-const Loading = new TransitionToken<Todo[]>("loading")
+const Loading = new TransitionToken<Todo[]>("loading", {
+   cancelPrevious: true,
+})
 
 function loadTodos(userId: string): Observable<Todo[]> {
    const loading = inject(Loading)

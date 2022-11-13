@@ -6,7 +6,7 @@ import {
    decorateDestroy,
    decorateFactory,
    decorateSelectors,
-   decorateSubscribe,
+   decorateAttachment,
    setup
 } from "./core";
 import {ActionMetadata, Phase, SelectMetadata} from "./interfaces";
@@ -36,7 +36,7 @@ export function Store() {
 
       decorateActions(prototype)
       decorateSelectors(prototype)
-      decorateSubscribe(prototype)
+      decorateAttachment(prototype)
    }
 }
 
@@ -45,10 +45,18 @@ export const Invoke = createDecorator<ActionMetadata>(action, {...defaults, phas
 export const Before = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterContentChecked})
 export const Layout = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterViewChecked})
 export const Select = createDecorator<SelectMetadata>(selector)
-export const Caught = createDecorator(caught)
+
+export function Caught() {
+   return function (target: {}, key: PropertyKey, descriptor: PropertyDescriptor) {
+      setMeta(action, { key, descriptor, phase: Phase.DoCheck }, target, key)
+      setMeta(caught, { key, descriptor }, target, key)
+   }
+}
 
 export function Attach(token?: ProviderToken<any>) {
    return function (target: {}, key: PropertyKey) {
       setMeta(attach, { key, token }, target, key)
    }
 }
+
+export type Action<TParams extends unknown = void, TReturn = void> = (...params: TParams extends [...infer R] ? R : [TParams]) => TReturn

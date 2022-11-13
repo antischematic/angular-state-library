@@ -1,24 +1,28 @@
 import {ChangeDetectorRef, ErrorHandler, inject} from "@angular/core";
-import {ActionMetadata, DispatchObserver, EventType, Metadata} from "./interfaces";
+import {ActionMetadata, DispatchObserver, EventType, Metadata, ZoneCompatible} from "./interfaces";
 import {catchError, EMPTY, Observable, Subject, tap} from "rxjs";
-import {isPlainObject, noop, observeInZone, wrap} from "./utils";
+import {isPlainObject, observeInZone, wrap} from "./utils";
 import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "./providers";
 
 const observers = [EventType.Next, EventType.Error, EventType.Complete, "finalize"] as const
 
-export function dispatch<TValue>(source: Observable<TValue>): Observable<TValue>
-export function dispatch<TValue>(source: Observable<TValue>, observer: DispatchObserver<TValue>): Observable<TValue>
-export function dispatch<TValue>(source: Observable<TValue>, next: (value: TValue) => void): Observable<TValue>
-export function dispatch(source: Observable<any>, observer?: any) {
+export interface DispatchOptions {
+   zone?: "noop" | ZoneCompatible
+}
+
+export function dispatch<TValue>(source: Observable<TValue>, options?: DispatchOptions): Observable<TValue>
+export function dispatch<TValue>(source: Observable<TValue>, observer: DispatchObserver<TValue>, options?: DispatchOptions): Observable<TValue>
+export function dispatch<TValue>(source: Observable<TValue>, next: (value: TValue) => void, options?: DispatchOptions): Observable<TValue>
+export function dispatch(source: Observable<any>, observerOrOptions: any = {}, options: DispatchOptions = observerOrOptions) {
    const action = inject(ACTION) as Metadata<ActionMetadata>
-   const context = observer && !isPlainObject(observer) ? observer : inject(CONTEXT).instance
+   const context = observerOrOptions && !isPlainObject(observerOrOptions) ? observerOrOptions : inject(CONTEXT).instance
    const event = inject(EventScheduler)
    const effect = inject(EffectScheduler)
    const errorHandler = inject(ErrorHandler)
    const changeDetector = inject(ChangeDetectorRef)
    const signal = new Subject<any>()
 
-   observer = typeof observer === "function" ? { next: observer } : { ...observer }
+   const observer = typeof observerOrOptions === "function" ? { next: observerOrOptions } : { ...observerOrOptions }
 
    for (const key of observers) {
       wrap(observer!, key, function (fn, value) {
@@ -43,7 +47,7 @@ export function dispatch(source: Observable<any>, observer?: any) {
          errorHandler.handleError(e)
          return EMPTY
       })
-   ), Zone.current))
+   ), options.zone === "noop" ? Zone.root : options.zone ?? Zone.current))
 
    return signal as any
 }
