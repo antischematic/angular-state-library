@@ -1,0 +1,11 @@
+.container {
+   display: block;
+   position: absolute;
+   transform-origin: 0 0;
+   left: 50%;
+   top: 50%;
+   transform: scale(0.4, 0.7);
+   width: 10px;
+   height: 10px;
+   /*transition: transform linear 1s*/
+}
