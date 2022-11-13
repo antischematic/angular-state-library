@@ -246,7 +246,7 @@ export class UITodos {
 
 #### Attach
 
-Attaches an object and runs change detection when its value changes. Attachable objects implement the `OnAttach` interface. Stores, template providers and transitions are attachable by default.
+Attaches an object and runs change detection when its value changes. Attachable objects implement the `OnAttach` or `Subscribable` interface. Stores, template providers and transitions are attachable by default.
 
 **Example: Attach theme from a template provider**
 
@@ -254,7 +254,7 @@ Attaches an object and runs change detection when its value changes. Attachable 
 @Store()
 @Component()
 export class UIButton {
-   @Attach(UITheme) theme = getValue(UITheme)
+   @Attach(UITheme) theme = get(UITheme)
 
    @HostBinding("style.color") get color() {
       return this.theme.color

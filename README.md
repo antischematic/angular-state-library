@@ -15,42 +15,42 @@ This API is experimental.
 
 <!-- TOC -->
 * [API](#api)
-  * [Core](#core)
-    * [Store](#store)
-    * [Action](#action)
-    * [Invoke](#invoke)
-    * [Before](#before)
-    * [Layout](#layout)
-    * [Select](#select)
-    * [Caught](#caught)
-    * [Attach](#attach)
-    * [configureStore](#configurestore)
-  * [Observables](#observables)
-    * [events](#events)
-    * [EVENTS](#events)
-    * [select](#select)
-    * [selectStore](#selectstore)
-  * [Action Hooks](#action-hooks)
-    * [dispatch](#dispatch)
-    * [loadEffect](#loadeffect)
-    * [addTeardown](#addteardown)
-    * [useChanges](#usechanges)
-    * [useOperator](#useoperator)
-    * [useConcat](#useconcat)
-    * [useExhaust](#useexhaust)
-    * [useMerge](#usemerge)
-    * [useSwitch](#useswitch)
-  * [Reactivity](#reactivity)
-    * [TemplateProvider](#templateprovider)
-    * [track (alias: `$`)](#track--alias---)
-    * [untrack (alias: `$$`)](#untrack--alias---)
-    * [isTracked](#istracked)
-  * [Extensions](#extensions)
-    * [Transition](#transition)
-    * [TransitionToken](#transitiontoken)
-    * [useTransition](#usetransition)
-    * [useQuery](#usequery)
-    * [useMutation](#usemutation)
+   * [Core](#core)
+      * [Store](#store)
+      * [Action](#action)
+      * [Invoke](#invoke)
+      * [Before](#before)
+      * [Layout](#layout)
+      * [Select](#select)
+      * [Caught](#caught)
+      * [Attach](#attach)
+      * [configureStore](#configurestore)
+   * [Observables](#observables)
+      * [events](#events)
+      * [EVENTS](#events)
+      * [select](#select)
+      * [selectStore](#selectstore)
+   * [Action Hooks](#action-hooks)
+      * [dispatch](#dispatch)
+      * [loadEffect](#loadeffect)
+      * [addTeardown](#addteardown)
+      * [useChanges](#usechanges)
+      * [useOperator](#useoperator)
+      * [useConcat](#useconcat)
+      * [useExhaust](#useexhaust)
+      * [useMerge](#usemerge)
+      * [useSwitch](#useswitch)
+   * [Reactivity](#reactivity)
+      * [TemplateProvider](#templateprovider)
+      * [track (alias: `$`)](#track--alias---)
+      * [untrack (alias: `$$`)](#untrack--alias---)
+      * [isTracked](#istracked)
+   * [Extensions](#extensions)
+      * [Transition](#transition)
+      * [TransitionToken](#transitiontoken)
+      * [useTransition](#usetransition)
+      * [useQuery](#usequery)
+      * [useMutation](#usemutation)
 * [Testing Environment](#testing-environment)
 <!-- TOC -->
 
@@ -246,7 +246,7 @@ export class UITodos {
 
 #### Attach
 
-Attaches an object and runs change detection when its value changes. Attachable objects implement the `OnAttach` interface. Stores, template providers and transitions are attachable by default.
+Attaches an object and runs change detection when its value changes. Attachable objects implement the `OnAttach` or `Subscribable` interface. Stores, template providers and transitions are attachable by default.
 
 **Example: Attach theme from a template provider**
 
@@ -254,7 +254,7 @@ Attaches an object and runs change detection when its value changes. Attachable 
 @Store()
 @Component()
 export class UIButton {
-   @Attach(UITheme) theme = getValue(UITheme)
+   @Attach(UITheme) theme = get(UITheme)
 
    @HostBinding("style.color") get color() {
       return this.theme.color
@@ -811,7 +811,7 @@ export class UITodos {
    @Input() userId!: string
 
    todos: Todo[] = []
-   
+
    @Attach() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
