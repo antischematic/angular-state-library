@@ -57,7 +57,7 @@ export function decorateCheck(target: {}, name: Phase) {
       for (const action of actions) {
          const deps = getDeps(this, action.key)
          const dirty = action.track && deps && checkDeps(deps)
-         if (this[action.key].length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
+         if (action.descriptor?.value.length === 0 && (!deps && action.immediate && action.phase === name || dirty)) {
             markDirty(this)
             call(this, action.key)
          }
@@ -120,14 +120,18 @@ export function decorateFactory(target: any, fn: (this: any, ...args: any[]) => 
    }
 }
 
-export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, key?: string, ...args: Parameters<T>) {
+export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: T, context = {}, catchError = true, key?: string, ...args: Parameters<T>) {
    const injector = getToken(EnvironmentInjector, untrack(context), key)
    const errorHandler = injector.get(ErrorHandler)
    pushStack(deps)
    try {
       return injector.runInContext(() => fn.apply(context, args))
    } catch (e) {
-      errorHandler.handleError(e)
+      if (catchError) {
+         errorHandler.handleError(e)
+      } else {
+         throw e
+      }
    } finally {
       popStack()
    }
@@ -140,13 +144,13 @@ function runAction(this: any, fn: any, key: any, ...args: any[]) {
 }
 
 export function decorateActions(target: {}) {
-   for (const { key } of getActions(target)) {
+   for (const { key, catchError } of getActions(target)) {
       wrap(target, key, function (fn, ...args) {
          const proxy = createProxy(this)
          const deps = new Map()
          setMeta(tracked, deps, this, key)
          teardown(this, key)
-         return runInContext(deps, runAction, proxy, key, fn, key, ...args)
+         return runInContext(deps, runAction, proxy, catchError, key, fn, key, ...args)
       })
    }
 }
@@ -170,7 +174,7 @@ export function decorateSelectors(target: {}) {
          let result = getMeta(cacheKey, this, key)
          if (dirty) {
             const newDeps = new Map()
-            result = runInContext(newDeps, fn, proxy, void 0, ...args)
+            result = runInContext(newDeps, fn, proxy, true, void 0, ...args)
             setMeta(cacheKey, result, this, key)
             setMeta(tracked, newDeps, this, cacheKey)
          }

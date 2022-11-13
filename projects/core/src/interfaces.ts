@@ -66,6 +66,7 @@ export interface ActionMetadata {
    immediate?: boolean;
    phase?: Phase
    track?: boolean
+   catchError?: boolean
 }
 
 export interface SelectMetadata {}

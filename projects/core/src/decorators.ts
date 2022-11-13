@@ -48,7 +48,7 @@ export const Select = createDecorator<SelectMetadata>(selector)
 
 export function Caught() {
    return function (target: {}, key: PropertyKey, descriptor: PropertyDescriptor) {
-      setMeta(action, { key, descriptor, phase: Phase.DoCheck }, target, key)
+      setMeta(action, { key, descriptor, phase: Phase.DoCheck, catchError: false }, target, key)
       setMeta(caught, { key, descriptor }, target, key)
    }
 }
