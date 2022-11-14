@@ -97,11 +97,6 @@ export function setup(target: any, factory: any, ...args: any[]) {
       ], storeInjector)
       setMeta(injector, actionInjector, instance, action.key)
    }
-   for (const attachment of getAttachments(target.prototype)) {
-      storeInjector.runInContext(() => {
-         attach(attachment.token, instance, attachment.key)
-      })
-   }
    return instance
 }
 
@@ -190,6 +185,18 @@ export function decorateChanges(target: {}) {
       events.schedule(EventType.Dispatch, "ngOnChanges", value)
       changes.setValue(value)
       fn.call(this, value)
+   })
+}
+
+export function decorateOnInit(target: {}) {
+   wrap(target, "ngOnInit", function (fn) {
+      const injector = getToken(EnvironmentInjector, this)
+      for (const attachment of getAttachments(target)) {
+         injector.runInContext(() => {
+            attach(attachment.token, this, attachment.key)
+         })
+      }
+      fn.call(this)
    })
 }
 

@@ -1,5 +1,5 @@
 import {track, untrack} from "./proxy";
-import {inject, ProviderToken} from "@angular/core";
+import {inject, INJECTOR, ProviderToken} from "@angular/core";
 import {filter, Observable} from "rxjs";
 import {ExtractEvents, StoreConfig, ZoneCompatible} from "./interfaces";
 import {EVENTS, ROOT_CONFIG, STORE_CONFIG} from "./providers";
@@ -40,9 +40,9 @@ export function getId() {
 export function events<T>(type: ProviderToken<T>): Observable<ExtractEvents<T, keyof T>>
 export function events<T>(type: T): Observable<ExtractEvents<T, keyof T>>
 export function events(type: ProviderToken<unknown> | unknown): Observable<ExtractEvents<unknown, any>> {
-   const instance = typeof type === "function" ? inject(type) : type
+   const injector = inject(INJECTOR)
    return inject(EVENTS).pipe(
-      filter(event => event.context === instance)
+      filter(event => event.context === (typeof type === "function" ? injector.get(type) : type))
    ) as Observable<ExtractEvents<unknown, any>>
 }
 

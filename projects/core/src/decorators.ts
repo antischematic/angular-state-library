@@ -1,4 +1,5 @@
 import {ProviderToken} from "@angular/core";
+import {Observable} from "rxjs";
 import {
    decorateActions,
    decorateChanges,
@@ -7,7 +8,7 @@ import {
    decorateFactory,
    decorateSelectors,
    decorateAttachment,
-   setup
+   setup, decorateOnInit
 } from "./core";
 import {ActionMetadata, Phase, SelectMetadata} from "./interfaces";
 import {action, attach, caught, selector, setMeta} from "./metadata";
@@ -28,6 +29,7 @@ export function Store() {
 
       decorateFactory(target, setup)
       decorateChanges(prototype)
+      decorateOnInit(prototype)
       decorateDestroy(prototype)
 
       decorateCheck(prototype, Phase.DoCheck)
@@ -60,3 +62,7 @@ export function Attach(token?: ProviderToken<any>) {
 }
 
 export type Action<TParams extends unknown = void, TReturn = void> = (...params: TParams extends [...infer R] ? R : [TParams]) => TReturn
+
+export type Select<T> = {
+   [key in keyof T]: Observable<T[key]>
+}

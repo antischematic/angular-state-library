@@ -13,12 +13,12 @@ import {
    Action, Attach,
    Caught,
    dispatch,
-   events,
+   events, get,
    Invoke,
    Layout,
    loadEffect,
-   Select,
-   Store, Transition,
+   Select, Selector,
+   Store,
    TransitionToken,
    useChanges,
    useMerge,
@@ -33,6 +33,12 @@ import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
 import {UITodo} from './ui-todo.component';
 
+const Todos = new Selector<Todo[]>("Todos", (withState) => {
+   return withState([], {
+      from: [UITodos, "loadTodos:next"]
+   })
+})
+
 @Store()
 @Component({
    imports: [UITodo, UISpinner, CommonModule, UITheme],
@@ -40,6 +46,7 @@ import {UITodo} from './ui-todo.component';
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todos.component.html',
+   providers: [Todos]
 })
 export class UITodos {
    @Input() userId!: string;
@@ -48,7 +55,7 @@ export class UITodos {
 
    @ViewChildren(UITodo) uiTodos!: QueryList<UITodos>;
 
-   todos: Todo[] = []
+   @Attach(Todos) todos = get(Todos)
 
    @Select() get remaining() {
       // Use "$" to track nested objects or array mutations
@@ -59,8 +66,8 @@ export class UITodos {
       return $(this.todos).filter((todo) => todo.completed) ?? [];
    }
 
-   @Action() setTodos(todos: Todo[]) {
-      this.todos = todos
+   @Action() setTodos(value: Todo[]) {
+      inject(Todos).next(value)
    }
 
    @Action() signal!: Action
@@ -68,9 +75,7 @@ export class UITodos {
    @Invoke() loadTodos() {
       this.signal() // test empty action
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId), {
-         next: this.setTodos
-      });
+      return dispatch(loadTodos(this.userId));
    }
 
    @Layout() countElements() {
