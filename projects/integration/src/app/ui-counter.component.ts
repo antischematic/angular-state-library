@@ -22,8 +22,8 @@ export class UICounter {
       this.count++;
       this.countChange.emit(this.count);
 
-      // dispatch(timer(1000), {
-      //    next: this.autoIncrement,
-      // });
+      dispatch(timer(1000), {
+         next: this.autoIncrement,
+      });
    }
 }

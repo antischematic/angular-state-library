@@ -10,13 +10,13 @@ import {UITheme} from "./ui-theme";
    selector: 'ui-descendent',
    standalone: true,
    template: `
-<!--      <p [style.color]="theme.color">UIDescendent: {{ counter.count }}</p>-->
+      <p [style.color]="theme.color">UIDescendent: {{ counter.count }}</p>
       <p [style.color]="theme.color">RootStore.userId: {{ store.userId }}</p>
   `,
 })
 export class UIDescendent {
    @Select() store = inject(AppComponent)
-   // @Select() counter = inject(UICounter)
+   @Select() counter = inject(UICounter)
    @Select(UITheme) theme = get(UITheme)
 
    @Invoke() logTheme() {

@@ -5,7 +5,6 @@ import {
    KeyValueDiffers,
    ProviderToken,
    Type,
-   ViewRef
 } from "@angular/core";
 import {
    BehaviorSubject,
@@ -99,7 +98,7 @@ export function withState<T>(initial: T, options: WithStateOptions<T> = {}): Wit
 
 export const Selector: Selector = function Selector(name: string, select: Function) {
    @Injectable()
-   class Selector {
+   class Selector implements OnSelect {
       source: Observable<any>
       destination: BehaviorSubject<any>
       connected = false
@@ -122,11 +121,17 @@ export const Selector: Selector = function Selector(name: string, select: Functi
          this.target.next(value)
       }
 
+      ngOnSelect(observer: Partial<Observer<any>>) {
+         try {
+            return this.destination.pipe(skip(1)).subscribe(observer)
+         } finally {
+            this.connect()
+         }
+      }
+
       subscribe(observer: any) {
          try {
-            return this.destination.pipe(
-               skip(1)
-            ).subscribe(observer)
+            return this.destination.subscribe(observer)
          } finally {
             this.connect()
          }
