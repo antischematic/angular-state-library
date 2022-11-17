@@ -423,15 +423,14 @@ Creates an injectable selector that derives a value from the event stream. Selec
 
 ```ts
 const Count = new Selector(() => action(UICounter, "increment").pipe(
-   mergeWith(of(0)),
-   scan(count => count + 1)
+   scan(count => count + 1, 0)
 ))
 
 @Store()
 @Directive()
 export class UICounter {
    @Select(Count) count = 0
-   
+
    @Action() increment!: Action<() => void>
 }
 ```
@@ -445,7 +444,7 @@ const Count = new Selector(() => withState(0))
 @Directive()
 export class UICounter {
    @Select(Count) count = get(Count) // 0
-   
+
    @Action() increment() {
       inject(Count).next(this.count + 1)
    }
@@ -463,7 +462,7 @@ const Count = new Selector((state) => withState(0, {
 @Directive()
 export class UICounter {
    @Select(Count) count = get(Count) // 0
-   
+
    @Action() increment() {
       inject(Count).next(this.count + 1)
    }
@@ -843,7 +842,7 @@ export class UITodos {
    @Input() userId!: string
 
    todos: Todo[] = []
-   
+
    @Select() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
@@ -869,7 +868,7 @@ const endpoint = "https://jsonplaceholder.typicode.com/todos"
 
 function loadTodos(userId: string) {
    return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId }}).pipe(
-      useQuery({ 
+      useQuery({
          key: [endpoint, userId],
          refreshInterval: 10000,
          refreshOnFocus: true,
@@ -887,15 +886,15 @@ function loadTodos(userId: string) {
 })
 export class UITodos {
    @Input() userId!: string
-   
+
    todos: Todo[] = []
-   
+
    @Select() loading = new Transition<Todo[]>()
-   
+
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
    }
-   
+
    @Invoke() loadTodos() {
       dispatch(loadTodos(this.userId, this.loading), {
          next: this.setTodos

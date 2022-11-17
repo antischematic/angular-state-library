@@ -423,8 +423,7 @@ Creates an injectable selector that derives a value from the event stream. Selec
 
 ```ts
 const Count = new Selector(() => action(UICounter, "increment").pipe(
-   mergeWith(of(0)),
-   scan(count => count + 1)
+   scan(count => count + 1, 0)
 ))
 
 @Store()
