@@ -8,14 +8,17 @@ Manage state in your Angular applications. **Status: in development**
 
 ## API
 
-Version: 0.5.0<br/>
-<small>Bundle size: ~15kb min. ~5kb gzip</small>
+Version: 0.7.0<br/>
+<small>Bundle size: ~20kb min. ~7kb gzip</small>
 
 This API is experimental.
 
-<!-- TOC -->
-* [API](#api)
-   * [Core](#core)
+<details>
+   <summary>Table of Contents</summary>
+
+   <!-- TOC -->
+* [Angular State Library](#angular-state-library)
+   * [API](#api)
       * [Store](#store)
       * [Action](#action)
       * [Invoke](#invoke)
@@ -23,36 +26,37 @@ This API is experimental.
       * [Layout](#layout)
       * [Select](#select)
       * [Caught](#caught)
-      * [Attach](#attach)
-      * [configureStore](#configurestore)
-   * [Observables](#observables)
-      * [events](#events)
-      * [EVENTS](#events)
-      * [select](#select)
-      * [selectStore](#selectstore)
-   * [Action Hooks](#action-hooks)
-      * [dispatch](#dispatch)
-      * [loadEffect](#loadeffect)
-      * [addTeardown](#addteardown)
-      * [useChanges](#usechanges)
-      * [useOperator](#useoperator)
-      * [useConcat](#useconcat)
-      * [useExhaust](#useexhaust)
-      * [useMerge](#usemerge)
-      * [useSwitch](#useswitch)
-   * [Reactivity](#reactivity)
       * [TemplateProvider](#templateprovider)
-      * [track (alias: `$`)](#track--alias---)
-      * [untrack (alias: `$$`)](#untrack--alias---)
-      * [isTracked](#istracked)
-   * [Extensions](#extensions)
-      * [Transition](#transition)
-      * [TransitionToken](#transitiontoken)
-      * [useTransition](#usetransition)
-      * [useQuery](#usequery)
-      * [useMutation](#usemutation)
-* [Testing Environment](#testing-environment)
+      * [configureStore](#configurestore)
+      * [Observables](#observables)
+         * [events](#events)
+         * [EVENTS](#events-1)
+         * [select](#select-1)
+         * [selectStore](#selectstore)
+         * [Selector](#selector)
+         * [actionEvent](#actionevent)
+         * [nextEvent](#nextevent)
+         * [errorEvent](#errorevent)
+         * [completeEvent](#completeevent)
+      * [Action Hooks](#action-hooks)
+         * [dispatch](#dispatch)
+         * [loadEffect](#loadeffect)
+         * [addTeardown](#addteardown)
+         * [useChanges](#usechanges)
+         * [useOperator](#useoperator)
+      * [Reactivity](#reactivity)
+         * [track (alias: `$`)](#track--alias---)
+         * [untrack (alias: `$$`)](#untrack--alias---)
+         * [isTracked](#istracked)
+      * [Extensions](#extensions)
+         * [Transition](#transition)
+         * [TransitionToken](#transitiontoken)
+         * [useTransition](#usetransition)
+         * [useQuery](#usequery)
+         * [useMutation](#usemutation)
+   * [Testing Environment](#testing-environment)
 <!-- TOC -->
+</details>
 
 ### Core
 
@@ -186,12 +190,14 @@ export class UIParent {
 
 #### Select
 
-Marks the decorated accessor or method as a selector. Use selectors to derive state from other class properties. Can be
+Marks the decorated property, accessor or method as a selector. Use selectors to derive state from other stores or class properties. Can be
 chained with other selectors. Selectors receive a reactive `this` context that tracks dependencies. Selectors are
-memoized until its dependencies change. Selectors are not evaluated until its value is read. The memoization cache is
+memoized until their dependencies change. Selectors are not evaluated until its value is read. The memoization cache is
 purged each time reactive dependencies change.
 
 For method selectors, arguments must be serializable with `JSON.stringify`.
+
+For property selectors, they must implement the `OnSelect` or `Subscribable` interface.
 
 **Example: Computed properties**
 
@@ -221,6 +227,44 @@ export class UITodos {
 }
 ```
 
+**Example: Select theme from a template provider**
+
+```ts
+@Store()
+@Component()
+export class UIButton {
+   @select(UITheme) theme = get(UITheme)
+
+   @HostBinding("style.color") get color() {
+      return this.theme.color
+   }
+}
+```
+
+**Example: Select parent store**
+
+```ts
+@Store()
+@Component()
+export class UIComponent {
+   @Select() uiTodos = inject(UITodos)
+
+   @Select() get todos() {
+      return this.uiTodos.todos
+   }
+}
+```
+
+**Example: Select a transition**
+
+```ts
+@Store()
+@Component()
+export class UIComponent {
+   @Select() loading = new Transition()
+}
+```
+
 #### Caught
 
 Marks the decorated method as an error handler. Unhandled exceptions inside `Action`, `Invoke`, `Before`, `Layout`
@@ -244,48 +288,39 @@ export class UITodos {
 }
 ```
 
-#### Attach
+#### TemplateProvider
 
-Attaches an object and runs change detection when its value changes. Attachable objects implement the `OnAttach` or `Subscribable` interface. Stores, template providers and transitions are attachable by default.
+Provide values from a component template reactively. Template providers are styled with `display: contents` so they
+don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `Select` to
+keep dependant views in sync.
 
-**Example: Attach theme from a template provider**
+**Example: Theme Provider**
 
 ```ts
-@Store()
-@Component()
-export class UIButton {
-   @Attach(UITheme) theme = get(UITheme)
+export interface Theme {
+   color: string
+}
 
-   @HostBinding("style.color") get color() {
-      return this.theme.color
+@Directive({
+   standalone: true,
+   selector: "ui-theme"
+})
+export class UITheme extends TemplateProvider {
+   value: Theme = {
+      color: "red"
    }
 }
 ```
 
-**Example: Attach parent store**
+```html
 
-```ts
-@Store()
-@Component()
-export class UIComponent {
-   @Attach() uiTodos = inject(UITodos)
-
-   @Select() get todos() {
-      return this.uiTodos.todos
-   }
-}
+<ui-theme>
+   <ui-button>Red button</ui-button>
+   <ui-theme [value]="{ color: 'green' }">
+      <ui-button>Green button</ui-button>
+   </ui-theme>
+</ui-theme>
 ```
-
-**Example: Attach a transition**
-
-```ts
-@Store()
-@Component()
-export class UIComponent {
-   @Attach() loading = new Transition()
-}
-```
-
 
 #### configureStore
 
@@ -378,6 +413,154 @@ const store = selectStore(UITodos)
 store.subscribe(current => {
    console.log("store", current)
 })
+```
+
+#### Selector
+
+Creates an injectable selector that derives a value from the event stream. Selectors can return an `Observable` or `WithState` object. If a `WithState` object is returned, the selector state can be mutated by calling `next`. The mutation action can be intercepted by providing the subject as the first argument to the selector.
+
+**Example: Selector with observable**
+
+```ts
+const Count = new Selector(() => action(UICounter, "increment").pipe(
+   mergeWith(of(0)),
+   scan(count => count + 1)
+))
+
+@Store()
+@Directive()
+export class UICounter {
+   @Select(Count) count = 0
+
+   @Action() increment!: Action<() => void>
+}
+```
+
+**Example: Selector with state mutation**
+
+```ts
+const Count = new Selector(() => withState(0))
+
+@Store()
+@Directive()
+export class UICounter {
+   @Select(Count) count = get(Count) // 0
+
+   @Action() increment() {
+      inject(Count).next(this.count + 1)
+   }
+}
+```
+
+**Example: Selector with debounced state**
+
+```ts
+const Count = new Selector((state) => withState(0, {
+   from: state.pipe(debounce(1000))
+}))
+
+@Store()
+@Directive()
+export class UICounter {
+   @Select(Count) count = get(Count) // 0
+
+   @Action() increment() {
+      inject(Count).next(this.count + 1)
+   }
+}
+```
+
+**Example: Selector with state from events**
+
+```ts
+const Count = new Selector(() =>
+   withState(0, {
+      from: action(UICounter, "setCount")
+   })
+)
+
+@Store()
+@Directive()
+export class UICounter {
+   @Select(Count) count = get(Count) // 0
+
+   @Action() setCount: Action<(count: number) => void>
+}
+```
+
+#### actionEvent
+
+Returns a `DispatchEvent` stream. Use `action` if you only want the value.
+
+**Example: Get a `DispatchEvent` stream from an action**
+
+```ts
+@Store()
+@Directive()
+export class UIStore {
+   action(value: number) {}
+}
+
+actionEvent(UIStore, "action") // Observable<DispatchEvent>
+action(UIStore, "action") // Observable<number>
+```
+
+#### nextEvent
+
+Returns a `NextEvent` stream. Use `next` if you only want the value.
+
+**Example: Get a `NextEvent` stream from an action**
+
+```ts
+@Store()
+@Directive()
+export class UIStore {
+   action(value: number) {
+      return dispatch(of(number.toString()))
+   }
+}
+
+nextEvent(UIStore, "action") // Observable<NextEvent>
+next(UIStore, "action") // Observable<string>
+```
+
+#### errorEvent
+
+Returns an `ErrorEvent` stream. Use `error` if you only want the error.
+
+**Example: Get an `ErrorEvent` stream from an action**
+
+```ts
+@Store()
+@Directive()
+export class UIStore {
+   action(value: number) {
+      return dispatch(throwError(() => new Error("Oops!")))
+   }
+}
+
+errorEvent(UIStore, "action") // Observable<ErrorEvent>
+error(UIStore, "action") // Observable<unknown>
+```
+
+
+#### completeEvent
+
+Returns a `CompleteEvent` stream.
+
+**Example: Get a `CompleteEvent` stream from an action**
+
+```ts
+@Store()
+@Directive()
+export class UIStore {
+   action(value: number) {
+      return dispatch(EMPTY)
+   }
+}
+
+completeEvent(UIStore, "action") // Observable<ErrorEvent>
+complete(UIStore, "action") // Observable<void>
 ```
 
 ### Action Hooks
@@ -494,6 +677,8 @@ export class UITodos {
 Sets the merge strategy for effects dispatched from an action. The default strategy is `switchAll`. Once `useOperator`
 is called, the operator is locked and cannot be changed.
 
+Shortcuts for common operators such as `useMerge`, `useConcat` and `useExhaust` are also available.
+
 **Example: Debounce effects**
 
 ```ts
@@ -536,60 +721,10 @@ export default function loadTodos(userId: string) {
 }
 ```
 
-#### useConcat
-
-Synonym for `useOperator(concatAll())`
-
-#### useExhaust
-
-Synonym for `useOperator(exhaustAll())`
-
-#### useMerge
-
-Synonym for `useOperator(mergeAll())`
-
-#### useSwitch
-
-Synonym for `useOperator(switchAll())`. This is the default behaviour.
-
 ### Reactivity
 
 Reactivity is enabled through the use of proxy objects. The reactivity API makes it possible to run actions and change
 detection automatically when data dependencies change.
-
-#### TemplateProvider
-
-Provide values from a component template reactively. Template providers are styled with `display: contents` so they
-don't break grid layouts. Only use template providers with an element selector on a `@Directive`. Use with `Attach` to
-keep dependant views in sync.
-
-**Example: Theme Provider**
-
-```ts
-export interface Theme {
-   color: string
-}
-
-@Directive({
-   standalone: true,
-   selector: "ui-theme"
-})
-export class UITheme extends TemplateProvider {
-   value: Theme = {
-      color: "red"
-   }
-}
-```
-
-```html
-
-<ui-theme>
-   <ui-button>Red button</ui-button>
-   <ui-theme [value]="{ color: 'green' }">
-      <ui-button>Green button</ui-button>
-   </ui-theme>
-</ui-theme>
-```
 
 #### track (alias: `$`)
 
@@ -641,7 +776,7 @@ any async activity is tracked in a transition zone. The transition ends once all
    `
 })
 export class UIButton {
-   @Attach() @Output() press = new Transition()
+   @Select() @Output() press = new Transition()
 
    @HostListener("click", ["$event"])
    handleClick(event) {
@@ -671,7 +806,7 @@ const Loading = new TransitionToken("Loading")
 
 @Component()
 export class UITodos {
-   @Attach() loading = inject(Loading)
+   @Select() loading = inject(Loading)
 }
 ```
 
@@ -708,8 +843,8 @@ export class UITodos {
    @Input() userId!: string
 
    todos: Todo[] = []
-   
-   @Attach() loading = new Transition<Todo[]>()
+
+   @Select() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
@@ -734,7 +869,7 @@ const endpoint = "https://jsonplaceholder.typicode.com/todos"
 
 function loadTodos(userId: string) {
    return inject(HttpClient).get<Todo[]>(endpoint, { params: { userId }}).pipe(
-      useQuery({ 
+      useQuery({
          key: [endpoint, userId],
          refreshInterval: 10000,
          refreshOnFocus: true,
@@ -752,14 +887,15 @@ function loadTodos(userId: string) {
 })
 export class UITodos {
    @Input() userId!: string
-   
+
    todos: Todo[] = []
-   @Attach() loading = new Transition<Todo[]>()
-   
+
+   @Select() loading = new Transition<Todo[]>()
+
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
    }
-   
+
    @Invoke() loadTodos() {
       dispatch(loadTodos(this.userId, this.loading), {
          next: this.setTodos
@@ -812,7 +948,7 @@ export class UITodos {
 
    todos: Todo[] = []
 
-   @Attach() loading = new Transition<Todo[]>()
+   @Select() loading = new Transition<Todo[]>()
 
    @Action() setTodos(todos: Todo[]) {
       this.todos = todos
