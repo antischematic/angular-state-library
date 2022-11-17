@@ -54,8 +54,8 @@ export function Caught() {
    }
 }
 
-export function Select(): (target: {}, key: PropertyKey, descriptor?: any) => void
-export function Select(token?: ProviderToken<any>): (target: {}, key: PropertyKey, descriptor?: never) => void
+export function Select(): (target: {}, key: PropertyKey, descriptor?: PropertyDescriptor) => void
+export function Select(token: ProviderToken<any>): (target: {}, key: PropertyKey, descriptor: void) => void
 export function Select(token?: ProviderToken<any>) {
    return function (target: {}, key: PropertyKey, descriptor: any) {
       setMeta(selector, { key, token, descriptor }, target, key)
