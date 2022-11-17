@@ -62,7 +62,7 @@ export function Select(token?: ProviderToken<any>) {
    }
 }
 
-export type Action<TParams extends unknown = void, TReturn = void> = (...params: TParams extends [...infer R] ? R : [TParams]) => TReturn
+export type Action<TFunction extends (...params: any[]) => void = () => void> = TFunction
 
 export type Select<T> = {
    [key in keyof T]: Observable<T[key]>

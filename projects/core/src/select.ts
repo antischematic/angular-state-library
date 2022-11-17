@@ -13,7 +13,7 @@ import {
    filter, isObservable,
    map, mergeWith,
    Observable, Observer, ReplaySubject,
-   shareReplay,
+   shareReplay, skip,
    startWith, Subject, Subscription,
 } from "rxjs";
 import {Select} from "./decorators";
@@ -91,7 +91,7 @@ export function withState(initial: any, options: WithStateOptions<any> = {}): Wi
 }
 
 export const Selector: Selector = function Selector(name: string, select: Function) {
-   @Injectable({ providedIn: "root" })
+   @Injectable()
    class Selector {
       source: Observable<any>
       destination: BehaviorSubject<any>
@@ -116,8 +116,13 @@ export const Selector: Selector = function Selector(name: string, select: Functi
       }
 
       subscribe(observer: any) {
-         this.connect()
-         return this.destination.subscribe(observer)
+         try {
+            return this.destination.pipe(
+               skip(1)
+            ).subscribe(observer)
+         } finally {
+            this.connect()
+         }
       }
 
       ngOnDestroy() {
@@ -135,7 +140,6 @@ export const Selector: Selector = function Selector(name: string, select: Functi
             this.destination = selection.destination
          }
          this.target = select.length > 0 ? subject : this.destination
-         this.subscription.add(this.destination.subscribe(subject))
       }
 
       static overriddenName = name

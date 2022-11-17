@@ -1,5 +1,5 @@
 import {inject, INJECTOR, ProviderToken} from "@angular/core";
-import {filter, map, Observable, OperatorFunction} from "rxjs";
+import {filter, map, Observable, OperatorFunction, tap} from "rxjs";
 import {
    CompleteEvent,
    DispatchEvent, ErrorEvent,

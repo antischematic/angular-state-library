@@ -3,10 +3,11 @@ import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
 import {
+   action,
    Action,
    dispatch,
    Invoke, Select,
-   select,
+   select, Selector,
    selectStore,
    Store, useMerge
 } from "@antischematic/angular-state-library";
@@ -16,14 +17,18 @@ import {UIDouble} from "./ui-double.component";
 import {timer} from "rxjs";
 import {UITheme} from "./ui-theme";
 
-@Store()
-@Directive({ selector: "store", standalone: true })
-class RootStore {
-   userId = 1
+const UserId = new Selector("UserId", () => action(RootStore, "setUserId"))
 
-   @Action() setUserId(userId: number) {
-      this.userId = userId
-   }
+@Store()
+@Directive({
+   standalone: true,
+   selector: "store",
+   providers: [UserId]
+})
+class RootStore {
+   @Select(UserId) userId = 1
+
+   @Action() setUserId!: Action<(userId: number) => void>
 }
 
 @Store()
@@ -34,7 +39,7 @@ class RootStore {
    templateUrl: './app.component.html',
    styleUrls: ['./app.component.css'],
    changeDetection: ChangeDetectionStrategy.OnPush,
-   hostDirectives: [RootStore]
+   hostDirectives: [RootStore],
 })
 export class AppComponent {
    count = 0
@@ -48,7 +53,7 @@ export class AppComponent {
    @Select() rootStore = inject(RootStore)
 
    @Select() get userId() {
-      return this.rootStore.userId
+      return this.rootStore.userId.toString()
    }
 
    @Input() appStore: any
