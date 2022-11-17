@@ -35,7 +35,7 @@ import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
 import {UITodo} from './ui-todo.component';
 
-const Todos = new Selector<Todo[]>("Todos", () => {
+const Todos = new Selector("Todos", () => {
    return withState([], {
       from: next(UITodos, "loadTodos")
    })

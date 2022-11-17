@@ -87,7 +87,7 @@ export interface Selector {
    new<T>(name: string, factory: (source: Observable<T>) => Observable<T>): Type<Observable<T>>
 }
 
-export function withState(initial: any, options: WithStateOptions<any> = {}): WithState<any> {
+export function withState<T>(initial: T, options: WithStateOptions<T> = {}): WithState<T> {
    const destination = new BehaviorSubject(initial)
    const source = options.from ?? EMPTY
 
