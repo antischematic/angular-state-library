@@ -14,13 +14,13 @@ Count: {{ count }}
    <input
       type="number"
       [value]="userId"
-      (keydown.enter)="userId = input.value"
-      (change)="userId = input.value"
+      (keydown.enter)="rootStore.setUserId(input.valueAsNumber)"
+      (change)="rootStore.setUserId(input.valueAsNumber)"
       #input
    />
 </div>
 
-<ui-todos [userId]="userId"></ui-todos>
+<ui-todos [userId]="userId.toString()"></ui-todos>
 <!--<ui-todos [userId]="userId"></ui-todos>-->
 
 <ui-theme>

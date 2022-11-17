@@ -1,11 +1,11 @@
-import {ChangeDetectionStrategy, Component, Input} from '@angular/core';
+import {ChangeDetectionStrategy, Component, Directive, inject, Input} from '@angular/core';
 import {UITodos} from './ui-todos.component';
 import {HttpClientModule} from '@angular/common/http';
 import {FakeBackendModule} from './fake-backend';
 import {
    Action,
    dispatch,
-   Invoke,
+   Invoke, Select,
    select,
    selectStore,
    Store, useMerge
@@ -17,6 +17,16 @@ import {timer} from "rxjs";
 import {UITheme} from "./ui-theme";
 
 @Store()
+@Directive({ selector: "store", standalone: true })
+class RootStore {
+   userId = 1
+
+   @Action() setUserId(userId: number) {
+      this.userId = userId
+   }
+}
+
+@Store()
 @Component({
    imports: [UITodos, UICounter, UIDescendent, UIDouble, HttpClientModule, FakeBackendModule, UITheme],
    selector: 'app-root',
@@ -24,15 +34,21 @@ import {UITheme} from "./ui-theme";
    templateUrl: './app.component.html',
    styleUrls: ['./app.component.css'],
    changeDetection: ChangeDetectionStrategy.OnPush,
+   hostDirectives: [RootStore]
 })
 export class AppComponent {
-   userId = '1';
    count = 0
    blueTheme = {
       color: "blue"
    }
    greenTheme = {
       color: "green"
+   }
+
+   @Select() rootStore = inject(RootStore)
+
+   @Select() get userId() {
+      return this.rootStore.userId
    }
 
    @Input() appStore: any

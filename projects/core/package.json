@@ -13,8 +13,8 @@
       "url": "https://github.com/antischematic/angular-state-library.git"
    },
    "peerDependencies": {
-      "@angular/common": "^14.1.0",
-      "@angular/core": "^14.1.0",
+      "@angular/common": "^15.0.0",
+      "@angular/core": "^15.0.0",
       "rxjs": "^7.5.0"
    },
    "dependencies": {
