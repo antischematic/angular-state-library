@@ -10,7 +10,7 @@ import {
    Subject, Subscription,
    takeWhile
 } from "rxjs";
-import {OnAttach} from "./attach";
+import {OnSelect} from "./select";
 
 interface TransitionOptions {
    async?: boolean
@@ -123,7 +123,7 @@ export class TransitionSpec implements ZoneSpec {
    constructor(public name: string, public transition: Transition<any>) {}
 }
 
-export class Transition<T = unknown> implements OnAttach {
+export class Transition<T = unknown> implements OnSelect {
    private readonly spec: TransitionSpec = new TransitionSpec("transition", this)
    private readonly emitter: EventEmitter<T>
 
@@ -188,7 +188,7 @@ export class Transition<T = unknown> implements OnAttach {
       return zone.run(fn, applyThis, applyArgs)
    }
 
-   ngOnAttach(observer: PartialObserver<any>) {
+   ngOnSelect(observer: PartialObserver<any>) {
       return merge(this.isUnstable, this.isSlow).pipe(map(() => this)).subscribe(observer)
    }
 

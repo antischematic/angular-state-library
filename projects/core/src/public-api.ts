@@ -19,10 +19,9 @@ export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
 export {Transition, useTransition, TransitionToken} from "./transition"
 export {EVENTS, ACTION} from "./providers";
-export {configureStore, events, get} from "./utils";
-export {Store, Caught, Select, Layout, Before, Invoke, Action, Attach} from "./decorators";
-export {select, selectStore, Selector} from "./select"
+export {configureStore, events, get, actionEvent, action, errorEvent, error, completeEvent, complete, nextEvent, next} from "./utils";
+export {Store, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
+export {select, selectStore, Selector, OnSelect, WithState, withState, WithStateOptions} from "./select"
 export {
    useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions, QueryError
 } from "./data"
-export { OnAttach } from "./attach"

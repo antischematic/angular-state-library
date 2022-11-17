@@ -1,7 +1,5 @@
-import {Directive, ElementRef, inject, Input, OnInit, ProviderToken} from "@angular/core";
-import {Observer, PartialObserver, ReplaySubject, Subscription} from "rxjs";
-import {OnAttach} from "./attach";
-import {track} from "./proxy";
+import {Directive, ElementRef, inject, Input, OnInit} from "@angular/core";
+import {Observer, ReplaySubject, Subscription} from "rxjs";
 
 @Directive()
 export abstract class TemplateProvider extends ReplaySubject<unknown> implements OnInit {

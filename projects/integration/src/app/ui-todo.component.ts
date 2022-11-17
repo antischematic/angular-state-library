@@ -3,7 +3,6 @@ import {ChangeDetectionStrategy, Component, Input, Output,} from '@angular/core'
 import {FormsModule} from "@angular/forms";
 import {
    Action,
-   Attach,
    dispatch,
    Select,
    Store,
@@ -25,7 +24,7 @@ import {UISpinner} from './spinner.component';
 export class UITodo {
    @Input() value: Todo = { ...UITodo.defaultValue };
 
-   @Attach() @Output() save = new Transition<Todo>({
+   @Select() @Output() save = new Transition<Todo>({
       resetOnSuccess: true,
    });
 

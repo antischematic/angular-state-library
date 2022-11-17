@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, inject} from '@angular/core';
-import {Attach, Select, Store} from '@antischematic/angular-state-library';
+import {Select, Store} from '@antischematic/angular-state-library';
 import {UICounter} from "./ui-counter.component";
 
 @Store()
@@ -15,7 +15,7 @@ import {UICounter} from "./ui-counter.component";
   `,
 })
 export class UIDouble {
-   @Attach() counter = inject(UICounter); // reactive proxy
+   @Select() counter = inject(UICounter); // reactive proxy
 
    @Select() get doubled() {
       return this.counter.count * 2; // reactive state derived from parent store

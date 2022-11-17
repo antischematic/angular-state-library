@@ -10,8 +10,8 @@ import {
    decorateAttachment,
    setup, decorateOnInit
 } from "./core";
-import {ActionMetadata, Phase, SelectMetadata} from "./interfaces";
-import {action, attach, caught, selector, setMeta} from "./metadata";
+import {ActionMetadata, Phase} from "./interfaces";
+import {action, caught, selector, setMeta} from "./metadata";
 
 const defaults = {track: true, immediate: true}
 
@@ -46,7 +46,6 @@ export const Action = createDecorator<ActionMetadata>(action, {phase: Phase.DoCh
 export const Invoke = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.DoCheck})
 export const Before = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterContentChecked})
 export const Layout = createDecorator<ActionMetadata>(action, {...defaults, phase: Phase.AfterViewChecked})
-export const Select = createDecorator<SelectMetadata>(selector)
 
 export function Caught() {
    return function (target: {}, key: PropertyKey, descriptor: PropertyDescriptor) {
@@ -55,9 +54,11 @@ export function Caught() {
    }
 }
 
-export function Attach(token?: ProviderToken<any>) {
-   return function (target: {}, key: PropertyKey) {
-      setMeta(attach, { key, token }, target, key)
+export function Select(): (target: {}, key: PropertyKey, descriptor?: any) => void
+export function Select(token?: ProviderToken<any>): (target: {}, key: PropertyKey, descriptor?: never) => void
+export function Select(token?: ProviderToken<any>) {
+   return function (target: {}, key: PropertyKey, descriptor: any) {
+      setMeta(selector, { key, token, descriptor }, target, key)
    }
 }
 

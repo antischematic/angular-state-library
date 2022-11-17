@@ -41,8 +41,8 @@ export function getActions(target: {}, phase?: Phase) {
    return getMetaValues<ActionMetadata>(action, target).filter(meta => phase ? meta.phase === phase : true)
 }
 
-export function getSelectors(target: {}) {
-   return getMetaValues<SelectMetadata>(selector, target)
+export function getSelectors<T>(target: {}, withDescriptor: boolean) {
+   return getMetaValues<T>(selector, target).filter(selector => !!selector.descriptor === withDescriptor)
 }
 
 export function getErrorHandlers(target: {}) {

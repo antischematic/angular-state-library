@@ -1,5 +1,5 @@
 import {ChangeDetectionStrategy, Component, HostBinding, InjectionToken, Input} from "@angular/core"
-import {Attach, Select, Store} from "@antischematic/angular-state-library";
+import {Select, Store} from "@antischematic/angular-state-library";
 import {interval, map} from "rxjs";
 
 function calcStyle(size: number, x: number, y: number) {
@@ -32,7 +32,7 @@ export class DotComponent {
    @Input() y = 0
    @Input() size = 0
 
-   @Attach(Counter) count = 0
+   @Select(Counter) count = 0
 
    @HostBinding("class.hover") hover = false
 

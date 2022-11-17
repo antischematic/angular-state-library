@@ -3,11 +3,10 @@ import {
    EnvironmentInjector,
    ErrorHandler,
    inject,
-   INJECTOR
+   INJECTOR, ProviderToken
 } from "@angular/core";
 import {filter, map} from "rxjs";
-import {attach} from "./attach";
-import {DepMap, EventType, Phase} from "./interfaces";
+import {DepMap, EventType, Phase, SelectMetadata} from "./interfaces";
 import {
    getActions,
    getAttachments,
@@ -34,6 +33,7 @@ import {
    Teardown
 } from "./providers";
 import {createProxy, popStack, pushStack, untrack} from "./proxy";
+import {subscribe} from "./select";
 import {call, wrap} from "./utils";
 
 function checkDeps(deps: DepMap) {
@@ -151,7 +151,7 @@ export function decorateActions(target: {}) {
 }
 
 export function decorateAttachment(target: any) {
-   target.ngOnAttach ??= function (this: any, observer: any) {
+   target.ngOnSelect ??= function (this: any, observer: any) {
       return inject(EVENTS).pipe(
          filter(event => event.context === this),
          map(() => this),
@@ -160,7 +160,7 @@ export function decorateAttachment(target: any) {
 }
 
 export function decorateSelectors(target: {}) {
-   for (const { key } of getSelectors(target)) {
+   for (const { key } of getSelectors<SelectMetadata>(target, true)) {
       wrap(target, key, function (fn, ...args) {
          const cacheKey = key + JSON.stringify(args)
          const proxy = createProxy(this)
@@ -191,9 +191,9 @@ export function decorateChanges(target: {}) {
 export function decorateOnInit(target: {}) {
    wrap(target, "ngOnInit", function (fn) {
       const injector = getToken(EnvironmentInjector, this)
-      for (const attachment of getAttachments(target)) {
+      for (const attachment of getSelectors<{ token: ProviderToken<any> | undefined }>(target, false)) {
          injector.runInContext(() => {
-            attach(attachment.token, this, attachment.key)
+            subscribe(attachment.token, this, attachment.key)
          })
       }
       fn.call(this)

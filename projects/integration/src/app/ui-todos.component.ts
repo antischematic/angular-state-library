@@ -10,7 +10,7 @@ import {
 } from '@angular/core';
 import {
    $,
-   Action, Attach,
+   Action,
    Caught,
    dispatch,
    events, get,
@@ -24,7 +24,9 @@ import {
    useMerge,
    useMutation,
    useQuery,
-   useTransition
+   useTransition,
+   withState,
+   next
 } from '@antischematic/angular-state-library';
 import {Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
@@ -33,9 +35,9 @@ import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
 import {UITodo} from './ui-todo.component';
 
-const Todos = new Selector<Todo[]>("Todos", (withState) => {
+const Todos = new Selector<Todo[]>("Todos", () => {
    return withState([], {
-      from: [UITodos, "loadTodos:next"]
+      from: next(UITodos, "loadTodos")
    })
 })
 
@@ -51,11 +53,11 @@ const Todos = new Selector<Todo[]>("Todos", (withState) => {
 export class UITodos {
    @Input() userId!: string;
 
-   @Attach() transition = inject(Loading)
+   @Select() transition = inject(Loading)
 
    @ViewChildren(UITodo) uiTodos!: QueryList<UITodos>;
 
-   @Attach(Todos) todos = get(Todos)
+   @Select(Todos) todos = get(Todos)
 
    @Select() get remaining() {
       // Use "$" to track nested objects or array mutations

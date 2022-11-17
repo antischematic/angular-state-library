@@ -1,8 +1,16 @@
-import {track, untrack} from "./proxy";
 import {inject, INJECTOR, ProviderToken} from "@angular/core";
-import {filter, Observable} from "rxjs";
-import {ExtractEvents, StoreConfig, ZoneCompatible} from "./interfaces";
+import {filter, map, Observable, OperatorFunction} from "rxjs";
+import {
+   CompleteEvent,
+   DispatchEvent, ErrorEvent,
+   EventType,
+   ExtractEvents, NextEvent,
+   StoreConfig,
+   StoreEvent,
+   ZoneCompatible
+} from "./interfaces";
 import {EVENTS, ROOT_CONFIG, STORE_CONFIG} from "./providers";
+import {track, untrack} from "./proxy";
 
 export function isPlainObject(obj: object) {
    const proto = Object.getPrototypeOf(obj)
@@ -63,4 +71,59 @@ export function observeInZone<T>(source: Observable<T>, zone: ZoneCompatible): O
 
 export function get<T extends { value: unknown }>(token: ProviderToken<T>): T["value"] {
    return track(inject(token).value)
+}
+
+type ActionParams<T> = T extends (...params: infer Params) => any ? Params extends { length: 1 } ? Params[0] : Params : never
+
+function filterByNameType<T extends StoreEvent>(name: PropertyKey, type: EventType): OperatorFunction<any, T> {
+   return filter((event: StoreEvent): event is T => event.name === name && event.type === type)
+}
+
+export function actionEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<DispatchEvent> {
+   return events(token).pipe(
+      filterByNameType<DispatchEvent<any, any, any[]>>(name, EventType.Dispatch),
+   )
+}
+
+export function action<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<ActionParams<T[TKey]>> {
+   return actionEvent(token, name).pipe(
+      map((event: any) => event.value.length === 1 ? event.value[0] : event.value)
+   )
+}
+
+export function nextEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<NextEvent> {
+   return events(token).pipe(
+      filterByNameType<NextEvent>(name, EventType.Next)
+   )
+}
+
+export function next<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<T[TKey] extends () => infer R ? R extends Observable<infer S> ? S : never : never> {
+   return nextEvent(token, name).pipe(
+      map((event) => event.value)
+   )
+}
+
+export function errorEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<ErrorEvent> {
+   return events(token).pipe(
+      filterByNameType<ErrorEvent>(name, EventType.Error)
+   )
+}
+
+export function error<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<unknown> {
+   return errorEvent(token, name).pipe(
+      map((event) => event.value)
+   )
+}
+
+export function completeEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<CompleteEvent> {
+   return events(token).pipe(
+      filterByNameType<CompleteEvent>(name, EventType.Complete)
+   )
+}
+
+export function complete<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<void> {
+   return completeEvent(token, name).pipe(
+      filterByNameType<CompleteEvent>(name, EventType.Complete),
+      map(() => undefined)
+   )
 }

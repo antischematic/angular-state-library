@@ -1,18 +1,27 @@
-import {inject, Injectable, KeyValueDiffers, ProviderToken, Type} from "@angular/core";
+import {
+   ChangeDetectorRef,
+   inject,
+   Injectable,
+   KeyValueDiffers,
+   ProviderToken,
+   Type, ViewRef
+} from "@angular/core";
 import {
    BehaviorSubject,
    defer,
    distinctUntilChanged, EMPTY,
    filter, isObservable,
    map, mergeWith,
-   Observable,
+   Observable, Observer, ReplaySubject,
    shareReplay,
-   startWith,
+   startWith, Subject, Subscription,
 } from "rxjs";
 import {Select} from "./decorators";
+import {addTeardown} from "./hooks";
 import {NextEvent, StoreEvent} from "./interfaces";
 import {getMeta, selector, setMeta} from "./metadata";
 import {FLUSHED} from "./providers";
+import {track} from "./proxy";
 import {events} from "./utils";
 
 export function select<T extends {}>(token: ProviderToken<T>): Select<T> {
@@ -58,58 +67,106 @@ export function selectStore<T extends {}>(token: ProviderToken<T>): Observable<T
 }
 
 export interface WithStateOptions<T> {
-   from?: any[] | Observable<T>
+   from?: Observable<T>
 }
 
 export interface WithState<T> {
-   source: BehaviorSubject<T>
-   destination: Observable<T>
-   initial: T
+   source: Observable<T>
+   destination: BehaviorSubject<T>
 }
 
 export interface Selector {
-   new<T>(name: string, factory: (withState: (value: T, options?: WithStateOptions<T>) => WithState<T>) => WithState<T>): Type<BehaviorSubject<T>>
-   new<T>(name: string, factory: () => Observable<T>): Type<Observable<T>>
+   new<T>(name: string, factory: (source: Observable<T>) => WithState<T>): Type<BehaviorSubject<T>>
+   new<T>(name: string, factory: (source: Observable<T>) => Observable<T>): Type<Observable<T>>
 }
 
-function withState(initial: any, options: WithStateOptions<any> = {}): WithState<any> {
-   const source = new BehaviorSubject(initial)
-   const from = options.from
-   const destination = source.pipe(
-      mergeWith(isObservable(from) ? from : from ? events(from[0]).pipe(
-         filter((event: StoreEvent): event is NextEvent => {
-            const [name, type] = from[1].split(":")
-            return event.name === name && event.type === type
-         }),
-         map(event => event.value)
-      ) : EMPTY)
-   )
+export function withState(initial: any, options: WithStateOptions<any> = {}): WithState<any> {
+   const destination = new BehaviorSubject(initial)
+   const source = options.from ?? EMPTY
 
    return {
-      source,
       destination,
-      initial
+      source,
    }
 }
 
-export const Selector: Selector = function Selector(name: string, factory: Function) {
+export const Selector: Selector = function Selector(name: string, select: Function) {
    @Injectable({ providedIn: "root" })
    class Selector {
-      state = factory(withState)
+      source: Observable<any>
+      destination: BehaviorSubject<any>
+      connected = false
+      subscription = new Subscription()
+      target: Subject<any>
 
       get value() {
-         return this.state.initial
+         this.connect()
+         return this.destination.value
+      }
+
+      connect() {
+         if (!this.connected) {
+            this.connected = true
+            this.subscription.add(this.source.subscribe(this.destination))
+         }
       }
 
       next(value: any) {
-         this.state.source.next(value)
+         this.target.next(value)
       }
 
       subscribe(observer: any) {
-         return isObservable(this.state) ? this.state.subscribe(observer) : this.state.destination.subscribe(observer)
+         this.connect()
+         return this.destination.subscribe(observer)
+      }
+
+      ngOnDestroy() {
+         this.subscription.unsubscribe()
+      }
+
+      constructor() {
+         const subject = new Subject()
+         const selection = select(subject)
+         if (isObservable(selection)) {
+            this.source = selection
+            this.destination = new BehaviorSubject(undefined)
+         } else {
+            this.source = selection.source
+            this.destination = selection.destination
+         }
+         this.target = select.length > 0 ? subject : this.destination
+         this.subscription.add(this.destination.subscribe(subject))
       }
 
       static overriddenName = name
    }
    return Selector
 } as any
+
+class SelectObserver {
+   next(value: any) {
+      this.target[this.key] = track(value)
+      this.cdr.markForCheck()
+   }
+   error() {}
+   complete() {}
+   constructor(private target: any, private key: any, private cdr: ChangeDetectorRef) {}
+}
+
+export function subscribe<T extends {}>(token: ProviderToken<T> | undefined, directive: any, key: string): any {
+   const cdr = inject(ChangeDetectorRef) as ViewRef
+   const instance =  token ? inject(token) : directive[key]
+   const observer = new SelectObserver(directive, key, cdr)
+   const subscription = instance.ngOnSelect?.(observer) ?? instance.subscribe?.(observer)
+   if (!subscription) {
+      console.error('Directive:', directive)
+      console.error('Key:', key)
+      console.error('Object:', instance)
+      throw new Error(`Object does not implement OnSelect or Subscribable interfaces`)
+   }
+   addTeardown(subscription)
+}
+
+export interface OnSelect {
+   ngOnSelect(observer: Observer<any>): Subscription
+}

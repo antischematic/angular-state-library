@@ -1,7 +1,7 @@
 import {ChangeDetectionStrategy, Component, inject, InjectionToken} from "@angular/core"
 
 import {DomSanitizer} from "@angular/platform-browser"
-import {Attach, Select, Store} from "@antischematic/angular-state-library";
+import {Select, Store} from "@antischematic/angular-state-library";
 import {animationFrameScheduler, interval} from "rxjs"
 
 export function calculateScaleX(elapsed: number) {
@@ -28,7 +28,7 @@ const Interval = new InjectionToken("Interval", {
 export class STriangleComponent {
    title = "bench"
 
-   @Attach(Interval) elapsed = 0
+   @Select(Interval) elapsed = 0
 
    @Select() get transform() {
       return inject(DomSanitizer).bypassSecurityTrustStyle(getTransform(this.elapsed))
