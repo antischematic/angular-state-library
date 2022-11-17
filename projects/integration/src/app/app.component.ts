@@ -63,9 +63,9 @@ export class AppComponent {
 
       this.otherAction()
 
-      dispatch(timer(1000), {
-         next: this.increment
-      })
+      // dispatch(timer(1000), {
+      //    next: this.increment
+      // })
    }
 
    @Action() otherAction() {}

@@ -1,28 +1,35 @@
 import {
-   ChangeDetectorRef,
+   ChangeDetectorRef, ErrorHandler,
    inject,
    Injectable,
    KeyValueDiffers,
    ProviderToken,
-   Type, ViewRef
+   Type,
+   ViewRef
 } from "@angular/core";
 import {
    BehaviorSubject,
    defer,
-   distinctUntilChanged, EMPTY,
-   filter, isObservable,
-   map, mergeWith,
-   Observable, Observer, ReplaySubject,
-   shareReplay, skip,
-   startWith, Subject, Subscription,
+   distinctUntilChanged,
+   EMPTY,
+   filter,
+   isObservable,
+   map,
+   Observable,
+   Observer,
+   shareReplay,
+   skip,
+   startWith,
+   Subject,
+   Subscription,
 } from "rxjs";
 import {Select} from "./decorators";
 import {addTeardown} from "./hooks";
-import {NextEvent, StoreEvent} from "./interfaces";
+import {EventType, StoreEvent} from "./interfaces";
 import {getMeta, selector, setMeta} from "./metadata";
-import {FLUSHED} from "./providers";
+import {EVENTS, FLUSHED} from "./providers";
 import {track} from "./proxy";
-import {events} from "./utils";
+import {getId} from "./utils";
 
 export function select<T extends {}>(token: ProviderToken<T>): Select<T> {
    const store = inject(token)
@@ -150,17 +157,26 @@ export const Selector: Selector = function Selector(name: string, select: Functi
 class SelectObserver {
    next(value: any) {
       this.target[this.key] = track(value)
+      this.events.next({
+         id: getId(),
+         context: this.target,
+         name: this.key,
+         value: [value],
+         type: EventType.Dispatch,
+         timestamp: Date.now()
+      })
       this.cdr.markForCheck()
    }
-   error() {}
+   error(error: unknown) {
+      this.errorHandler.handleError(error)
+   }
    complete() {}
-   constructor(private target: any, private key: any, private cdr: ChangeDetectorRef) {}
+   constructor(private target: any, private key: any, private events: Subject<StoreEvent>, private cdr: ChangeDetectorRef, private errorHandler: ErrorHandler) {}
 }
 
 export function subscribe<T extends {}>(token: ProviderToken<T> | undefined, directive: any, key: string): any {
-   const cdr = inject(ChangeDetectorRef) as ViewRef
    const instance =  token ? inject(token) : directive[key]
-   const observer = new SelectObserver(directive, key, cdr)
+   const observer = new SelectObserver(directive, key, inject(EVENTS), inject(ChangeDetectorRef), inject(ErrorHandler))
    const subscription = instance.ngOnSelect?.(observer) ?? instance.subscribe?.(observer)
    if (!subscription) {
       console.error('Directive:', directive)
