@@ -3,13 +3,12 @@ import {
    EnvironmentInjector,
    ErrorHandler,
    inject,
-   INJECTOR, ProviderToken
+   INJECTOR,
+   ProviderToken
 } from "@angular/core";
-import {filter, map} from "rxjs";
 import {DepMap, EventType, Phase, SelectMetadata} from "./interfaces";
 import {
    getActions,
-   getAttachments,
    getDeps,
    getMeta,
    getMetaValues,
@@ -25,15 +24,14 @@ import {
    Changes,
    CONTEXT,
    EffectScheduler,
-   EVENTS,
    EventScheduler,
    ROOT_CONFIG,
    STORE_CONFIG,
    StoreErrorHandler,
    Teardown
 } from "./providers";
-import {createProxy, popStack, pushStack, untrack} from "./proxy";
-import {subscribe} from "./select";
+import {createProxy, getChanges, popStack, pushStack, untrack} from "./proxy";
+import {store, subscribe} from "./select";
 import {call, wrap} from "./utils";
 
 function checkDeps(deps: DepMap) {
@@ -75,22 +73,26 @@ function getConfig() {
    return inject(STORE_CONFIG, { self: true, optional: true }) ?? inject(ROOT_CONFIG)
 }
 
+function provideValue(provide: any, useValue: any) {
+   return { provide, useValue}
+}
+
 export function setup(target: any, factory: any, ...args: any[]) {
    const instance = factory(...args)
    const prototype = target.prototype
    const parent = inject(INJECTOR) as EnvironmentInjector
-   const errorHandler = new StoreErrorHandler(prototype, instance)
-   const storeInjector = createEnvironmentInjector([Changes,
-      { provide: ErrorHandler, useValue: errorHandler},
-      { provide: EventScheduler, useValue: new EventScheduler(instance) },
+   const storeInjector = createEnvironmentInjector([
+      provideValue(Changes, new Changes(instance)),
+      provideValue(ErrorHandler, new StoreErrorHandler(prototype, instance)),
+      provideValue(EventScheduler, new EventScheduler(instance)),
       Teardown
    ], parent)
    let storeConfig = getConfig()
    setMeta(injector, storeInjector, instance)
    for (const action of getActions(prototype)) {
       const actionInjector = createEnvironmentInjector([
-         { provide: ACTION, useValue: action },
-         { provide: CONTEXT, useValue: {instance}},
+         provideValue(ACTION, action),
+         provideValue(CONTEXT, { instance }),
          EffectScheduler,
          Teardown,
          storeConfig?.actionProviders ?? []
@@ -132,9 +134,9 @@ export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: 
    }
 }
 
-function runAction(this: any, fn: any, key: any, ...args: any[]) {
+function runAction(this: any, fn: any, key: any, deps: DepMap, ...args: any[]) {
    const event = inject(EventScheduler)
-   event.schedule(EventType.Dispatch, key, args)
+   event.schedule(EventType.Dispatch, key, args.length === 1 ? args[0] : args, getChanges(deps))
    return fn.apply(this, args)
 }
 
@@ -145,17 +147,14 @@ export function decorateActions(target: {}) {
          const deps = new Map()
          setMeta(tracked, deps, this, key)
          teardown(this, key)
-         return runInContext(deps, runAction, proxy, catchError, key, fn, key, ...args)
+         return runInContext(deps, runAction, proxy, catchError, key, fn, key, deps, ...args)
       })
    }
 }
 
-export function decorateAttachment(target: any) {
-   target.ngOnSelect ??= function (this: any, observer: any) {
-      return inject(EVENTS).pipe(
-         filter(event => event.context === this),
-         map(() => this),
-      ).subscribe(observer)
+export function decorateSelect(target: any) {
+   target.prototype.ngOnSelect ??= function (this: any, observer: any) {
+      return store(target).subscribe(observer)
    }
 }
 
@@ -181,9 +180,8 @@ export function decorateSelectors(target: {}) {
 export function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, value) {
       const events = getToken(EventScheduler, this)
-      const changes = getToken(Changes, this)
-      events.schedule(EventType.Dispatch, "ngOnChanges", value)
-      changes.setValue(value)
+      const changes = Object.entries(value).map(([key, value]) => [key, (value as any).previousValue]) as any[]
+      events.schedule(EventType.Dispatch, "ngOnChanges", value, new Map([[this, new Map(changes)]]))
       fn.call(this, value)
    })
 }

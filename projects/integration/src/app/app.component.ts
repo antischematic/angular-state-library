@@ -7,22 +7,23 @@ import {
    Action,
    dispatch,
    Invoke, Select,
-   select, Selector,
-   selectStore,
-   Store, useMerge
+   slice, Selector,
+   store,
+   Store, useMerge, EVENTS
 } from "@antischematic/angular-state-library";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
-import {timer} from "rxjs";
+import {delay} from "rxjs";
 import {UITheme} from "./ui-theme";
 
-const UserId = new Selector("UserId", () => action(RootStore, "setUserId"))
+const UserId = new Selector("UserId", () => action(RootStore, "setUserId").pipe(
+   delay(0)
+))
 
 @Store()
 @Directive({
    standalone: true,
-   selector: "store",
    providers: [UserId]
 })
 class RootStore {
@@ -56,30 +57,44 @@ export class AppComponent {
       return this.rootStore.userId.toString()
    }
 
+   @Invoke() readUserId() {
+      console.log("userId changed", this.userId)
+
+      this.ngOnSelect({
+         next: () => {
+            console.log("NEXT VALUE???")
+         }
+      })
+   }
+
    @Input() appStore: any
+
+   declare ngOnSelect: any
 
    @Invoke() increment() {
       this.count++
 
       this.otherAction()
 
-      dispatch(timer(1000), {
-         next: this.increment
-      })
+      // dispatch(timer(1000), {
+      //    next: this.increment
+      // })
    }
 
    @Action() otherAction() {}
 
    @Invoke({ track: false }) observeState() {
-      const { count } = select(AppComponent)
-      const store = selectStore(AppComponent)
+      const sliced = slice(AppComponent, ["count", "userId"])
+      const appStore = store(AppComponent)
 
       useMerge()
 
-      dispatch(count, (current) => {
-         // console.log("count updated", current)
+      inject(EVENTS).subscribe(console.log)
+
+      dispatch(sliced, (current) => {
+         // console.log("slice updated", current)
       })
-      dispatch(store, (current) => {
+      dispatch(appStore, (current) => {
          // console.log("store updated", current)
       })
 
@@ -90,18 +105,18 @@ export class AppComponent {
    }
 
    @Action() delayedAction() {
-      const { count } = select(AppComponent)
-      const store = selectStore(AppComponent)
+      const count = slice(AppComponent, "count")
+      const appStore = store(AppComponent)
 
       useMerge()
 
-      dispatch(count, (current) => {
-         // console.log("count updated 2", current)
-      })
+      // dispatch(count, (current) => {
+      //    // console.log("count updated 2", current)
+      // })
 
-      dispatch(store, (current) => {
-         // console.log("store updated 2", current)
-      })
+      // dispatch(appStore, (current) => {
+      //    // console.log("store updated 2", current)
+      // })
    }
 
    swapThemes() {

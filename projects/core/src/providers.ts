@@ -1,9 +1,9 @@
 import {ErrorHandler, inject, Injectable, InjectionToken} from "@angular/core";
 import {Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
-import {ActionMetadata, EventType, StoreConfig, StoreEvent} from "./interfaces";
-import {track} from "./proxy";
-import {getId} from "./utils";
+import {ActionMetadata, DepMap, EventType, StoreConfig, StoreEvent} from "./interfaces";
 import {getErrorHandlers} from "./metadata";
+import {getChanges, track} from "./proxy";
+import {getId} from "./utils";
 
 export const ACTION = new InjectionToken<ActionMetadata>("ACTION")
 export const CONTEXT = new InjectionToken<{ instance: unknown }>("CONTEXT")
@@ -19,18 +19,11 @@ export const EVENTS = new InjectionToken("EVENTS", {
    }
 })
 
-export const FLUSHED = new InjectionToken("FLUSH", {
-   factory() {
-      return new Subject<unknown>()
-   }
-})
-
 export class EventScheduler {
    events: StoreEvent<any, any, any, any>[] = []
    dispatcher = inject(EVENTS)
-   flushed = inject(FLUSHED)
 
-   schedule(type: EventType, name: string, value: unknown) {
+   schedule(type: EventType, name: string, value: unknown, changes: Map<any, any>) {
       this.events.push({
          id: getId(),
          timestamp: Date.now(),
@@ -38,6 +31,7 @@ export class EventScheduler {
          context: this.context,
          name,
          value,
+         changes
       })
    }
 
@@ -47,7 +41,6 @@ export class EventScheduler {
          while (event = this.events.shift()) {
             this.dispatcher.next(event)
          }
-         this.flushed.next(this.context)
       }
    }
 
@@ -59,15 +52,13 @@ export class EffectScheduler {
    source = new Subject<Observable<any>>()
    queue: any[] = []
    operator?: OperatorFunction<Observable<any>, any>
-   destination!: Subject<any>
    connected = false
    subscription = Subscription.EMPTY
    pending = new Set
+   closed = false
 
    next(source: Observable<any>) {
-      if (!this.connected) {
-         this.connect()
-      }
+      this.connect()
       this.source.next(source)
    }
 
@@ -85,10 +76,11 @@ export class EffectScheduler {
    }
 
    connect() {
-      this.connected = true
-      this.destination = new Subject()
-      this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe()
-      this.subscription.add(() => this.connected = false)
+      if (!this.connected && !this.closed) {
+         this.connected = true
+         this.subscription = this.source.pipe(this.operator ?? switchAll()).subscribe()
+         this.subscription.add(() => this.connected = false)
+      }
    }
 
    addPending(promise: Promise<any>) {
@@ -100,6 +92,8 @@ export class EffectScheduler {
    }
 
    ngOnDestroy() {
+      this.closed = true
+      this.source.complete()
       this.subscription.unsubscribe()
    }
 }
@@ -121,16 +115,11 @@ export class Teardown {
 }
 
 export class Changes {
-   value = track({}) as any
-
-   setValue(value: any) {
-      for (const key in this.value) {
-         if (!(key in value)) {
-            delete this.value[key]
-         }
-      }
-      Object.assign(this.value, value)
+   get value() {
+      return track(this.target.__ngSimpleChanges__?.previous) ?? {}
    }
+
+   constructor(private target: any) {}
 }
 
 export class StoreErrorHandler implements ErrorHandler {

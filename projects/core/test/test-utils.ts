@@ -1,5 +1,6 @@
-import {ChangeDetectorRef, Component, ErrorHandler} from "@angular/core";
+import {ChangeDetectorRef, Component, EnvironmentInjector, ErrorHandler} from "@angular/core";
 import {TestBed} from "@angular/core/testing";
+import {injector, setMeta} from "../src/metadata";
 import {ACTION, CONTEXT, EffectScheduler, EventScheduler} from "../src/providers";
 import {ActionMetadata, Metadata} from "../src/interfaces";
 
@@ -15,10 +16,11 @@ export function runInAction(fn: Function, doneFn?: any) {
       descriptor: {}
    }
    const context = {}
+
    TestBed.configureTestingModule({
       providers: [
          { provide: ACTION, useValue: action },
-         { provide: CONTEXT, useValue: context },
+         { provide: CONTEXT, useValue: { instance: context } },
          { provide: ChangeDetectorRef, useValue: { markForCheck() {} }},
          { provide: ErrorHandler, useValue: { handleError() {} }},
          { provide: UIComponent, useValue: new UIComponent },
@@ -27,6 +29,7 @@ export function runInAction(fn: Function, doneFn?: any) {
          EffectScheduler,
       ]
    })
+   setMeta(injector, TestBed.inject(EnvironmentInjector), context, "test")
    TestBed.inject(fn)
    return
 }

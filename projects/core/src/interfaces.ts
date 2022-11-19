@@ -1,11 +1,14 @@
 import {Observable} from "rxjs";
 import {Provider} from "@angular/core";
 
+type Changes = Map<object, Map<PropertyKey, any>>
+
 export interface EventData<ActionName, ActionContext = unknown> {
    readonly id: number
    readonly name: ActionName
    readonly context: ActionContext
    readonly timestamp: number
+   readonly changes: Changes
 }
 
 export interface DispatchEvent<ActionName = PropertyKey, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
@@ -47,13 +50,15 @@ export interface DispatchObserver<U> {
    finalize?(): void
 }
 
+export interface TypedChange<T> {
+   previousValue: T | undefined;
+   currentValue: T;
+   firstChange: boolean;
+   isFirstChange(): boolean;
+}
+
 export type TypedChanges<T> = {
-   [key in keyof T]?: {
-      previousValue: T[key] | undefined;
-      currentValue: T[key];
-      firstChange: boolean;
-      isFirstChange(): boolean;
-   }
+   [key in keyof T]?: TypedChange<T[key]>
 }
 
 export const enum Phase {

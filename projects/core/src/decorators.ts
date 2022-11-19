@@ -7,7 +7,7 @@ import {
    decorateDestroy,
    decorateFactory,
    decorateSelectors,
-   decorateAttachment,
+   decorateSelect,
    setup, decorateOnInit
 } from "./core";
 import {ActionMetadata, Phase} from "./interfaces";
@@ -38,7 +38,7 @@ export function Store() {
 
       decorateActions(prototype)
       decorateSelectors(prototype)
-      decorateAttachment(prototype)
+      decorateSelect(target)
    }
 }
 

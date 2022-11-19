@@ -3,7 +3,7 @@ import {ComponentFixture, fakeAsync, flush, TestBed} from "@angular/core/testing
 import {concat, finalize, from, NEVER, Observable, of, TeardownLogic, throwError} from "rxjs";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {dispatch} from "./dispatch";
-import {addTeardown, useChanges} from "./hooks";
+import {addTeardown, useInputs} from "./hooks";
 import {EVENTS} from "./providers";
 import createSpy = jasmine.createSpy;
 import Spy = jasmine.Spy;
@@ -175,7 +175,7 @@ describe("Core", () => {
          class UITest {
             @Input() count = 0
             @Invoke() iAmReactive() {
-               const { count } = useChanges<UITest>()
+               const { count } = useInputs<UITest>()
                iAmReactive(count)
             }
          }

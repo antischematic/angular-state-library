@@ -46,6 +46,6 @@ export function addTeardown(teardown: TeardownLogic) {
    inject(Teardown).subscriptions.push(subscription)
 }
 
-export function useChanges<T>(): TypedChanges<T> {
+export function useInputs<T>(): TypedChanges<T> {
    return inject(Changes).value
 }

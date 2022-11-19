@@ -1,34 +1,44 @@
+import {DepMap} from "./interfaces";
+
 const cache = new WeakMap()
 const proxies = new WeakMap()
 
 let deps: Map<any, Map<any, any>>[] = []
 
 export function pushStack(value: Map<any, any>) {
-   deps.push(value)
+   deps.unshift(value)
 }
 
 export function popStack() {
-   deps.pop()
+   deps.shift()
 }
 
 function isTracking() {
    return deps.length > 0
 }
 
-export const changes = new WeakMap()
+export const changesMap = new WeakMap()
+
+export function getChanges(deps: DepMap) {
+   const changes = changesMap.get(deps) ?? new Map()
+   changesMap.set(deps, changes)
+   return changes
+}
 
 export function addDep(object: object, key: PropertyKey, value: any, previous: any = value, update = false) {
    if (isTracking()) {
+      let seen = false
       for (const dep of deps) {
          const keyValues = dep.get(object) ?? new Map
          dep.set(object, keyValues)
-         if (update) {
-            const changelist = changes.get(keyValues) ?? new Map()
-            changes.set(keyValues, changelist)
-            if (changelist.has(key)) {
-               [previous] = changelist.get(key)
+         if (!seen && update && !Object.is(value, previous)) {
+            seen = true
+            const changes = getChanges(dep)
+            const change = changes.get(object) ?? new Map()
+            changes.set(object, change)
+            if (!change.has(key)) {
+               change.set(key, untrack(previous))
             }
-            changelist.set(key, [previous, value])
          }
          if (update && keyValues.has(key) || !update) {
             keyValues.set(key, value)
@@ -70,7 +80,7 @@ export function createProxy(object: object) {
    return proxy
 }
 
-export function isTracked(object: object) {
+export function isTracked(object: any) {
    return proxies.has(object)
 }
 
@@ -79,7 +89,7 @@ function isObject(value: any) {
 }
 
 export function track<T>(object: T): T {
-   return isObject(object) ? createProxy(object as any) : object
+   return isObject(object) && !isTracked(object) ? createProxy(object as any) : object
 }
 
 export function untrack<T>(object: T): T {

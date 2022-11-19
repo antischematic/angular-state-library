@@ -1,5 +1,5 @@
-import {inject, INJECTOR, ProviderToken} from "@angular/core";
-import {filter, map, Observable, OperatorFunction, tap} from "rxjs";
+import {inject, Injector, INJECTOR, ProviderToken} from "@angular/core";
+import {defer, filter, map, Observable, OperatorFunction, tap} from "rxjs";
 import {
    CompleteEvent,
    DispatchEvent, ErrorEvent,
@@ -45,13 +45,14 @@ export function getId() {
    return id++
 }
 
-export function events<T>(type: ProviderToken<T>): Observable<ExtractEvents<T, keyof T>>
-export function events<T>(type: T): Observable<ExtractEvents<T, keyof T>>
-export function events(type: ProviderToken<unknown> | unknown): Observable<ExtractEvents<unknown, any>> {
-   const injector = inject(INJECTOR)
-   return inject(EVENTS).pipe(
-      filter(event => event.context === (typeof type === "function" ? injector.get(type) : type))
-   ) as Observable<ExtractEvents<unknown, any>>
+
+export function events<T>(token: ProviderToken<T>, injector = inject(INJECTOR)): Observable<ExtractEvents<T, keyof T>> {
+   return defer(() => {
+      const context = injector.get(token)
+      return injector.get(EVENTS).pipe(
+         filter(event => event.context === context)
+      )
+   }) as Observable<ExtractEvents<T, keyof T>>
 }
 
 export function configureStore(config: StoreConfig) {
@@ -79,50 +80,50 @@ function filterByNameType<T extends StoreEvent>(name: PropertyKey, type: EventTy
    return filter((event: StoreEvent): event is T => event.name === name && event.type === type)
 }
 
-export function actionEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<DispatchEvent> {
-   return events(token).pipe(
+export function actionEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<DispatchEvent> {
+   return events(token, injector).pipe(
       filterByNameType<DispatchEvent<any, any, any[]>>(name, EventType.Dispatch),
    )
 }
 
-export function action<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<ActionParams<T[TKey]>> {
-   return actionEvent(token, name).pipe(
-      map((event: any) => event.value.length === 1 ? event.value[0] : event.value)
+export function action<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<ActionParams<T[TKey]>> {
+   return actionEvent(token, name, injector).pipe(
+      map((event: any) => event.value)
    )
 }
 
-export function nextEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<NextEvent> {
-   return events(token).pipe(
+export function nextEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<NextEvent> {
+   return events(token, injector).pipe(
       filterByNameType<NextEvent>(name, EventType.Next)
    )
 }
 
-export function next<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<T[TKey] extends () => infer R ? R extends Observable<infer S> ? S : never : never> {
-   return nextEvent(token, name).pipe(
+export function next<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<T[TKey] extends () => infer R ? R extends Observable<infer S> ? S : never : never> {
+   return nextEvent(token, name, injector).pipe(
       map((event) => event.value)
    )
 }
 
-export function errorEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<ErrorEvent> {
-   return events(token).pipe(
+export function errorEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<ErrorEvent> {
+   return events(token, injector).pipe(
       filterByNameType<ErrorEvent>(name, EventType.Error)
    )
 }
 
-export function error<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<unknown> {
-   return errorEvent(token, name).pipe(
+export function error<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<unknown> {
+   return errorEvent(token, name, injector).pipe(
       map((event) => event.value)
    )
 }
 
-export function completeEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<CompleteEvent> {
-   return events(token).pipe(
+export function completeEvent<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<CompleteEvent> {
+   return events(token, injector).pipe(
       filterByNameType<CompleteEvent>(name, EventType.Complete)
    )
 }
 
-export function complete<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey): Observable<void> {
-   return completeEvent(token, name).pipe(
+export function complete<T, TKey extends keyof T>(token: ProviderToken<T>, name: TKey, injector?: Injector): Observable<void> {
+   return completeEvent(token, name, injector).pipe(
       filterByNameType<CompleteEvent>(name, EventType.Complete),
       map(() => undefined)
    )

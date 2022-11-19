@@ -13,7 +13,7 @@ export {
 } from "./proxy"
 export {dispatch} from "./dispatch";
 export {
-   useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useChanges
+   useOperator, useConcat, useExhaust, useMerge, useSwitch, addTeardown, useInputs
 } from "./hooks"
 export {TemplateProvider} from "./template-provider"
 export {loadEffect} from "./load-effect"
@@ -21,7 +21,7 @@ export {Transition, useTransition, TransitionToken} from "./transition"
 export {EVENTS, ACTION} from "./providers";
 export {configureStore, events, get, actionEvent, action, errorEvent, error, completeEvent, complete, nextEvent, next} from "./utils";
 export {Store, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
-export {select, selectStore, Selector, OnSelect, WithState, withState, WithStateOptions} from "./select"
+export {slice, store, Selector, OnSelect, WithState, withState, WithStateOptions, inputs} from "./select"
 export {
    useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions, QueryError
 } from "./data"

@@ -1,8 +1,10 @@
 import {
-   ChangeDetectorRef, ErrorHandler,
+   ChangeDetectorRef,
+   ErrorHandler,
    inject,
    Injectable,
-   KeyValueDiffers,
+   Injector,
+   INJECTOR,
    ProviderToken,
    Type,
 } from "@angular/core";
@@ -16,60 +18,59 @@ import {
    map,
    Observable,
    Observer,
-   shareReplay,
    skip,
    startWith,
    Subject,
    Subscription,
 } from "rxjs";
-import {Select} from "./decorators";
 import {addTeardown} from "./hooks";
-import {EventType, StoreEvent} from "./interfaces";
-import {getMeta, selector, setMeta} from "./metadata";
-import {EVENTS, FLUSHED} from "./providers";
+import {DispatchEvent, EventType, StoreEvent, TypedChanges} from "./interfaces";
+import {EVENTS, EventScheduler} from "./providers";
 import {track} from "./proxy";
-import {getId} from "./utils";
+import {events} from "./utils";
 
-export function select<T extends {}>(token: ProviderToken<T>): Select<T> {
-   const store = inject(token)
-   const flushed = inject(FLUSHED)
-
-   return new Proxy(store, {
-      get(target: T, property: PropertyKey) {
-         const cache = getMeta(selector, store, property)
-         if (cache) {
-            return cache
-         } else {
-            const source = defer(() => flushed.pipe(
-               filter((context): context is T => context === store),
-               map(() => store[property as keyof T]),
-               startWith(store[property as keyof T]),
-               distinctUntilChanged(Object.is),
-            )).pipe(shareReplay(1))
-            setMeta(selector, source, store, property)
-            return source
-         }
-      }
-   }) as unknown as Select<T>
+function pick<T, U extends (keyof T)[]>(object: T, keys: U): Pick<T, U[number]>
+function pick<T, U extends keyof T>(object: T, keys: U): T[U]
+function pick(object: any, keys: PropertyKey | PropertyKey[]): unknown {
+   if (Array.isArray(keys)) {
+      return keys.reduce((acc, key) => {
+         acc[key] = object[key]
+         return acc
+      }, {} as any)
+   }
+   return object[keys]
 }
 
-export function selectStore<T extends {}>(token: ProviderToken<T>): Observable<T> {
-   const store = inject(token)
-   const cache = getMeta(selector, store) as Observable<T>
-   if (cache) {
-      return cache
-   } else {
-      const differ = inject(KeyValueDiffers).find(store).create()
-      differ.diff(store)
-      const source = inject(FLUSHED).pipe(
-         filter((context): context is T => context === store),
-         startWith(store),
-         distinctUntilChanged((value) => differ.diff(value) === null),
-         shareReplay(1)
+export function slice<T extends {}, U extends keyof T>(token: ProviderToken<T>, key: U, injector?: Injector): Observable<T[U]>
+export function slice<T extends {}, U extends (keyof T)[]>(token: ProviderToken<T>, key: U, injector?: Injector): Observable<Pick<T, U[number]>>
+export function slice(token: ProviderToken<any>, keys: any, injector = inject(INJECTOR)): Observable<unknown> {
+   return defer(() => {
+      const context = injector.get(token)
+      return store(token, injector).pipe(
+         map((context) => pick(context, keys)),
+         startWith(pick(context, keys)),
+         distinctUntilChanged((a, b) => !Array.isArray(keys) ? Object.is(a, b) : keys.every(key => Object.is(a[key], b[key])))
       )
-      setMeta(selector, source, store)
-      return source
-   }
+   })
+}
+
+export function store<T extends {}>(token: ProviderToken<T>, injector = inject(INJECTOR)): Observable<T> {
+   return defer(() => {
+      const context = injector.get(token)
+      return injector.get(EVENTS).pipe(
+         filter(event => event.changes.has(context)),
+         map(() => context)
+     )
+   })
+}
+
+export function inputs<T>(token: ProviderToken<T>, injector = inject(INJECTOR)): Observable<TypedChanges<T>> {
+   return defer(() => {
+      return events(token, injector).pipe(
+         filter((event: StoreEvent): event is DispatchEvent => event.name === "ngOnChanges"),
+         map(event => event.value as TypedChanges<T>)
+      )
+   })
 }
 
 export interface WithStateOptions<T> {
@@ -106,7 +107,6 @@ export const Selector: Selector = function Selector(name: string, select: Functi
       target: Subject<any>
 
       get value() {
-         this.connect()
          return this.destination.value
       }
 
@@ -161,27 +161,26 @@ export const Selector: Selector = function Selector(name: string, select: Functi
 
 class SelectObserver {
    next(value: any) {
+      const previous = this.target[this.key]
       this.target[this.key] = track(value)
-      this.events.next({
-         id: getId(),
-         context: this.target,
-         name: this.key,
-         value: [value],
-         type: EventType.Dispatch,
-         timestamp: Date.now()
-      })
+      const changes = new Map([[this.target, new Map([[this.key, previous]])]])
+      this.event.schedule(EventType.Dispatch, this.key, value, changes)
+      this.event.flush()
       this.cdr.markForCheck()
    }
    error(error: unknown) {
+      console.error("Error thrown in Select")
+      console.error("Directive:", this.target)
+      console.error("Key:", this.key)
       this.errorHandler.handleError(error)
    }
    complete() {}
-   constructor(private target: any, private key: any, private events: Subject<StoreEvent>, private cdr: ChangeDetectorRef, private errorHandler: ErrorHandler) {}
+   constructor(private target: any, private key: any, private event: EventScheduler, private cdr: ChangeDetectorRef, private errorHandler: ErrorHandler) {}
 }
 
 export function subscribe<T extends {}>(token: ProviderToken<T> | undefined, directive: any, key: string): any {
    const instance =  token ? inject(token) : directive[key]
-   const observer = new SelectObserver(directive, key, inject(EVENTS), inject(ChangeDetectorRef), inject(ErrorHandler))
+   const observer = new SelectObserver(directive, key, inject(EventScheduler), inject(ChangeDetectorRef), inject(ErrorHandler))
    const subscription = instance.ngOnSelect?.(observer) ?? instance.subscribe?.(observer)
    if (!subscription) {
       console.error('Directive:', directive)
@@ -189,6 +188,7 @@ export function subscribe<T extends {}>(token: ProviderToken<T> | undefined, dir
       console.error('Object:', instance)
       throw new Error(`Object does not implement OnSelect or Subscribable interfaces`)
    }
+   directive[key] = track(directive[key])
    addTeardown(subscription)
 }
 

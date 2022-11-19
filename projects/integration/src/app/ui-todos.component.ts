@@ -20,13 +20,13 @@ import {
    Select, Selector,
    Store,
    TransitionToken,
-   useChanges,
+   useInputs,
    useMerge,
    useMutation,
    useQuery,
    useTransition,
    withState,
-   next
+   next, inputs
 } from '@antischematic/angular-state-library';
 import {Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
@@ -106,8 +106,12 @@ export class UITodos {
    }
 
    @Invoke() trackInputChanges() {
-      const {userId} = useChanges<UITodos>()
+      const {userId} = useInputs<UITodos>()
       console.log("inputs changed!", userId)
+
+      dispatch(inputs(UITodos), ({ userId }) => {
+         console.log("inputs observable changed!", userId)
+      })
    }
 
    // create a todo then toggle complete to trigger an error
