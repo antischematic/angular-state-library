@@ -105,10 +105,9 @@ export class TransitionSpec implements ZoneSpec {
    }
 
    onHandleError(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, error: any) {
-      const handled = parentZoneDelegate.handleError(targetZone, error)
       this.transition.failed = true
       this.transition.thrownError = error
-      return handled
+      return parentZoneDelegate.handleError(targetZone, error)
    }
 
    cancelTasks() {
@@ -185,7 +184,7 @@ export class Transition<T = unknown> implements OnSelect {
       if (this.options.cancelPrevious) {
          this.cancel()
       }
-      return zone.run(fn, applyThis, applyArgs)
+      return zone.runGuarded(fn, applyThis, applyArgs)
    }
 
    ngOnSelect(observer: PartialObserver<any>) {

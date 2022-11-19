@@ -74,6 +74,10 @@ export function get<T extends { value: unknown }>(token: ProviderToken<T>): T["v
    return track(inject(token).value)
 }
 
+export function set<T extends { value: unknown, next: (value: T["value"]) => void }>(token: ProviderToken<T>, value: T["value"]): void {
+   inject(token).next(value)
+}
+
 type ActionParams<T> = T extends (...params: infer Params) => any ? Params extends { length: 1 } ? Params[0] : Params : never
 
 function filterByNameType<T extends StoreEvent>(name: PropertyKey, type: EventType): OperatorFunction<any, T> {

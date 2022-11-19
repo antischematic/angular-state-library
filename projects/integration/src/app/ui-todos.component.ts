@@ -26,7 +26,9 @@ import {
    useQuery,
    useTransition,
    withState,
-   next, inputs
+   next,
+   inputs,
+   set
 } from '@antischematic/angular-state-library';
 import {Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
@@ -69,7 +71,7 @@ export class UITodos {
    }
 
    @Action() setTodos(value: Todo[]) {
-      inject(Todos).next(value)
+      set(Todos, value)
    }
 
    @Action() signal!: Action
@@ -109,7 +111,7 @@ export class UITodos {
       const {userId} = useInputs<UITodos>()
       console.log("inputs changed!", userId)
 
-      dispatch(inputs(UITodos), ({ userId }) => {
+      dispatch(inputs(UITodos), ({userId}) => {
          console.log("inputs observable changed!", userId)
       })
    }
@@ -119,7 +121,7 @@ export class UITodos {
       console.log('error handled', error);
       dispatch(timer(1000), () => {
          console.info('uh oh')
-      }, { zone: "noop" })
+      }, {zone: "noop"})
    }
 
    @Invoke() logEvents() {
@@ -151,7 +153,7 @@ const Loading = new TransitionToken<Todo[]>("loading", {
 function loadTodos(userId: string): Observable<Todo[]> {
    const loading = inject(Loading)
    return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
-      useTransition(loading, { emit: true }),
+      useTransition(loading, {emit: true}),
       useQuery({
          key: [endpoint, userId],
          // refreshInterval: 5000,

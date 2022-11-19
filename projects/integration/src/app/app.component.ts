@@ -9,7 +9,7 @@ import {
    Invoke, Select,
    slice, Selector,
    store,
-   Store, useMerge, EVENTS
+   Store, useMerge
 } from "@antischematic/angular-state-library";
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
@@ -59,12 +59,6 @@ export class AppComponent {
 
    @Invoke() readUserId() {
       console.log("userId changed", this.userId)
-
-      this.ngOnSelect({
-         next: () => {
-            console.log("NEXT VALUE???")
-         }
-      })
    }
 
    @Input() appStore: any
@@ -88,8 +82,6 @@ export class AppComponent {
       const appStore = store(AppComponent)
 
       useMerge()
-
-      inject(EVENTS).subscribe(console.log)
 
       dispatch(sliced, (current) => {
          // console.log("slice updated", current)

@@ -42,7 +42,7 @@ This API is experimental.
          * [dispatch](#dispatch)
          * [loadEffect](#loadeffect)
          * [addTeardown](#addteardown)
-         * [useChanges](#usechanges)
+         * [useInputs](#useinputs)
          * [useOperator](#useoperator)
       * [Reactivity](#reactivity)
          * [track (alias: `$`)](#track--alias---)
@@ -400,18 +400,41 @@ userId.subscribe(current => {
 })
 ```
 
-#### selectStore
+#### store
 
-Observe when any store property has changed. Values are checked after actions have run. This method must be called
-inside an injection context.
+Emits the store instance when data has changed due to an action, including parent stores if they are selected.
 
-**Example: Select full store state**
+**Example: Observe store changes**
 
 ```ts
-const store = selectStore(UITodos)
+const uiTodos = store(UITodos)
 
-store.subscribe(current => {
+uiTodos.subscribe(current => {
    console.log("store", current)
+})
+```
+
+#### slice
+
+Select a slice of a store's state, emitting the current state on subscribe and each time the state changes due to an action.
+
+**Example: Observe a single property from a store**
+
+```ts
+const todos = slice(UITodos, "todos")
+
+todos.subscribe(current => {
+   console.log("todos", current)
+})
+```
+
+**Example: Observe multiple properties from a store**
+
+```ts
+const state = slice(UITodos, ["userId", "todos"])
+
+state.subscribe(current => {
+   console.log("state", current.userId, current.todos)
 })
 ```
 
@@ -647,7 +670,7 @@ export class UIPlugin {
 }
 ```
 
-#### useChanges
+#### useInputs
 
 Returns a reactive `SimpleChanges` object for the current component. Use this to track changes to input values.
 
@@ -662,7 +685,7 @@ export class UITodos {
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
-      const {userId} = useChanges<UITodos>()
+      const { userId } = useInputs<UITodos>()
 
       dispatch(loadTodos(userId.currentValue), (todos) => {
          this.todos = todos
@@ -720,7 +743,7 @@ export default function loadTodos(userId: string) {
 }
 ```
 
-### Reactivity
+### Proxies
 
 Reactivity is enabled through the use of proxy objects. The reactivity API makes it possible to run actions and change
 detection automatically when data dependencies change.

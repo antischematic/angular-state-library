@@ -28,7 +28,7 @@ export function dispatch(source: Observable<any>, observerOrOptions: any = {}, o
    const effect = inject(EffectScheduler)
    const changeDetector = inject(ChangeDetectorRef) as ViewRef
    const signal = new Subject<any>()
-
+   const zone = options.zone === "noop" ? Zone.root : options.zone ?? Zone.current
    const observer = typeof observerOrOptions === "function" ? { next: observerOrOptions } : { ...observerOrOptions }
 
    for (const key of observers) {
@@ -54,10 +54,10 @@ export function dispatch(source: Observable<any>, observerOrOptions: any = {}, o
    effect.enqueue(observeInZone(source.pipe(
       tap(observer),
       catchError(e => {
-         errorHandler.handleError(e)
+         zone.runGuarded(errorHandler.handleError, errorHandler, e)
          return EMPTY
       })
-   ), options.zone === "noop" ? Zone.root : options.zone ?? Zone.current))
+   ), zone))
 
    return signal as any
 }
