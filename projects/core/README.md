@@ -16,23 +16,25 @@ This API is experimental.
 <details>
    <summary>Table of Contents</summary>
 
-   <!-- TOC -->
+<!-- TOC -->
 * [Angular State Library](#angular-state-library)
    * [API](#api)
-      * [Store](#store)
-      * [Action](#action)
-      * [Invoke](#invoke)
-      * [Before](#before)
-      * [Layout](#layout)
-      * [Select](#select)
-      * [Caught](#caught)
-      * [TemplateProvider](#templateprovider)
-      * [configureStore](#configurestore)
+      * [Core](#core)
+         * [Store](#store)
+         * [Action](#action)
+         * [Invoke](#invoke)
+         * [Before](#before)
+         * [Layout](#layout)
+         * [Select](#select)
+         * [Caught](#caught)
+         * [TemplateProvider](#templateprovider)
+         * [configureStore](#configurestore)
       * [Observables](#observables)
          * [events](#events)
-         * [EVENTS](#events-1)
-         * [select](#select-1)
-         * [selectStore](#selectstore)
+         * [EVENTS](#events)
+         * [store](#store)
+         * [slice](#slice)
+         * [inputs](#inputs)
          * [Selector](#selector)
          * [actionEvent](#actionevent)
          * [nextEvent](#nextevent)
@@ -42,9 +44,9 @@ This API is experimental.
          * [dispatch](#dispatch)
          * [loadEffect](#loadeffect)
          * [addTeardown](#addteardown)
-         * [useChanges](#usechanges)
+         * [useInputs](#useinputs)
          * [useOperator](#useoperator)
-      * [Reactivity](#reactivity)
+      * [Proxies](#proxies)
          * [track (alias: `$`)](#track--alias---)
          * [untrack (alias: `$$`)](#untrack--alias---)
          * [isTracked](#istracked)
@@ -381,38 +383,62 @@ export class UIApp {
 }
 ```
 
-#### select
+#### store
 
-Observe changes to individual store properties. Values are checked after actions have run. This method must be called
-inside an injection context.
+Emits the store instance when data has changed due to an action, including changes to parent stores if selected.
 
-**Example: Select partial store state**
+**Example: Observe store changes**
 
 ```ts
-const {todos, userId} = select(UITodos)
+const uiTodos = store(UITodos)
+
+uiTodos.subscribe(current => {
+   console.log("store", current)
+})
+```
+
+#### slice
+
+Select a slice of a store's state, emitting the current state on subscribe and each time the state changes due to an action.
+
+**Example: Observe a single property from a store**
+
+```ts
+const todos = slice(UITodos, "todos")
 
 todos.subscribe(current => {
    console.log("todos", current)
 })
+```
 
-userId.subscribe(current => {
-   console.log("userId", current)
+**Example: Observe multiple properties from a store**
+
+```ts
+const state = slice(UITodos, ["userId", "todos"])
+
+state.subscribe(current => {
+   console.log("state", current.userId, current.todos)
 })
 ```
 
-#### selectStore
+#### inputs
 
-Observe when any store property has changed. Values are checked after actions have run. This method must be called
-inside an injection context.
+Returns an observable stream of `TypedChanges` representing changes to a store's `@Input` bindings.
 
-**Example: Select full store state**
+**Example: Observable inputs**
 
 ```ts
-const store = selectStore(UITodos)
-
-store.subscribe(current => {
-   console.log("store", current)
-})
+@Store()
+@Component()
+export class UITodos {
+   @Input() userId!: string
+   
+   @Invoke() observeChanges() {
+      dispatch(inputs(UITodos), (changes) => {
+         console.log(changes.userId?.currentValue)
+      })
+   }
+}
 ```
 
 #### Selector
@@ -647,7 +673,7 @@ export class UIPlugin {
 }
 ```
 
-#### useChanges
+#### useInputs
 
 Returns a reactive `SimpleChanges` object for the current component. Use this to track changes to input values.
 
@@ -662,7 +688,7 @@ export class UITodos {
    todos: Todo[] = []
 
    @Invoke() loadTodos() {
-      const {userId} = useChanges<UITodos>()
+      const { userId } = useInputs<UITodos>()
 
       dispatch(loadTodos(userId.currentValue), (todos) => {
          this.todos = todos
@@ -720,7 +746,7 @@ export default function loadTodos(userId: string) {
 }
 ```
 
-### Reactivity
+### Proxies
 
 Reactivity is enabled through the use of proxy objects. The reactivity API makes it possible to run actions and change
 detection automatically when data dependencies change.

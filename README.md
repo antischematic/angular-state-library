@@ -16,9 +16,10 @@ This API is experimental.
 <details>
    <summary>Table of Contents</summary>
 
-   <!-- TOC -->
+<!-- TOC -->
 * [Angular State Library](#angular-state-library)
-   * [API](#api)
+  * [API](#api)
+    * [Core](#core)
       * [Store](#store)
       * [Action](#action)
       * [Invoke](#invoke)
@@ -28,33 +29,34 @@ This API is experimental.
       * [Caught](#caught)
       * [TemplateProvider](#templateprovider)
       * [configureStore](#configurestore)
-      * [Observables](#observables)
-         * [events](#events)
-         * [EVENTS](#events-1)
-         * [select](#select-1)
-         * [selectStore](#selectstore)
-         * [Selector](#selector)
-         * [actionEvent](#actionevent)
-         * [nextEvent](#nextevent)
-         * [errorEvent](#errorevent)
-         * [completeEvent](#completeevent)
-      * [Action Hooks](#action-hooks)
-         * [dispatch](#dispatch)
-         * [loadEffect](#loadeffect)
-         * [addTeardown](#addteardown)
-         * [useInputs](#useinputs)
-         * [useOperator](#useoperator)
-      * [Reactivity](#reactivity)
-         * [track (alias: `$`)](#track--alias---)
-         * [untrack (alias: `$$`)](#untrack--alias---)
-         * [isTracked](#istracked)
-      * [Extensions](#extensions)
-         * [Transition](#transition)
-         * [TransitionToken](#transitiontoken)
-         * [useTransition](#usetransition)
-         * [useQuery](#usequery)
-         * [useMutation](#usemutation)
-   * [Testing Environment](#testing-environment)
+    * [Observables](#observables)
+      * [events](#events)
+      * [EVENTS](#events)
+      * [store](#store)
+      * [slice](#slice)
+      * [inputs](#inputs)
+      * [Selector](#selector)
+      * [actionEvent](#actionevent)
+      * [nextEvent](#nextevent)
+      * [errorEvent](#errorevent)
+      * [completeEvent](#completeevent)
+    * [Action Hooks](#action-hooks)
+      * [dispatch](#dispatch)
+      * [loadEffect](#loadeffect)
+      * [addTeardown](#addteardown)
+      * [useInputs](#useinputs)
+      * [useOperator](#useoperator)
+    * [Proxies](#proxies)
+      * [track (alias: `$`)](#track--alias---)
+      * [untrack (alias: `$$`)](#untrack--alias---)
+      * [isTracked](#istracked)
+    * [Extensions](#extensions)
+      * [Transition](#transition)
+      * [TransitionToken](#transitiontoken)
+      * [useTransition](#usetransition)
+      * [useQuery](#usequery)
+      * [useMutation](#usemutation)
+  * [Testing Environment](#testing-environment)
 <!-- TOC -->
 </details>
 
@@ -381,28 +383,9 @@ export class UIApp {
 }
 ```
 
-#### select
-
-Observe changes to individual store properties. Values are checked after actions have run. This method must be called
-inside an injection context.
-
-**Example: Select partial store state**
-
-```ts
-const {todos, userId} = select(UITodos)
-
-todos.subscribe(current => {
-   console.log("todos", current)
-})
-
-userId.subscribe(current => {
-   console.log("userId", current)
-})
-```
-
 #### store
 
-Emits the store instance when data has changed due to an action, including parent stores if they are selected.
+Emits the store instance when data has changed due to an action, including changes to parent stores if selected.
 
 **Example: Observe store changes**
 
@@ -436,6 +419,26 @@ const state = slice(UITodos, ["userId", "todos"])
 state.subscribe(current => {
    console.log("state", current.userId, current.todos)
 })
+```
+
+#### inputs
+
+Returns an observable stream of `TypedChanges` representing changes to a store's `@Input` bindings.
+
+**Example: Observable inputs**
+
+```ts
+@Store()
+@Component()
+export class UITodos {
+   @Input() userId!: string
+   
+   @Invoke() observeChanges() {
+      dispatch(inputs(UITodos), (changes) => {
+         console.log(changes.userId?.currentValue)
+      })
+   }
+}
 ```
 
 #### Selector
