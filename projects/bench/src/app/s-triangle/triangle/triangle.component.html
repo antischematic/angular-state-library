@@ -3,10 +3,11 @@
    [size]="targetSize"
    [x]="x - halfTargetSize"
    [y]="y - halfTargetSize"
+   [count]="count"
 ></app-dot>
 
 <ng-template #triangles>
-   <app-triangle [s]="halfS" [x]="x" [y]="y - half2S"></app-triangle>
-   <app-triangle [s]="halfS" [x]="x - halfS" [y]="y + half2S"></app-triangle>
-   <app-triangle [s]="halfS" [x]="x + halfS" [y]="y + half2S"></app-triangle>
+   <app-triangle [s]="halfS" [x]="x" [y]="y - half2S" [count]="count"></app-triangle>
+   <app-triangle [s]="halfS" [x]="x - halfS" [y]="y + half2S" [count]="count"></app-triangle>
+   <app-triangle [s]="halfS" [x]="x + halfS" [y]="y + half2S" [count]="count"></app-triangle>
 </ng-template>

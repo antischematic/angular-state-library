@@ -14,7 +14,7 @@ import {
 import {UICounter} from "./ui-counter.component";
 import {UIDescendent} from "./ui-descendent.component";
 import {UIDouble} from "./ui-double.component";
-import {delay} from "rxjs";
+import {delay, timer} from "rxjs";
 import {UITheme} from "./ui-theme";
 
 const UserId = new Selector("UserId", () => action(RootStore, "setUserId").pipe(
@@ -70,9 +70,9 @@ export class AppComponent {
 
       this.otherAction()
 
-      // dispatch(timer(1000), {
-      //    next: this.increment
-      // })
+      dispatch(timer(1000), {
+         next: this.increment
+      })
    }
 
    @Action() otherAction() {}

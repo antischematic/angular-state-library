@@ -9,12 +9,6 @@ function calcStyle(size: number, x: number, y: number) {
    }px; line-height: ${s}px;`
 }
 
-const Counter = new InjectionToken("Counter", {
-   factory: () => interval(1000).pipe(
-      map(count => 1 + (count % 10)),
-   )
-})
-
 @Store()
 @Component({
    selector: "app-dot",
@@ -31,8 +25,7 @@ export class DotComponent {
    @Input() x = 0
    @Input() y = 0
    @Input() size = 0
-
-   @Select(Counter) count = 0
+   @Input() count = 0
 
    @HostBinding("class.hover") hover = false
 

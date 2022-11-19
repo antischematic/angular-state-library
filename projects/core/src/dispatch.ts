@@ -54,7 +54,7 @@ export function dispatch(source: Observable<any>, observerOrOptions: any = {}, o
    effect.enqueue(observeInZone(source.pipe(
       tap(observer),
       catchError(e => {
-         zone.runGuarded(errorHandler.handleError, errorHandler, e)
+         zone.runGuarded(() => errorHandler.handleError(e))
          return EMPTY
       })
    ), zone))

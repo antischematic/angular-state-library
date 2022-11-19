@@ -12,6 +12,7 @@ export class TriangleComponent {
    @Input() x = 0
    @Input() y = 0
    @Input() s = 0
+   @Input() count = 0
 
    targetSize = 25
 
