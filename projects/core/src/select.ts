@@ -165,7 +165,6 @@ class SelectObserver {
       this.target[this.key] = track(value)
       const changes = new Map([[this.target, new Map([[this.key, previous]])]])
       this.event.schedule(EventType.Dispatch, this.key, value, changes)
-      this.event.flush()
       this.cdr.markForCheck()
    }
    error(error: unknown) {
