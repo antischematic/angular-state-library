@@ -4,10 +4,10 @@
    "compilerOptions": {
     "paths": {
       "@antischematic/angular-state-library": [
-        "dist/angular-state-library"
+        "projects/core/src/public-api.ts"
       ],
       "@antischematic/angular-state-library/testing": [
-        "dist/angular-state-library/testing"
+        "projects/core/testing/public-api.ts"
       ]
     },
     "baseUrl": "./",

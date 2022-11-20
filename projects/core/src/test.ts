@@ -8,6 +8,12 @@ import {
    platformBrowserDynamicTesting
 } from '@angular/platform-browser-dynamic/testing';
 import {initStoreTestEnvironment} from "../testing/init-store-test-environment";
+// @ts-ignore
+import JasmineDOM from '@testing-library/jasmine-dom';
+
+beforeAll(() => {
+   jasmine.addMatchers(JasmineDOM);
+});
 
 // First, initialize the Angular testing environment.
 getTestBed().initTestEnvironment(

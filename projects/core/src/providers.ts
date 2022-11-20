@@ -1,9 +1,9 @@
 import {ErrorHandler, inject, Injectable, InjectionToken} from "@angular/core";
 import {Observable, OperatorFunction, Subject, Subscription, switchAll} from "rxjs";
-import {ActionMetadata, DepMap, EventType, StoreConfig, StoreEvent} from "./interfaces";
+import {ActionMetadata, EventType, StoreConfig, StoreEvent} from "./interfaces";
 import {getErrorHandlers} from "./metadata";
-import {getChanges, track} from "./proxy";
-import {getId} from "./utils";
+import {track} from "./proxy";
+import {UID} from "./utils";
 
 export const ACTION = new InjectionToken<ActionMetadata>("ACTION")
 export const CONTEXT = new InjectionToken<{ instance: unknown }>("CONTEXT")
@@ -22,10 +22,11 @@ export const EVENTS = new InjectionToken("EVENTS", {
 export class EventScheduler {
    events: StoreEvent<any, any, any, any>[] = []
    dispatcher = inject(EVENTS)
+   getId = inject(UID)
 
    schedule(type: EventType, name: string, value: unknown, changes: Map<any, any>) {
       this.events.push({
-         id: getId(),
+         id: this.getId(),
          timestamp: Date.now(),
          type,
          context: this.context,

@@ -4,7 +4,8 @@
   "compilerOptions": {
     "outDir": "../../out-tsc/spec",
     "types": [
-      "jasmine"
+      "jasmine",
+       "@testing-library/jasmine-dom"
     ]
   },
   "files": [
@@ -12,6 +13,7 @@
   ],
   "include": [
     "**/*.spec.ts",
-    "**/*.d.ts"
+    "**/*.d.ts",
+     "src/tests/**.ts"
   ]
 }

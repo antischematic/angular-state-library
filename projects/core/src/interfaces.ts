@@ -3,7 +3,7 @@ import {Provider} from "@angular/core";
 
 type Changes = Map<object, Map<PropertyKey, any>>
 
-export interface EventData<ActionName, ActionContext = unknown> {
+export interface EventData<ActionName = string, ActionContext = unknown> {
    readonly id: number
    readonly name: ActionName
    readonly context: ActionContext
@@ -11,26 +11,31 @@ export interface EventData<ActionName, ActionContext = unknown> {
    readonly changes: Changes
 }
 
-export interface DispatchEvent<ActionName = PropertyKey, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
+export interface UnknownEvent extends EventData {
+   type: EventType,
+   value?: unknown
+}
+
+export interface DispatchEvent<ActionName = string, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
    readonly type: EventType.Dispatch
    readonly value: ActionValue
 }
 
-export interface NextEvent<ActionName = PropertyKey, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
+export interface NextEvent<ActionName = string, ActionContext = unknown, ActionValue = unknown> extends EventData<ActionName, ActionContext> {
    readonly value: ActionValue extends Observable<infer R> ? R : never
    readonly type: EventType.Next
 }
 
-export interface ErrorEvent<ActionName = PropertyKey, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
+export interface ErrorEvent<ActionName = string, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
    readonly value: unknown
    readonly type: EventType.Error
 }
 
-export interface CompleteEvent<ActionName = PropertyKey, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
+export interface CompleteEvent<ActionName = string, ActionContext = unknown> extends EventData<ActionName, ActionContext> {
    readonly type: EventType.Complete
 }
 
-export type StoreEvent<ActionName = PropertyKey, ActionContext = unknown, ActionType = unknown, EffectType = unknown> =
+export type StoreEvent<ActionName = string, ActionContext = unknown, ActionType = unknown, EffectType = unknown> =
    | DispatchEvent<ActionName, ActionContext, ActionType>
    | NextEvent<ActionName, ActionContext, EffectType>
    | ErrorEvent<ActionName, ActionContext>
@@ -83,7 +88,7 @@ export type Metadata<T> = T & {
    descriptor?: PropertyDescriptor
 }
 
-export type ExtractEvents<T, U extends PropertyKey> = {
+export type ExtractEvents<T, U extends string> = {
    [key in U]: key extends keyof T ? T[key] extends (...params: infer P) => infer R ? StoreEvent<key, T, P, R> : never : never
 }[U]
 

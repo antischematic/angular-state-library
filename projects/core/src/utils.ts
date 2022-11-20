@@ -1,4 +1,4 @@
-import {inject, Injector, INJECTOR, ProviderToken} from "@angular/core";
+import {inject, InjectionToken, Injector, INJECTOR, ProviderToken} from "@angular/core";
 import {defer, filter, map, Observable, OperatorFunction, tap} from "rxjs";
 import {
    CompleteEvent,
@@ -39,20 +39,24 @@ export function wrap(target: { [key: PropertyKey]: any }, property: PropertyKey,
 
 export function noop() {}
 
-let id = 0
+export const UID = new InjectionToken("UID", {
+   factory() {
+      let id = 0
+      return function getId() {
+         return id++
+      }
+   }
+})
 
-export function getId() {
-   return id++
-}
-
-
-export function events<T>(token: ProviderToken<T>, injector = inject(INJECTOR)): Observable<ExtractEvents<T, keyof T>> {
+export function events<T>(token: ProviderToken<T>, injector?: Injector): Observable<ExtractEvents<T, Extract<keyof T, string>>>
+export function events<T>(context: T): Observable<ExtractEvents<T, Extract<keyof T, string>>>
+export function events<T>(token: ProviderToken<T> | T, injector = inject(INJECTOR)): Observable<ExtractEvents<T, Extract<keyof T, string>>> {
    return defer(() => {
-      const context = injector.get(token)
+      const context = typeof token === "function" ? injector.get(token) : token
       return injector.get(EVENTS).pipe(
          filter(event => event.context === context)
       )
-   }) as Observable<ExtractEvents<T, keyof T>>
+   }) as Observable<ExtractEvents<T, Extract<keyof T, string>>>
 }
 
 export function configureStore(config: StoreConfig) {

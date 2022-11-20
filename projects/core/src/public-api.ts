@@ -25,3 +25,4 @@ export {slice, store, Selector, OnSelect, WithState, withState, WithStateOptions
 export {
    useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions, QueryError
 } from "./data"
+export { EventType, StoreEvent, TypedChanges, TypedChange, CompleteEvent, DispatchEvent, ErrorEvent, NextEvent, ZoneCompatible, StoreConfig, DispatchObserver, EventData, UnknownEvent } from "./interfaces"
