@@ -134,7 +134,7 @@ export function runInContext<T extends (...args: any) => any>(deps: DepMap, fn: 
    }
 }
 
-function runAction(this: any, fn: any, key: any, deps: DepMap, ...args: any[]) {
+function runAction(this: any, fn: any, key: any, deps: DepMap, args: any[]) {
    const event = inject(EventScheduler)
    event.schedule(EventType.Dispatch, key, args.length === 1 ? args[0] : args, getChanges(deps))
    return fn.apply(this, args)
@@ -147,7 +147,7 @@ export function decorateActions(target: {}) {
          const deps = new Map()
          setMeta(tracked, deps, this, key)
          teardown(this, key)
-         return runInContext(deps, runAction, proxy, catchError, key, fn, key, deps, ...args)
+         return runInContext(deps, runAction, proxy, catchError, key, fn, key, deps, args)
       })
    }
 }

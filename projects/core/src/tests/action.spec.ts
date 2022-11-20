@@ -1,28 +1,28 @@
 import {configureStore, EventType} from "@antischematic/angular-state-library";
-import {render} from "@testing-library/angular";
-import {BasicAction} from "./fixtures/basic-action.component";
+import {BasicAction} from "./fixtures/action/basic-action";
 import {
    DispatchActionsInCallOrder,
    DispatchActionsInCallOrderWithEffect, DispatchActionsInCallOrderWithEffectError
-} from "./fixtures/dispatch-actions-in-order.component";
-import {DispatchAfterSubscribe} from "./fixtures/dispatch-after-subscribe";
-import {EventLog} from "./fixtures/event-log";
+} from "./fixtures/action/dispatch-actions-in-order";
+import {DispatchAfterSubscribe} from "./fixtures/action/dispatch-after-subscribe";
+import {EventLog} from "./fixtures/action/event-log";
 import {
    InjectableAction,
    InjectableActionWithEffect,
    InjectableActionWithEffectError
-} from "./fixtures/injectable-action";
+} from "./fixtures/action/injectable-action";
 import {eventsContaining} from "./utils/event-matcher";
 // noinspection ES6UnusedImports
 import {pretty} from "./utils/pretty";
+import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("Action", () => {
    it("should dispatch events", async () => {
       const expected = [
+         { id: 0, name: "increment", type: EventType.Dispatch },
          { id: 1, name: "increment", type: EventType.Dispatch },
          { id: 2, name: "increment", type: EventType.Dispatch },
-         { id: 3, name: "increment", type: EventType.Dispatch },
       ]
       const { container, fixture } = await render(BasicAction)
 
@@ -37,11 +37,11 @@ describe("Action", () => {
 
    it("should dispatch actions in order they are called", async () => {
       const expected = [
-         { id: 1, name: "start", type: EventType.Dispatch },
+         { id: 0, name: "start", type: EventType.Dispatch },
+         { id: 1, name: "next", type: EventType.Dispatch },
          { id: 2, name: "next", type: EventType.Dispatch },
          { id: 3, name: "next", type: EventType.Dispatch },
-         { id: 4, name: "next", type: EventType.Dispatch },
-         { id: 5, name: "finally", type: EventType.Dispatch }
+         { id: 4, name: "finally", type: EventType.Dispatch }
       ]
       const { container, fixture } = await render(DispatchActionsInCallOrder)
 
@@ -54,16 +54,16 @@ describe("Action", () => {
 
    it("should dispatch actions in order they are called with effect", async () => {
       const expected = [
-         { id: 1, name: "start", type: EventType.Dispatch },
-         { id: 2, name: "start", type: EventType.Next, value: 1 },
-         { id: 3, name: "setCount", type: EventType.Dispatch, value: 1 },
-         { id: 4, name: "start", type: EventType.Next, value: 2 },
-         { id: 5, name: "setCount", type: EventType.Dispatch, value: 2 },
-         { id: 6, name: "start", type: EventType.Next, value: 3 },
-         { id: 7, name: "setCount", type: EventType.Dispatch, value: 3 },
-         { id: 8, name: "start", type: EventType.Complete },
-         { id: 9, name: "setComplete", type: EventType.Dispatch },
-         { id: 10, name: "finally", type: EventType.Dispatch }
+         { id: 0, name: "start", type: EventType.Dispatch },
+         { id: 1, name: "start", type: EventType.Next, value: 1 },
+         { id: 2, name: "setCount", type: EventType.Dispatch, value: 1 },
+         { id: 3, name: "start", type: EventType.Next, value: 2 },
+         { id: 4, name: "setCount", type: EventType.Dispatch, value: 2 },
+         { id: 5, name: "start", type: EventType.Next, value: 3 },
+         { id: 6, name: "setCount", type: EventType.Dispatch, value: 3 },
+         { id: 7, name: "start", type: EventType.Complete },
+         { id: 8, name: "setComplete", type: EventType.Dispatch },
+         { id: 9, name: "finally", type: EventType.Dispatch }
       ]
       const { container, fixture } = await render(DispatchActionsInCallOrderWithEffect)
 
@@ -77,16 +77,16 @@ describe("Action", () => {
 
    it("should dispatch actions in order they are called with effect error", async () => {
       const expected = [
-         { id: 1, name: "start", type: EventType.Dispatch },
-         { id: 2, name: "start", type: EventType.Next, value: 1 },
-         { id: 3, name: "setCount", type: EventType.Dispatch, value: 1 },
-         { id: 4, name: "start", type: EventType.Next, value: 2 },
-         { id: 5, name: "setCount", type: EventType.Dispatch, value: 2 },
-         { id: 6, name: "start", type: EventType.Next, value: 3 },
-         { id: 7, name: "setCount", type: EventType.Dispatch, value: 3 },
-         { id: 8, name: "start", type: EventType.Error, value: new Error("BOGUS") },
-         { id: 9, name: "setError", type: EventType.Dispatch, value: new Error("BOGUS") },
-         { id: 10, name: "finally", type: EventType.Dispatch }
+         { id: 0, name: "start", type: EventType.Dispatch },
+         { id: 1, name: "start", type: EventType.Next, value: 1 },
+         { id: 2, name: "setCount", type: EventType.Dispatch, value: 1 },
+         { id: 3, name: "start", type: EventType.Next, value: 2 },
+         { id: 4, name: "setCount", type: EventType.Dispatch, value: 2 },
+         { id: 5, name: "start", type: EventType.Next, value: 3 },
+         { id: 6, name: "setCount", type: EventType.Dispatch, value: 3 },
+         { id: 7, name: "start", type: EventType.Error, value: new Error("BOGUS") },
+         { id: 8, name: "setError", type: EventType.Dispatch, value: new Error("BOGUS") },
+         { id: 9, name: "finally", type: EventType.Dispatch }
       ]
       const { container, fixture } = await render(DispatchActionsInCallOrderWithEffectError)
 
@@ -105,8 +105,8 @@ describe("Action", () => {
       const button = 10
       const value = new MouseEvent("click", { button })
       const expected = [
-         { id: 1, name: "start", type: EventType.Dispatch, value },
-         { id: 2, name: "start", type: EventType.Next, value },
+         { id: 0, name: "start", type: EventType.Dispatch, value },
+         { id: 1, name: "start", type: EventType.Next, value },
       ]
       const { container, fixture } = await render(DispatchAfterSubscribe)
 
