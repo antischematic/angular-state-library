@@ -11,12 +11,14 @@ export class EventLog {
 
    events: UnknownEvent[] = []
    injector = inject(INJECTOR)
-   subscription = Subscription.EMPTY
+   subscription = new Subscription()
 
    monitor(context: any) {
-      this.subscription = events(context, this.injector).subscribe((event) => {
+      const subscription = events(context, this.injector).subscribe((event) => {
          this.events.push(event)
       })
+      this.subscription.add(subscription)
+      return subscription
    }
 
    ngOnDestroy() {

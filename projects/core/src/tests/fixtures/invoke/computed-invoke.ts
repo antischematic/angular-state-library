@@ -1,6 +1,6 @@
 import {Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
-import {Action, Invoke, Store} from "@antischematic/angular-state-library";
+import {Action, Invoke, Select, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 
 @Store()
@@ -10,15 +10,23 @@ import {fireEvent, screen} from "@testing-library/angular";
       count1: {{ count1 }}
       count2: {{ count2 }}
       count3: {{ count3 }}
+      sum: {{ sum }}
+      computed: {{ computed }}
       read: {{ times }}
       <button (click)="increment()">Increment</button>
    `
 })
-export class BatchInvoke {
+export class ComputedInvoke {
    @Input() count1 = 1
    @Input() count2 = 10
    @Input() count3 = 100
 
+   @Select() get sum() {
+      this.computed++
+      return this.count1 + this.count2 + this.count3
+   }
+
+   computed = 0
    times = 0
 
    @Action() increment() {
@@ -34,7 +42,7 @@ export class BatchInvoke {
       this.times++
    }
 
-   static start(fixture: ComponentFixture<BatchInvoke>) {
+   static start(fixture: ComponentFixture<ComputedInvoke>) {
       fixture.autoDetectChanges()
    }
 
