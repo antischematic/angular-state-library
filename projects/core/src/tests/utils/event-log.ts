@@ -2,7 +2,6 @@ import {inject, Injectable, INJECTOR, Input} from "@angular/core";
 import {ComponentFixture, TestBed} from "@angular/core/testing";
 import {events, EventType, UnknownEvent} from "@antischematic/angular-state-library";
 import {Subscription} from "rxjs";
-import {isPlainObject} from "../../utils";
 
 interface EventMatcher { name?: string, type?: EventType | string }
 
@@ -38,5 +37,9 @@ export class EventLog {
 
    static monitor(fixture: ComponentFixture<any>) {
       TestBed.inject(EventLog).monitor(fixture.componentInstance)
+   }
+
+   static suppressErrors() {
+      spyOn(console, "error")
    }
 }

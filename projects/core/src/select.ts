@@ -15,7 +15,7 @@ import {
    EMPTY,
    filter,
    isObservable,
-   map,
+   map, observable,
    Observable,
    Observer,
    skip,
@@ -106,6 +106,10 @@ export const Selector: Selector = function Selector(name: string, select: Functi
       subscription = new Subscription()
       target: Subject<any>
 
+      [observable]() {
+         return this
+      }
+
       get value() {
          return this.destination.value
       }
@@ -127,6 +131,10 @@ export const Selector: Selector = function Selector(name: string, select: Functi
          } finally {
             this.connect()
          }
+      }
+
+      pipe(...operators: any[]) {
+         return this.destination.pipe(...operators as [])
       }
 
       subscribe(observer: any) {

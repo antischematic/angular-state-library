@@ -29,7 +29,11 @@ module.exports = function (config) {
       reporters: [
         { type: 'html' },
         { type: 'text-summary' }
-      ]
+      ],
+       include: [
+          "projects/core/src/**.ts",
+          "!projects/core/src/tests/**.ts"
+       ]
     },
      browserDisconnectTimeout : 210000,
      browserNoActivityTimeout : 210000,
