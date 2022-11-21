@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
 import {Action, Invoke, Select, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
@@ -14,7 +14,8 @@ import {fireEvent, screen} from "@testing-library/angular";
       computed: {{ computed }}
       read: {{ times }}
       <button (click)="increment()">Increment</button>
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class ComputedInvoke {
    @Input() count1 = 1

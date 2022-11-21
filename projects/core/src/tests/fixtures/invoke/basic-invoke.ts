@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
 import {Invoke, Store} from "@antischematic/angular-state-library";
 
@@ -7,7 +7,8 @@ import {Invoke, Store} from "@antischematic/angular-state-library";
    standalone: true,
    template: `
       count: {{ count }}
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BasicInvoke {
    @Input() count = 0

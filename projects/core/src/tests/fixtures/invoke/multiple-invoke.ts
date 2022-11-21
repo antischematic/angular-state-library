@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
 import {Invoke, Store} from "@antischematic/angular-state-library";
 
@@ -10,7 +10,8 @@ import {Invoke, Store} from "@antischematic/angular-state-library";
       first: {{ first }}
       second: {{ second }}
       third: {{ third }}
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class MultipleInvoke {
    @Input() count = 0

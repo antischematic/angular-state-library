@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {Action, dispatch, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 import {from, merge, throwError} from "rxjs";
@@ -80,7 +80,8 @@ export class DispatchActionsInCallOrderWithEffect {
       count: {{ count }}
       error: {{ error?.message }}
       <button (click)="start()">Start</button>
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class DispatchActionsInCallOrderWithEffectError {
    @Input() count = 0

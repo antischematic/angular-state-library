@@ -1,4 +1,4 @@
-import {Component, inject, InjectionToken, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, inject, InjectionToken, Input} from "@angular/core";
 import {Action, dispatch, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 import {of, throwError} from "rxjs";
@@ -33,7 +33,8 @@ export class InjectableAction {
    template: `
       count: {{ count }}
       <button (click)="increment()">Increment</button>
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InjectableActionWithEffect {
    @Input() count = 0
@@ -65,7 +66,8 @@ export class InjectableActionWithEffect {
    template: `
       count: {{ count }}
       <button (click)="increment()">Increment</button>
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InjectableActionWithEffectError {
    @Input() count = 0

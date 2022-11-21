@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
 import {Invoke, Store} from "@antischematic/angular-state-library";
 
@@ -8,7 +8,8 @@ import {Invoke, Store} from "@antischematic/angular-state-library";
    template: `
       count: {{ count }}
       read: {{ times }}
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class InputInvoke {
    @Input() count = 1

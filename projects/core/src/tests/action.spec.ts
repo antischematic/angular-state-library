@@ -5,7 +5,7 @@ import {
    DispatchActionsInCallOrderWithEffect, DispatchActionsInCallOrderWithEffectError
 } from "./fixtures/action/dispatch-actions-in-order";
 import {DispatchAfterSubscribe} from "./fixtures/action/dispatch-after-subscribe";
-import {EventLog} from "./fixtures/action/event-log";
+import {EventLog} from "./utils/event-log";
 import {
    InjectableAction,
    InjectableActionWithEffect,

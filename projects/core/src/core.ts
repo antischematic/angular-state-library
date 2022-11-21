@@ -179,10 +179,9 @@ export function decorateSelectors(target: {}) {
 
 export function decorateChanges(target: {}) {
    wrap(target, "ngOnChanges", function (fn, value) {
-      const copy = {...value}
       const events = getToken(EventScheduler, this)
-      const changes = Object.entries(copy).map(([key, change]) => [key, (change as any).previousValue]) as any[]
-      events.schedule(EventType.Dispatch, "ngOnChanges", copy, new Map([[this, new Map(changes)]]))
+      const changes = Object.entries(value).map(([key, change]) => [key, (change as any).previousValue]) as any[]
+      events.schedule(EventType.Dispatch, "ngOnChanges", {...value}, new Map([[this, new Map(changes)]]))
       fn.call(this, value)
    })
 }

@@ -1,6 +1,6 @@
 import {SimpleChange} from "@angular/core";
 import {EventType} from "@antischematic/angular-state-library";
-import {EventLog} from "./fixtures/action/event-log";
+import {EventLog} from "./utils/event-log";
 import {BasicInvoke} from "./fixtures/invoke/basic-invoke";
 import {BatchInvoke} from "./fixtures/invoke/batch-invoke";
 import {ComputedInvoke} from "./fixtures/invoke/computed-invoke";

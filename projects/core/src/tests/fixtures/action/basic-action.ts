@@ -1,4 +1,4 @@
-import {Component, Input} from "@angular/core";
+import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {Action, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 
@@ -8,7 +8,8 @@ import {fireEvent, screen} from "@testing-library/angular";
    template: `
       count: {{ count }}
       <button (click)="increment()">Increment</button>
-   `
+   `,
+   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class BasicAction {
    @Input() count = 0
