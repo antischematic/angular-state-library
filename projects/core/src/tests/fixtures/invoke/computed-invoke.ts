@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
-import {Action, Invoke, Select, Store} from "@antischematic/angular-state-library";
+import {$$, Action, Invoke, Select, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 
 @Store()
@@ -23,7 +23,7 @@ export class ComputedInvoke {
    @Input() count3 = 100
 
    @Select() get sum() {
-      this.computed++
+      $$(this).computed++
       return this.count1 + this.count2 + this.count3
    }
 
@@ -40,7 +40,7 @@ export class ComputedInvoke {
       void this.count1
       void this.count2
       void this.count3
-      this.times++
+      $$(this).times++
    }
 
    static start(fixture: ComponentFixture<ComputedInvoke>) {

@@ -1,11 +1,14 @@
-import {fakeAsync, flush, tick} from "@angular/core/testing";
-import {EventType} from "@antischematic/angular-state-library";
+import {tick} from "@angular/core/testing";
 import {BasicAsyncSelector} from "./fixtures/select/basic-async-selector";
 import {BasicSelectWithGetter} from "./fixtures/select/basic-select-getter";
 import {DerivedAsyncSelector} from "./fixtures/select/derived-async-selector";
+import {ObservableInputs} from "./fixtures/select/observable-inputs";
+import {PierceOnPushBoundary} from "./fixtures/select/pierce-on-push-boundary.component";
 import {SelectAssigned} from "./fixtures/select/select-assigned";
 import {Parent} from "./fixtures/select/select-parent-store";
 import {SelectWithState} from "./fixtures/select/select-with-state";
+import {SelectorChain} from "./fixtures/select/selector-chain";
+import {SliceState} from "./fixtures/select/slice-state";
 import {UnselectableError} from "./fixtures/select/unselectable-error";
 import {EventLog} from "./utils/event-log";
 import {eventsContaining} from "./utils/event-matcher";
@@ -32,8 +35,25 @@ describe("Select", () => {
       expect(container).toHaveTextContent("double: 20")
    })
 
-   it("should chain selectors", () => {
+   it("should chain selectors", async () => {
+      const { container, fixture, change } = await render(SelectorChain, {
+         detectChanges: false,
+         componentProperties: {
+            count: 1
+         }
+      })
 
+      SelectorChain.start(fixture)
+
+      expect(container).toHaveTextContent("count: 1")
+      expect(container).toHaveTextContent("sum: 4")
+      expect(container).toHaveTextContent("read: 3")
+
+      change({ count: 10 })
+
+      expect(container).toHaveTextContent("count: 10")
+      expect(container).toHaveTextContent("sum: 31")
+      expect(container).toHaveTextContent("read: 6")
    })
 
    it("should dispatch action when async selector emits", async () => {
@@ -145,16 +165,77 @@ describe("Select", () => {
       expect(container).toHaveTextContent("child: 10")
    })
 
-   it("should derive from computed grandparent", () => {
+   it("should pierce OnPush boundary", async () => {
+      const { container, fixture } = await render(PierceOnPushBoundary, {
+         detectChanges: false
+      })
 
+      const error = withFakeAsync(() => {
+         PierceOnPushBoundary.start(fixture)
+
+         expect(container).toHaveTextContent("count: 0")
+         expect(container).toHaveTextContent("quadruple: 0")
+         expect(container).toHaveTextContent("read: 1")
+
+         tick(1000)
+
+         expect(container).toHaveTextContent("count: 1")
+         expect(container).toHaveTextContent("quadruple: 4")
+         expect(container).toHaveTextContent("read: 2")
+
+         tick(9000)
+
+         expect(container).toHaveTextContent("count: 10")
+         expect(container).toHaveTextContent("quadruple: 40")
+         expect(container).toHaveTextContent("read: 11")
+      })
+
+      expect(error).toBeNull()
    })
 
-   it("should slice state", () => {
+   it("should slice state", async () => {
+      const { container } = await render(SliceState)
 
+      expect(container).toHaveTextContent("count: 0")
+      expect(container).toHaveTextContent("double: 0")
+      expect(container).toHaveTextContent("many: 0 0")
+
+      SliceState.increment()
+
+      expect(container).toHaveTextContent("count: 1")
+      expect(container).toHaveTextContent("double: 2")
+      expect(container).toHaveTextContent("many: 1 2")
+
+      SliceState.increment()
+
+      expect(container).toHaveTextContent("count: 2")
+      expect(container).toHaveTextContent("double: 4")
+      expect(container).toHaveTextContent("many: 2 4")
    })
 
-   it("should observe input changes", () => {
+   it("should observe input changes", async () => {
+      const { container, fixture, change } = await render(ObservableInputs, {
+         detectChanges: false,
+         componentProperties: {
+            count: 0
+         }
+      })
 
+      ObservableInputs.start(fixture)
+
+      expect(container).toHaveTextContent("count: 0")
+      expect(container).toHaveTextContent("previous: empty")
+      expect(container).toHaveTextContent("count: 0")
+      expect(container).toHaveTextContent("firstChange: true")
+      expect(container).toHaveTextContent("read: 2")
+
+      change({ count: 10 })
+
+      expect(container).toHaveTextContent("count: 10")
+      expect(container).toHaveTextContent("previous: 0")
+      expect(container).toHaveTextContent("count: 10")
+      expect(container).toHaveTextContent("firstChange: false")
+      expect(container).toHaveTextContent("read: 4")
    })
 
    it("should handle errors", () => {

@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
-import {Invoke, Store} from "@antischematic/angular-state-library";
+import {$$, Invoke, Store} from "@antischematic/angular-state-library";
 
 @Store()
 @Component({
@@ -18,7 +18,7 @@ export class InputInvoke {
 
    @Invoke() read() {
       void this.count
-      this.times++
+      $$(this).times++
    }
 
    static start(fixture: ComponentFixture<InputInvoke>) {

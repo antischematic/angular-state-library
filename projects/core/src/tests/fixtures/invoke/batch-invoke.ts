@@ -1,6 +1,6 @@
 import {ChangeDetectionStrategy, Component, Input} from "@angular/core";
 import {ComponentFixture} from "@angular/core/testing";
-import {Action, Invoke, Store} from "@antischematic/angular-state-library";
+import {$$, Action, Invoke, Store} from "@antischematic/angular-state-library";
 import {fireEvent, screen} from "@testing-library/angular";
 
 @Store()
@@ -32,7 +32,7 @@ export class BatchInvoke {
       void this.count1
       void this.count2
       void this.count3
-      this.times++
+      $$(this).times++
    }
 
    static start(fixture: ComponentFixture<BatchInvoke>) {
