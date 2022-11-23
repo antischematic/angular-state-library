@@ -15,7 +15,7 @@ import {action, caught, selector, setMeta} from "./metadata";
 
 const defaults = {track: true, immediate: true}
 
-export function createDecorator<T extends {}>(symbol: symbol, defaults = {}) {
+export function createDecorator<T extends {}>(symbol: symbol, defaults: {}) {
    return function decorate(options?: T) {
       return function (target: {}, key: PropertyKey, descriptor?: PropertyDescriptor) {
          setMeta(symbol, {...defaults, ...options, key, descriptor}, target, key)
