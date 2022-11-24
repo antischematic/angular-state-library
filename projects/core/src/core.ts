@@ -50,7 +50,7 @@ function checkDeps(deps: DepMap) {
 
 export function decorateCheck(target: {}, name: Phase) {
    const actions = getActions(target, name)
-   wrap(target, name, function (fn) {
+   wrap(target, name, function check(fn) {
       const events = getToken(EventScheduler, this)
       for (const action of actions) {
          const deps = getDeps(this, action.key)
@@ -64,8 +64,11 @@ export function decorateCheck(target: {}, name: Phase) {
          const effect = getToken(EffectScheduler, this, action.key)
          effect.dequeue()
       }
-      events.flush()
-      fn.apply(this)
+      if (events.flush()) {
+         check.call(this, fn)
+      } else {
+         fn.apply(this)
+      }
    })
 }
 

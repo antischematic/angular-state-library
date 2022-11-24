@@ -49,8 +49,8 @@ export function addDep(object: object, key: PropertyKey, value: any, previous: a
 
 function createObjectProxy(object: object) {
    return new Proxy(object, {
-      get(target: object, p: string | symbol, receiver: any): any {
-         const value = Reflect.get(target, p, receiver)
+      get(target: object, p: string | symbol): any {
+         const value = Reflect.get(target, p)
          addDep(target, p, value)
          return value
       },

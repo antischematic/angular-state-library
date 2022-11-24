@@ -113,8 +113,8 @@ describe("Action", () => {
       EventLog.monitor(fixture)
       DispatchAfterSubscribe.start(button)
 
-      expect(container).toHaveTextContent(`count: ${button}`)
       expect(EventLog.getEvents()).toEqual(eventsContaining(expected))
+      expect(container).toHaveTextContent(`count: ${button}`)
    })
 
    it("should be injectable with action providers", async () => {

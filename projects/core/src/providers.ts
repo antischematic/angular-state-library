@@ -37,12 +37,15 @@ export class EventScheduler {
    }
 
    flush() {
-      let event
-      if (this.events.length) {
-         while (event = this.events.shift()) {
+      const events = this.events
+      if (events.length) {
+         let event
+         this.events = []
+         while (event = events.shift()) {
             this.dispatcher.next(event)
          }
       }
+      return this.events.length > 0
    }
 
    constructor(private context: {}) {}

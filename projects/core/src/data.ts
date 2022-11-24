@@ -163,6 +163,11 @@ export class ResourceManager {
       )
    }
 
+   revalidate(key: any[]) {
+      this.invalidate(this.keygen(key), true)
+      this.invalidate(this.keygen(key), false)
+   }
+
    private keygen(seed: unknown[]) {
       return JSON.stringify(seed)
    }
