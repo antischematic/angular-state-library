@@ -62,12 +62,13 @@ function checkStable({ transition, microtasks, macroTasks, parentZone, timeout }
                transition.timeout = true
                transition.thrownError = new Error(`Transition timed out after ${timeoutMs}ms`)
                transition.cancel()
-               handleError(transition)
             }, timeoutMs)
          }
       })
    }
 }
+
+let id = 0
 
 export class TransitionSpec implements ZoneSpec {
    microtasks = 0
@@ -75,6 +76,9 @@ export class TransitionSpec implements ZoneSpec {
    parentZone = Zone.current
    tasks = new Set<Task>()
    timeout = {} as any
+   properties = {
+      id: id++
+   }
 
    onScheduleTask(parentZoneDelegate: ZoneDelegate, currentZone: Zone, targetZone: Zone, task: Task) {
       this.tasks.add(task)
@@ -112,11 +116,8 @@ export class TransitionSpec implements ZoneSpec {
 
    cancelTasks() {
       for (const task of this.tasks) {
-         task.cancelFn?.(task)
+         task.zone.cancelTask(task)
       }
-      this.microtasks = 0
-      this.macroTasks = 0
-      checkStable(this)
    }
 
    constructor(public name: string, public transition: Transition<any>) {}
@@ -180,11 +181,15 @@ export class Transition<T = unknown> implements OnSelect {
    }
 
    run<T extends (...args: any[]) => any>(fn: Function, applyThis?: {}, ...applyArgs: Parameters<T>): ReturnType<T> {
-      const zone = Zone.current.fork(this.spec)
-      if (this.options.cancelPrevious) {
-         this.cancel()
+      if (Zone.current.get("id") === this.spec.properties.id) {
+         return fn.apply(this, applyArgs)
+      } else {
+         const zone = Zone.current.fork(this.spec)
+         if (this.options.cancelPrevious) {
+            this.cancel()
+         }
+         return zone.runGuarded(fn, applyThis, applyArgs)
       }
-      return zone.runGuarded(fn, applyThis, applyArgs)
    }
 
    ngOnSelect(observer: PartialObserver<any>) {
