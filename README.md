@@ -269,8 +269,8 @@ export class UIComponent {
 
 #### Caught
 
-Marks the decorated method as an error handler. Unhandled exceptions inside `Action`, `Invoke`, `Before`, `Layout`
-and `Select` are forwarded to the first error handler. Unhandled exceptions from dispatched effects are also captured.
+Marks the decorated method as an error handler. Unhandled exceptions inside `@Action`, `@Invoke`, `@Before`, `@Layout`
+and `@Select` are forwarded to the first error handler. Unhandled exceptions from dispatched effects are also captured.
 If the class has multiple error handlers, rethrown errors will propagate to the next error handler in the chain from top
 to bottom.
 
@@ -337,7 +337,7 @@ interface StoreConfig {
 
 `root` Set to true so stores inherit the configuration. Set to false to configure a specific store.
 
-`actionProviders` Configure action providers. Each method decorated with `Action`, `Invoke`, `Before`, or `Layout` will
+`actionProviders` Configure action providers. Each method decorated with `@Action`, `@Invoke`, `@Before`, `@Layout` or `@Caught` will
 receive a unique instance of each provider.
 
 ### Observables
@@ -591,7 +591,7 @@ complete(UIStore, "action") // Observable<void>
 ### Action Hooks
 
 Use action hooks to configure the behaviour of actions and effects. Action hooks can only be called inside a method
-decorated with `@Action`, `@Invoke`, `@Before` or `@Layout`.
+decorated with `@Action`, `@Invoke`, `@Before`, `@Layout` or `@Caught`.
 
 #### dispatch
 
