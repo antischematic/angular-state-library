@@ -84,16 +84,17 @@ describe("Select", () => {
 
    it("should select with state", async () => {
       const expected = [
-         { id: 0, name: "count", value: 1 },
-         { id: 1, name: "count", value: 2 },
-         { id: 2, name: "count", value: 3 },
-         { id: 3, name: "count", value: 4 },
-         { id: 4, name: "count", value: 5 },
-         { id: 5, name: "count", value: 6 },
-         { id: 6, name: "count", value: 7 },
-         { id: 7, name: "count", value: 8 },
-         { id: 8, name: "count", value: 9 },
-         { id: 9, name: "count", value: 10 },
+         { id: 0, name: "count", value: 0 },
+         { id: 1, name: "count", value: 1 },
+         { id: 2, name: "count", value: 2 },
+         { id: 3, name: "count", value: 3 },
+         { id: 4, name: "count", value: 4 },
+         { id: 5, name: "count", value: 5 },
+         { id: 6, name: "count", value: 6 },
+         { id: 7, name: "count", value: 7 },
+         { id: 8, name: "count", value: 8 },
+         { id: 9, name: "count", value: 9 },
+         { id: 10, name: "count", value: 10 },
       ]
       const { container, fixture } = await render(SelectWithState, { detectChanges: false })
 
@@ -236,6 +237,10 @@ describe("Select", () => {
       expect(container).toHaveTextContent("count: 10")
       expect(container).toHaveTextContent("firstChange: false")
       expect(container).toHaveTextContent("read: 4")
+   })
+
+   it("should should pipe", () => {
+
    })
 
    it("should handle errors", () => {

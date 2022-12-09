@@ -12,7 +12,7 @@ const Remaining = new Selector("Remaining", () => inject(Todos).pipe(
    map(todos => todos.filter(todo => !todo.completed))
 ))
 
-const Completed = new Selector("Remaining", () => inject(Todos).pipe(
+const Completed = new Selector("Completed", () => inject(Todos).pipe(
    map(todos => todos.filter(todo => todo.completed))
 ))
 

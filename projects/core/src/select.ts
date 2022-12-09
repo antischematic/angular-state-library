@@ -12,13 +12,14 @@ import {
    BehaviorSubject,
    defer,
    distinctUntilChanged,
-   EMPTY,
    filter,
    isObservable,
-   map, observable,
+   map,
+   NEVER,
+   observable,
    Observable,
    Observer,
-   skip,
+   ReplaySubject,
    startWith,
    Subject,
    Subscription,
@@ -84,12 +85,12 @@ export interface WithState<T> {
 
 export interface Selector {
    new<T>(name: string, factory: (source: Observable<T>) => WithState<T>): Type<BehaviorSubject<T>>
-   new<T>(name: string, factory: (source: Observable<T>) => Observable<T>): Type<Observable<T>>
+   new<T>(name: string, factory: (source: Observable<T>) => Observable<T>): Type<BehaviorSubject<T> & { value: T | undefined }>
 }
 
 export function withState<T>(initial: T, options: WithStateOptions<T> = {}): WithState<T> {
    const destination = new BehaviorSubject(initial)
-   const source = options.from ?? EMPTY
+   const source = options.from ?? NEVER
 
    return {
       destination,
@@ -99,9 +100,9 @@ export function withState<T>(initial: T, options: WithStateOptions<T> = {}): Wit
 
 export const Selector: Selector = function Selector(name: string, select: Function) {
    @Injectable()
-   class Selector implements OnSelect {
+   class Selector {
       source: Observable<any>
-      destination: BehaviorSubject<any>
+      destination: Subject<any>
       connected = false
       subscription = new Subscription()
       target: Subject<any>
@@ -110,9 +111,7 @@ export const Selector: Selector = function Selector(name: string, select: Functi
          return this
       }
 
-      get value() {
-         return this.destination.value
-      }
+      value: any
 
       connect() {
          if (!this.connected) {
@@ -125,16 +124,10 @@ export const Selector: Selector = function Selector(name: string, select: Functi
          this.target.next(value)
       }
 
-      ngOnSelect(observer: Partial<Observer<any>>) {
-         try {
-            return this.destination.pipe(skip(1)).subscribe(observer)
-         } finally {
-            this.connect()
-         }
-      }
-
       pipe(...operators: any[]) {
-         return this.destination.pipe(...operators as [])
+         return new Observable(subscriber => {
+            return this.subscribe(subscriber)
+         }).pipe(...operators as [])
       }
 
       subscribe(observer: any) {
@@ -154,12 +147,15 @@ export const Selector: Selector = function Selector(name: string, select: Functi
          const selection = select(subject)
          if (isObservable(selection)) {
             this.source = selection
-            this.destination = new BehaviorSubject(undefined)
+            this.destination = new ReplaySubject(1)
          } else {
             this.source = selection.source
             this.destination = selection.destination
          }
          this.target = select.length > 0 ? subject : this.destination
+         this.subscription.add(this.destination.subscribe((value) => {
+            this.value = value
+         }))
       }
 
       static overriddenName = name
