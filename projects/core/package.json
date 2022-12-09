@@ -1,7 +1,7 @@
 {
    "name": "@antischematic/angular-state-library",
    "description": "Reactive state without boilerplate",
-   "version": "0.7.7",
+   "version": "0.7.8",
    "sideEffects": false,
    "author": {
       "name": "Michael Muscat"
