@@ -1,12 +1,12 @@
 import {tick} from "@angular/core/testing";
 import {EventType} from "@antischematic/angular-state-library";
+import {render} from "@testing-library/angular";
 import {UseConcat} from "./fixtures/hooks/use-concat";
 import {UseExhaust} from "./fixtures/hooks/use-exhaust";
 import {UseMerge} from "./fixtures/hooks/use-merge";
 import {UseSwitch} from "./fixtures/hooks/use-switch";
 import {EventLog} from "./utils/event-log";
 import {eventsContaining} from "./utils/event-matcher";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("hooks", () => {

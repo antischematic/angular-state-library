@@ -1,4 +1,5 @@
 import {tick} from "@angular/core/testing";
+import {render} from "@testing-library/angular";
 import {BasicAsyncSelector} from "./fixtures/select/basic-async-selector";
 import {BasicSelectWithGetter} from "./fixtures/select/basic-select-getter";
 import {DerivedAsyncSelector} from "./fixtures/select/derived-async-selector";
@@ -12,14 +13,13 @@ import {SliceState} from "./fixtures/select/slice-state";
 import {UnselectableError} from "./fixtures/select/unselectable-error";
 import {EventLog} from "./utils/event-log";
 import {eventsContaining} from "./utils/event-matcher";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("Select", () => {
    it("should get the selected value", async () => {
-      const { container, fixture, change } = await render(BasicSelectWithGetter, {
-         detectChanges: false,
-         componentProperties: {
+      const { container, fixture, changeInput } = await render(BasicSelectWithGetter, {
+         detectChangesOnRender: false,
+         componentInputs: {
             count: 1
          }
       })
@@ -29,16 +29,16 @@ describe("Select", () => {
       expect(container).toHaveTextContent("count: 1")
       expect(container).toHaveTextContent("double: 2")
 
-      change({ count: 10 })
+      changeInput({ count: 10 })
 
       expect(container).toHaveTextContent("count: 10")
       expect(container).toHaveTextContent("double: 20")
    })
 
    it("should chain selectors", async () => {
-      const { container, fixture, change } = await render(SelectorChain, {
-         detectChanges: false,
-         componentProperties: {
+      const { container, fixture, changeInput } = await render(SelectorChain, {
+         detectChangesOnRender: false,
+         componentInputs: {
             count: 1
          }
       })
@@ -49,7 +49,7 @@ describe("Select", () => {
       expect(container).toHaveTextContent("sum: 4")
       expect(container).toHaveTextContent("read: 3")
 
-      change({ count: 10 })
+      changeInput({ count: 10 })
 
       expect(container).toHaveTextContent("count: 10")
       expect(container).toHaveTextContent("sum: 31")
@@ -69,7 +69,10 @@ describe("Select", () => {
          { id: 8, name: "count", value: 9 },
          { id: 9, name: "count", value: 10 },
       ]
-      const { container, fixture } = await render(BasicAsyncSelector, { detectChanges: false })
+      const { container, fixture } = await render(BasicAsyncSelector, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+      })
 
       const error = withFakeAsync(() => {
          EventLog.monitor(fixture)
@@ -96,7 +99,10 @@ describe("Select", () => {
          { id: 9, name: "count", value: 9 },
          { id: 10, name: "count", value: 10 },
       ]
-      const { container, fixture } = await render(SelectWithState, { detectChanges: false })
+      const { container, fixture } = await render(SelectWithState, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+      })
 
       const error = withFakeAsync(() => {
          EventLog.monitor(fixture)
@@ -111,7 +117,10 @@ describe("Select", () => {
 
    it("should throw when value is not selectable", async () => {
       const expectedError = "Object does not implement OnSelect or Subscribable interfaces"
-      const { fixture } = await render(UnselectableError, { detectChanges: false })
+      const { fixture } = await render(UnselectableError, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+      })
 
       const error = withFakeAsync(() => {
          EventLog.suppressErrors()
@@ -143,7 +152,10 @@ describe("Select", () => {
          { id: 0, name: "remaining", value: [{ id: 1, title: "angular state library", completed: false }] },
          { id: 1, name: "completed", value: [{ id: 0, title: "hello world", completed: true }] },
       ]
-      const { container, fixture } = await render(DerivedAsyncSelector, { detectChanges: false })
+      const { container, fixture } = await render(DerivedAsyncSelector, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+      })
 
       EventLog.monitor(fixture)
       DerivedAsyncSelector.start(fixture)
@@ -154,7 +166,10 @@ describe("Select", () => {
    })
 
    it("should derive from parent store asynchronously", async () => {
-      const { container, fixture } = await render(Parent, { detectChanges: false })
+      const { container, fixture } = await render(Parent, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+      })
 
       const error = withFakeAsync(() => {
          Parent.start(fixture)
@@ -168,7 +183,8 @@ describe("Select", () => {
 
    it("should pierce OnPush boundary", async () => {
       const { container, fixture } = await render(PierceOnPushBoundary, {
-         detectChanges: false
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       const error = withFakeAsync(() => {
@@ -215,9 +231,9 @@ describe("Select", () => {
    })
 
    it("should observe input changes", async () => {
-      const { container, fixture, change } = await render(ObservableInputs, {
-         detectChanges: false,
-         componentProperties: {
+      const { container, fixture, changeInput } = await render(ObservableInputs, {
+         detectChangesOnRender: false,
+         componentInputs: {
             count: 0
          }
       })
@@ -230,7 +246,7 @@ describe("Select", () => {
       expect(container).toHaveTextContent("firstChange: true")
       expect(container).toHaveTextContent("read: 2")
 
-      change({ count: 10 })
+      changeInput({ count: 10 })
 
       expect(container).toHaveTextContent("count: 10")
       expect(container).toHaveTextContent("previous: 0")

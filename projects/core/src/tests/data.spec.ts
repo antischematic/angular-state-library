@@ -1,15 +1,16 @@
 import {tick} from "@angular/core/testing";
+import {render} from "@testing-library/angular";
 import {BasicMutation} from "./fixtures/data/basic-mutation";
 import {BasicQuery} from "./fixtures/data/basic-query";
 import {EventLog} from "./utils/event-log";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("Data", () => {
    it("should emit cached results", async () => {
-      const { container, fixture, change } = await render(BasicQuery, {
-         detectChanges: false,
-         componentProperties: {
+      const { container, fixture, changeInput } = await render(BasicQuery, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+         componentInputs: {
             multiplier: 5
          }
       })
@@ -26,13 +27,13 @@ describe("Data", () => {
          expect(container).toHaveTextContent("multiplier: 5")
          expect(container).toHaveTextContent("result: [50]")
 
-         change({ multiplier: 10 })
+         changeInput({ multiplier: 10 })
          tick(1000)
 
          expect(container).toHaveTextContent("multiplier: 10")
          expect(container).toHaveTextContent("result: [100]")
 
-         change({ multiplier: 5 })
+         changeInput({ multiplier: 5 })
 
          expect(container).toHaveTextContent("multiplier: 5")
          expect(container).toHaveTextContent("result: [50]")
@@ -42,9 +43,10 @@ describe("Data", () => {
    })
 
    it("should invalidate cached results", async () => {
-      const { container, fixture, change } = await render(BasicMutation, {
-         detectChanges: false,
-         componentProperties: {
+      const { container, fixture } = await render(BasicMutation, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
+         componentInputs: {
             multiplier: 5
          }
       })

@@ -1,4 +1,4 @@
-import {SimpleChange} from "@angular/core";
+import {Component, Input, SimpleChange} from "@angular/core";
 import {EventType} from "@antischematic/angular-state-library";
 import {EventLog} from "./utils/event-log";
 import {BasicInvoke} from "./fixtures/invoke/basic-invoke";
@@ -7,7 +7,9 @@ import {ComputedInvoke} from "./fixtures/invoke/computed-invoke";
 import {InputInvoke} from "./fixtures/invoke/input-invoke";
 import {MultipleInvoke} from "./fixtures/invoke/multiple-invoke";
 import {eventsContaining} from "./utils/event-matcher";
-import {render} from "./utils/render";
+import {render} from "@testing-library/angular";
+import {pretty} from "./utils/pretty";
+import createSpy = jasmine.createSpy;
 
 describe("Invoke", () => {
    it("should dispatch action on first render", async () => {
@@ -15,7 +17,8 @@ describe("Invoke", () => {
          { id: 0, name: "increment" }
       ]
       const { container, fixture } = await render(BasicInvoke, {
-         detectChanges: false,
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       EventLog.monitor(fixture)
@@ -34,7 +37,8 @@ describe("Invoke", () => {
          { id: 4, name: "read" },
       ]
       const { container, fixture } = await render(BatchInvoke, {
-         detectChanges: false
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       EventLog.monitor(fixture)
@@ -59,8 +63,9 @@ describe("Invoke", () => {
          { id: 5, name: "two" },
          { id: 6, name: "three" },
       ]
-      const { container, fixture, change } = await render(MultipleInvoke, {
-         detectChanges: false
+      const { container, fixture, changeInput } = await render(MultipleInvoke, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       EventLog.monitor(fixture)
@@ -71,7 +76,7 @@ describe("Invoke", () => {
       expect(container).toHaveTextContent("second: 2")
       expect(container).toHaveTextContent("third: 1")
 
-      change({ count: 10 })
+      changeInput({ count: 10 })
 
       expect(container).toHaveTextContent("count: 10")
       expect(container).toHaveTextContent("first: 6")
@@ -91,7 +96,8 @@ describe("Invoke", () => {
          { id: 6, name: "read" },
       ]
       const { container, fixture } = await render(ComputedInvoke, {
-         detectChanges: false
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       EventLog.monitor(fixture)
@@ -119,8 +125,9 @@ describe("Invoke", () => {
          { id: 3, name: "ngOnChanges", type: EventType.Dispatch, value: { count: new SimpleChange(10, 100, false) }},
          { id: 4, name: "read", type: EventType.Dispatch },
       ]
-      const { container, fixture, change } = await render(InputInvoke, {
-         detectChanges: false,
+      const { container, fixture, changeInput } = await render(InputInvoke, {
+         detectChangesOnRender: false,
+         autoDetectChanges: false,
       })
 
       EventLog.monitor(fixture)
@@ -129,12 +136,12 @@ describe("Invoke", () => {
       expect(container).toHaveTextContent("read: 1")
       expect(container).toHaveTextContent("count: 1")
 
-      change({ count: 10 })
+      changeInput({ count: 10 })
 
       expect(container).toHaveTextContent("read: 2")
       expect(container).toHaveTextContent("count: 10")
 
-      change({ count: 100 })
+      changeInput({ count: 100 })
 
       expect(container).toHaveTextContent("read: 3")
       expect(container).toHaveTextContent("count: 100")

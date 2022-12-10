@@ -1,4 +1,5 @@
 import {configureStore, EventType} from "@antischematic/angular-state-library";
+import {render} from "@testing-library/angular";
 import {BasicAction} from "./fixtures/action/basic-action";
 import {
    DispatchActionsInCallOrder,
@@ -14,7 +15,6 @@ import {
 import {eventsContaining} from "./utils/event-matcher";
 // noinspection ES6UnusedImports
 import {pretty} from "./utils/pretty";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("Action", () => {

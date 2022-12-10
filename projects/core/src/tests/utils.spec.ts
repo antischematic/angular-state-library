@@ -1,10 +1,10 @@
 import {EventType} from "@antischematic/angular-state-library";
+import {render} from "@testing-library/angular";
 import {ObservableAction} from "./fixtures/utils/observable-action";
 import {ObservableComplete} from "./fixtures/utils/observable-complete";
 import {ObservableError} from "./fixtures/utils/observable-error";
 import {ObservableNext} from "./fixtures/utils/observable-next";
 import {EventLog} from "./utils/event-log";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("utils", () => {

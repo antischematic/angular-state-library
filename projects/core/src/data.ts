@@ -24,6 +24,7 @@ import {
    throttle,
    timer,
 } from "rxjs";
+import {QueryClient} from "./tests/fixtures/data/query-client";
 import {observeInZone} from "./utils";
 
 export interface QueryOptions<T = any> {

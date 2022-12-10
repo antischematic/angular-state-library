@@ -1,8 +1,8 @@
 import {discardPeriodicTasks, tick} from "@angular/core/testing";
+import {render} from "@testing-library/angular";
 import {SlowTransition} from "./fixtures/transition/slow-transition";
 import {TimeoutTransition} from "./fixtures/transition/timeout-transition";
 import {UseTransition} from "./fixtures/transition/use-transition";
-import {render} from "./utils/render";
 import {withFakeAsync} from "./utils/with-fake-async";
 
 describe("Transition", () => {
