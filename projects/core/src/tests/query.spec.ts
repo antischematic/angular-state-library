@@ -2,7 +2,8 @@ import {inject, InjectionToken} from "@angular/core";
 import {discardPeriodicTasks, fakeAsync, tick} from "@angular/core/testing";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {
-   BehaviorSubject, delay,
+   BehaviorSubject,
+   delay,
    distinctUntilChanged,
    EMPTY,
    expand,
@@ -16,7 +17,6 @@ import {
    MonoTypeOperatorFunction,
    Observable,
    of,
-   repeat,
    ReplaySubject,
    scan,
    share,
@@ -25,9 +25,10 @@ import {
    Subscription,
    switchAll,
    switchMap,
+   switchScan,
    take,
    tap,
-   timer, withLatestFrom
+   timer
 } from "rxjs";
 import {arrayContaining} from "./utils/event-matcher";
 import createSpy = jasmine.createSpy;
@@ -43,26 +44,12 @@ interface QueryState {
    pages: Page[]
 }
 
-const INITIAL_STATE: QueryState = Object.freeze({
-   isFetching: false,
-   isProgress: false,
-   isSuccess: false,
-   data: null,
-   hasError: false,
-   error: null,
-   pages: []
-})
-
-const getInitialEvent = (): InitialEvent => ({
-   type: "initial",
-   fetch: {
-      queryParams: []
-   },
-   state: INITIAL_STATE
-})
-
 interface FetchParams {
+   queryFn: (...params: any[]) => Observable<any>
    queryParams: any[]
+   options: QueryOptions
+   refresh?: boolean
+   pages?: Page[]
 }
 
 interface FetchEvent {
@@ -95,12 +82,20 @@ interface InitialEvent {
    readonly state: QueryState
 }
 
+interface RefreshEvent {
+   readonly type: "refresh"
+   readonly fetch: FetchParams
+   readonly state: QueryState
+   readonly limit: number
+}
+
 type QueryEvent =
    | InitialEvent
    | FetchEvent
    | SuccessEvent
    | ProgressEvent
    | ErrorEvent
+   | RefreshEvent
 
 interface Page extends QueryState {
    params: any[]
@@ -111,7 +106,6 @@ interface Page extends QueryState {
 
 type QueryStore = Map<string, {
    fetch: Subject<FetchParams>
-   invalidate: Subject<void>
    result: Observable<QueryEvent>
 }>
 
@@ -126,6 +120,29 @@ interface QueryOptions {
    select?: (result: any) => any
    keepPreviousData?: boolean
 }
+
+const INITIAL_STATE: QueryState = Object.freeze({
+   isFetching: false,
+   isProgress: false,
+   isSuccess: false,
+   data: null,
+   hasError: false,
+   error: null,
+   pages: []
+})
+
+const getInitialEvent = (): InitialEvent => Object.freeze({
+   type: "initial",
+   fetch: {
+      queryFn: noop,
+      queryParams: [],
+      options: {
+         key: "",
+         fetch: noop
+      }
+   },
+   state: INITIAL_STATE
+})
 
 function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
    if (options.refreshInterval) {
@@ -153,60 +170,37 @@ function upsertPage(state: any, cursor: any, pages: Page[], mode: number) {
    return [state]
 }
 
-function createPages(options: QueryOptions, initialEvent: QueryEvent = getInitialEvent()) {
-   return (source: Observable<QueryEvent>) => source.pipe(
-      scan((previous, event) => {
-         const { type, fetch: { queryParams: [pageIndex, ...params] } } = event
-         const previousPage = previous.state.pages.find(page => page.currentPage === pageIndex)
-         const page = { ...previousPage, currentPage: pageIndex, params } as Page
+function createPages(event: QueryEvent, options: QueryOptions) {
+   if (!options.previousPage && !options.nextPage) {
+      return event
+   }
+   const { type, fetch: { queryParams: [pageIndex, ...params] } } = event
+   const previousPage = event.state.pages.find(page => page.currentPage === pageIndex)
+   const page = { ...previousPage, currentPage: pageIndex, params } as Page
 
+   if (type === "success") {
+      page.data = options.select?.(event.state.data) ?? event.state.data
+      page.previousPage = options.previousPage?.(event.state.data) ?? NO_PAGE
+      page.nextPage = options.nextPage?.(event.state.data) ?? NO_PAGE
+   }
 
-         const mode = type === "fetch" ? 0 : 1
-         switch (type) {
-            // @ts-ignore
-            case "success":
-               page.data = options.select?.(event.state.data) ?? event.state.data
-               page.previousPage = options.previousPage?.(event.state.data) ?? NO_PAGE
-               page.nextPage = options.nextPage?.(event.state.data) ?? NO_PAGE
-            default:
-               return {
-                  ...event,
-                  state: {
-                     ...event.state,
-                     pages: upsertPage(page, pageIndex, previous.state.pages, mode)
-                  }
-               }
-         }
-      }, initialEvent)
-   )
+   return {
+      ...event,
+      state: {
+         ...event.state,
+         pages: upsertPage(page, pageIndex, event.state.pages, type === "fetch" ? 0 : 1)
+      }
+   }
 }
 
-function createRefresh(queryFn: (...params: any[]) => Observable<any>, invalidate: Observable<any>, options: QueryOptions) {
-   return (events: Observable<QueryEvent>) => events.pipe(
-      switchMap(event => {
+function withInvalidation(client: QueryClient) {
+   return (source: Observable<QueryEvent>) => source.pipe(
+      switchMap((event) => {
          if (event.type === "success") {
-            const firstPage = event.state.pages[0]
-            const pageCount = event.state.pages.length
-            const refresh = getInvalidators(invalidate, options).pipe(
-               map(() => {
-                  return { queryParams: [firstPage.currentPage, ...firstPage.params] }
-               }),
-               createResult(queryFn, () => EMPTY),
-               createPages(options),
-               filter(event => event.type === "success"),
-               expand((event, index) => {
-                  const current: Page = event.state.pages[index]
-                  if (current.nextPage) {
-                     return of({ queryParams: [current.nextPage, ...current.params] }).pipe(
-                        createResult(queryFn, () => EMPTY, event),
-                        createPages(options, event),
-                        filter(event => event.type === "success"),
-                     )
-                  }
-                  return EMPTY
-               }),
-               take(pageCount),
-               last(),
+            const refresh = getInvalidators(client.invalidator, client.options).pipe(
+               tap(() => {
+                  client.fetchInternal(event.fetch.queryParams, { refresh: true })
+               })
             )
             return merge(of(event), refresh)
          }
@@ -215,34 +209,56 @@ function createRefresh(queryFn: (...params: any[]) => Observable<any>, invalidat
    )
 }
 
-function createInfiniteQuery(queryKey: string, queryFn: (...params: any[]) => Observable<any>, store: QueryStore, options: QueryOptions) {
+function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
+   return (source: Observable<FetchParams>) => source.pipe(
+      createResult(),
+      filter(event => event.type === "success"),
+      expand((event, index) => {
+         const current: Page = event.state.pages[index]
+         if (current.nextPage) {
+            return of({ queryFn: event.fetch.queryFn, queryParams: [current.nextPage, ...current.params], options }).pipe(
+               createResult(event),
+               filter(event => event.type === "success"),
+            )
+         }
+         return EMPTY
+      }),
+      take(pages.length),
+      last(),
+   )
+}
+
+function createInfiniteQuery(queryKey: string, store: QueryStore, options: QueryOptions) {
    if (store.has(queryKey)) {
       return store.get(queryKey)!
    }
 
    const fetch = new ReplaySubject<FetchParams>(1)
-   const invalidate = new Subject<void>()
    const pages = fetch.pipe(
-      createResult(queryFn, () => EMPTY),
-      createPages(options),
-      createRefresh(queryFn, invalidate, options),
+      switchScan((event, fetch) => {
+         return fetch.refresh
+            ? of(fetch).pipe(
+               refreshInfiniteData(options, fetch.pages)
+            )
+            : of(fetch).pipe(
+               createResult(event)
+            )
+      }, getInitialEvent() as QueryEvent),
       shareCache(options)
    )
    const result: Observable<QueryEvent> = pages
 
-   store.set(queryKey, { fetch, result, invalidate })
+   store.set(queryKey, { fetch, result })
 
    return { fetch, result }
 }
 
-function createResult(queryFn: (...params: any[]) => Observable<any>, invalidators: () => Observable<any> = () => EMPTY, initialEvent: QueryEvent = getInitialEvent()) {
+function createResult(initialEvent: QueryEvent = getInitialEvent()) {
    return (source: Observable<FetchParams>) => source.pipe(
       switchMap((fetch) => {
-         return queryFn(...fetch.queryParams).pipe(
+         const queryParams = fetch.refresh && fetch.pages?.length ? [fetch.pages[0].currentPage, ...fetch.queryParams.slice(1)] : fetch.queryParams
+         return fetch.queryFn(...queryParams).pipe(
             materialize(),
-            repeat({
-               delay: invalidators
-            }),
             startWith({kind: "F"} as const),
             map(result => {
                return { ...result, fetch }
@@ -250,36 +266,37 @@ function createResult(queryFn: (...params: any[]) => Observable<any>, invalidato
          )
       }),
       scan(({ state }, event) => {
+         const { options } = event.fetch
          switch (event.kind) {
             case "F": {
-               return {
+               return createPages({
                   type: "fetch",
                   fetch: event.fetch,
-                  state: { ...state, isFetching: true, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" }
-               } as FetchEvent
+                  state: { ...state, isFetching: true, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
+               } as FetchEvent, options)
             }
             case "N": {
-               return {
+               return createPages({
                   type: "progress",
                   fetch: event.fetch,
                   value: event.value,
                   state: { ...state, isProgress: true, data: event.value, state: "progress" }
-               } as ProgressEvent
+               } as ProgressEvent, options)
             }
             case "E": {
-               return {
+               return createPages({
                   type: "error",
                   fetch: event.fetch,
                   error: event.error,
                   state: { ...state, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
-               } as ErrorEvent
+               } as ErrorEvent, options)
             }
             case "C": {
-               return {
+               return createPages({
                   type: "success",
                   fetch: event.fetch,
                   state: { ...state, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
-               } as SuccessEvent
+               } as SuccessEvent, options)
             }
          }
       }, initialEvent)
@@ -293,52 +310,45 @@ function shareCache<T>(options: QueryOptions): MonoTypeOperatorFunction<T> {
    })
 }
 
-function createQuery(queryKey: string, queryFn: (...params: any[]) => Observable<any>, store: QueryStore, options: QueryOptions) {
+function createQuery(queryKey: string, store: QueryStore, options: QueryOptions) {
    if (store.has(queryKey)) {
       return store.get(queryKey)!
    }
    const fetch = new ReplaySubject<FetchParams>(1)
-   const invalidate = new Subject<void>()
-   const invalidators = () => getInvalidators(invalidate, options)
    const result = fetch.pipe(
-      createResult(queryFn, invalidators),
+      createResult(),
       shareCache(options)
    )
-   store.set(queryKey, { fetch, result, invalidate })
+   store.set(queryKey, { fetch, result })
    return { fetch, result }
 }
 
-function keepPreviousData(client: QueryClient) {
-   return (source: Observable<QueryEvent>) => source.pipe(
-      withLatestFrom(client),
-      map(([event, client]) => {
-         if (event.type === "fetch") {
-            const { keepPreviousData } = client.options
-            const previousData = keepPreviousData && {
-               data: client.state.data,
-               pages: client.state.pages
-            }
-            return {
-               ...event,
-               state: {
-                  ...event.state,
-                  ...previousData
-               }
-            }
+function keepPreviousData({ state, options: { keepPreviousData }}: QueryClient, event: QueryEvent) {
+   if (event.type === "fetch") {
+      const previousData = keepPreviousData && {
+         data: state.data,
+         pages: state.pages
+      }
+      return {
+         ...event,
+         state: {
+            ...event.state,
+            ...previousData
          }
-         return event
-      })
-   )
+      }
+   }
+   return event
 }
 
 class QueryClient extends Observable<QueryClient> {
    params = [] as any[]
-   query = new ReplaySubject<Observable<any>>(1)
+   query = new ReplaySubject<Observable<QueryEvent>>(1)
    connections = 0
    emitter = new BehaviorSubject(this)
    subscription = Subscription.EMPTY
    store: QueryStore
    event: QueryEvent = getInitialEvent()
+   invalidator = new Subject<void>()
    createQuery
 
    get isSettled() {
@@ -373,8 +383,16 @@ class QueryClient extends Observable<QueryClient> {
       return this.state.pages[0]
    }
 
+   get hasNextPage() {
+      return this.last && this.last.nextPage !== NO_PAGE
+   }
+
+   get hasPreviousPage() {
+      return this.first && this.first.previousPage !== NO_PAGE
+   }
+
    next(event: QueryEvent) {
-      this.event = event
+      this.event = keepPreviousData(this, event)
       this.emitter.next(this)
    }
 
@@ -383,7 +401,7 @@ class QueryClient extends Observable<QueryClient> {
          this.subscription = this.query.pipe(
             distinctUntilChanged(),
             switchAll(),
-            keepPreviousData(this)
+            withInvalidation(this)
          ).subscribe(this)
       }
    }
@@ -395,23 +413,32 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    fetch(...queryParams: any[]) {
-      this.params = queryParams
-      const { fetch, result } = this.createQuery(
-         this.getQueryKey(queryParams),
-         this.options.fetch,
-         this.store,
-         this.options
-      )
-      if (this.isSettled) {
-         fetch.next({ queryParams })
-      }
-      this.query.next(result)
+      this.fetchInternal(queryParams)
       return this
    }
 
+   fetchInternal(queryParams: any[], { refresh = false } = {}) {
+      const { fetch, result } = this.createQuery(
+         this.getQueryKey(queryParams),
+         this.store,
+         this.options,
+      )
+      this.params = queryParams
+      if (this.isSettled) {
+         fetch.next({ queryFn: this.options.fetch, queryParams, refresh, pages: this.pages, options: this.options })
+      }
+      this.query.next(result)
+   }
+
    fetchNextPage() {
-      if (this.last?.nextPage !== NO_PAGE) {
+      if (this.hasNextPage) {
          this.fetch(this.last.nextPage, ...this.params.slice(1))
+      }
+   }
+
+   fetchPreviousPage() {
+      if (this.hasPreviousPage) {
+         this.fetch(this.last.previousPage, ...this.params.slice(1))
       }
    }
 
@@ -425,11 +452,7 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    refetch() {
-      const key = this.getQueryKey(this.params)
-      if (this.store.has(key)) {
-         const { invalidate } = this.store.get(key)!
-         invalidate.next()
-      }
+      this.invalidator.next()
    }
 
    constructor(public options: QueryOptions) {
@@ -701,7 +724,13 @@ describe("Query", () => {
       subscribeSpyTo(query.fetch(cursor))
 
       query.fetchNextPage()
+
+      expect(query.pages.length).toBe(2)
+
       query.fetchNextPage()
+
+      expect(query.pages.length).toBe(3)
+
       query.refetch()
 
       expect(query.pages).toEqual(arrayContaining([
@@ -749,5 +778,33 @@ describe("Query", () => {
 
       tick(1000)
       expect(query.state.data).toBe(2)
+   }))
+
+   it("should clear cache when there are no observers after a period of time", fakeAsync(() => {
+      let subscription
+      const store = new Map()
+      const fetch = (value: number) => of(value).pipe(delay(1000))
+      const query = new QueryClient({
+         key: "todos",
+         fetch,
+         store,
+         cacheTime: 10000
+      })
+
+      subscription = subscribeSpyTo(query.fetch(10))
+
+      expect(query.state.data).toBe(null)
+
+      tick(1000)
+
+      expect(query.state.data).toBe(10)
+      subscription.unsubscribe()
+
+      tick(10000)
+
+      subscribeSpyTo(query.fetch(10))
+
+      expect(query.state.data).toBe(null)
+      discardPeriodicTasks()
    }))
 })
