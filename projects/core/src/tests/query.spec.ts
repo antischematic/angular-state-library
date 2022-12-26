@@ -2,19 +2,20 @@ import {inject, InjectionToken} from "@angular/core";
 import {discardPeriodicTasks, fakeAsync, tick} from "@angular/core/testing";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {
-   BehaviorSubject,
+   audit,
+   BehaviorSubject, defer,
    delay,
    distinctUntilChanged,
    EMPTY,
    expand,
-   filter,
+   filter, ignoreElements,
    interval,
    last,
    map,
    materialize,
    merge,
    mergeWith,
-   MonoTypeOperatorFunction,
+   MonoTypeOperatorFunction, NEVER,
    Observable,
    of,
    ReplaySubject,
@@ -26,7 +27,7 @@ import {
    switchAll,
    switchMap,
    switchScan,
-   take,
+   take, takeWhile,
    tap,
    timer
 } from "rxjs";
@@ -82,20 +83,12 @@ interface InitialEvent {
    readonly state: QueryState
 }
 
-interface RefreshEvent {
-   readonly type: "refresh"
-   readonly fetch: FetchParams
-   readonly state: QueryState
-   readonly limit: number
-}
-
 type QueryEvent =
    | InitialEvent
    | FetchEvent
    | SuccessEvent
    | ProgressEvent
    | ErrorEvent
-   | RefreshEvent
 
 interface Page extends QueryState {
    params: any[]
@@ -195,17 +188,7 @@ function createPages(event: QueryEvent, options: QueryOptions) {
 
 function withInvalidation(client: QueryClient) {
    return (source: Observable<QueryEvent>) => source.pipe(
-      switchMap((event) => {
-         if (event.type === "success") {
-            const refresh = getInvalidators(client.invalidator, client.options).pipe(
-               tap(() => {
-                  client.fetchInternal(event.fetch.queryParams, { refresh: true })
-               })
-            )
-            return merge(of(event), refresh)
-         }
-         return of(event)
-      })
+      filter(() => client.window)
    )
 }
 
@@ -342,14 +325,16 @@ function keepPreviousData({ state, options: { keepPreviousData }}: QueryClient, 
 
 class QueryClient extends Observable<QueryClient> {
    params = [] as any[]
-   query = new ReplaySubject<Observable<QueryEvent>>(1)
+   query = new BehaviorSubject<Observable<QueryEvent>>(EMPTY)
    connections = 0
    emitter = new BehaviorSubject(this)
    subscription = Subscription.EMPTY
    store: QueryStore
    event: QueryEvent = getInitialEvent()
    invalidator = new Subject<void>()
+   window = false
    createQuery
+   sub = Subscription.EMPTY
 
    get isSettled() {
       return this.state.isSuccess || this.state.hasError || this.isInitial
@@ -392,8 +377,18 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    next(event: QueryEvent) {
-      this.event = keepPreviousData(this, event)
-      this.emitter.next(this)
+      if (this.window) {
+         this.window = event.type !== "success" && event.type !== "error"
+         this.event = keepPreviousData(this, event)
+         this.emitter.next(this)
+         if (event.type === "success") {
+            this.sub = getInvalidators(this.invalidator, this.options).subscribe(() => {
+               this.fetchInternal(this.params, {refresh: true})
+            })
+         } else {
+            this.sub.unsubscribe()
+         }
+      }
    }
 
    connect() {
@@ -401,7 +396,6 @@ class QueryClient extends Observable<QueryClient> {
          this.subscription = this.query.pipe(
             distinctUntilChanged(),
             switchAll(),
-            withInvalidation(this)
          ).subscribe(this)
       }
    }
@@ -424,10 +418,16 @@ class QueryClient extends Observable<QueryClient> {
          this.options,
       )
       this.params = queryParams
+      this.window = true
+      if (refresh) {
+         result.pipe(take(1)).subscribe(this).unsubscribe()
+      } else {
+         this.query.next(result)
+      }
       if (this.isSettled) {
+         this.window = true
          fetch.next({ queryFn: this.options.fetch, queryParams, refresh, pages: this.pages, options: this.options })
       }
-      this.query.next(result)
    }
 
    fetchNextPage() {
@@ -805,6 +805,59 @@ describe("Query", () => {
       subscribeSpyTo(query.fetch(10))
 
       expect(query.state.data).toBe(null)
+      discardPeriodicTasks()
+   }))
+
+   it("should fetch independently of other queries with the same query key", fakeAsync(() => {
+      let count = 0
+      const store = new Map()
+      const fetch = () => {
+         return of(count++).pipe(delay(1000))
+      }
+      const query = new QueryClient({
+         key: "todos",
+         fetch,
+         store,
+         refreshInterval: 10000
+      })
+      const query2 = new QueryClient({
+         key: "todos",
+         fetch,
+         store,
+         refreshInterval: 33000
+      })
+
+      subscribeSpyTo(query)
+      subscribeSpyTo(query2)
+
+      query.fetch()
+      query2.fetch()
+
+      tick(1000)
+
+      expect(query.state.data).toBe(0)
+      expect(query2.state.data).toBe(0)
+
+      tick(11000)
+
+      expect(query.state.data).toBe(1)
+      expect(query2.state.data).toBe(0)
+
+      tick(11000)
+
+      expect(query.state.data).toBe(2)
+      expect(query2.state.data).toBe(0)
+
+      tick(11000)
+
+      expect(query.state.data).toBe(3)
+      expect(query2.state.data).toBe(3)
+
+      tick(5000)
+
+      expect(query.state.data).toBe(3)
+      expect(query2.state.data).toBe(3)
+
       discardPeriodicTasks()
    }))
 })
