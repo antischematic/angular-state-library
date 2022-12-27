@@ -31,13 +31,17 @@ import {
 } from "rxjs";
 import {arrayContaining} from "./utils/event-matcher";
 import createSpy = jasmine.createSpy;
+import {subscribe} from "../select";
+import {pretty} from "./utils/pretty";
 
 
 interface QueryState {
    data: unknown
+   isInitial: boolean
    isFetching: boolean
    isProgress: boolean
    isSuccess: boolean
+   isPreviousData: boolean
    hasError: boolean
    error: unknown
    pages: Page[]
@@ -51,8 +55,8 @@ interface FetchParams {
    pages?: Page[]
 }
 
-interface FetchEvent {
-   readonly type: "fetch"
+interface LoadingEvent {
+   readonly type: "loading"
    readonly fetch: FetchParams
    readonly state: QueryState
 }
@@ -83,7 +87,7 @@ interface InitialEvent {
 
 type QueryEvent =
    | InitialEvent
-   | FetchEvent
+   | LoadingEvent
    | SuccessEvent
    | ProgressEvent
    | ErrorEvent
@@ -113,9 +117,11 @@ interface QueryOptions {
 }
 
 const INITIAL_STATE: QueryState = Object.freeze({
+   isInitial: true,
    isFetching: false,
    isProgress: false,
    isSuccess: false,
+   isPreviousData: false,
    data: null,
    hasError: false,
    error: null,
@@ -165,16 +171,16 @@ function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
 
 const NO_PAGE = Symbol("No page")
 
-function upsertPage(state: any, cursor: any, pages: Page[], mode: number) {
-   pages = pages.slice()
+function upsertPage(state: any, cursor: any, pages: Page[], replace: number) {
+   const newPages = pages.slice()
    for (const [index, page] of pages.entries()) {
       if (page.previousPage === cursor) {
-         pages.splice(index - 1, mode, state)
-         return pages
+         newPages.splice(index - replace, replace, state)
+         return newPages
       }
       if (page.nextPage === cursor) {
-         pages.splice(index + 1, mode, state)
-         return pages
+         newPages.splice(index + 1, replace, state)
+         return newPages
       }
    }
    return [state]
@@ -198,7 +204,7 @@ function createPages(event: QueryEvent, options: QueryOptions) {
       ...event,
       state: {
          ...event.state,
-         pages: upsertPage(page, pageIndex, event.state.pages, type === "fetch" ? 0 : 1)
+         pages: upsertPage(page, pageIndex, event.state.pages, type === "loading" ? 0 : 1)
       }
    }
 }
@@ -209,7 +215,7 @@ function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
       filter(event => event.type === "success"),
       expand((event, index) => {
          const current: Page = event.state.pages[index]
-         if (current.nextPage) {
+         if (current.nextPage !== NO_PAGE) {
             return of({ queryFn: event.fetch.queryFn, queryParams: [current.nextPage, ...current.params], options }).pipe(
                createResult(event),
                filter(event => event.type === "success"),
@@ -264,17 +270,17 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
          switch (event.kind) {
             case "F": {
                return createPages({
-                  type: "fetch",
+                  type: "loading",
                   fetch: event.fetch,
-                  state: { ...state, isFetching: true, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
-               } as FetchEvent, options)
+                  state: { ...state, isFetching: true, isPreviousData: false, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
+               } as LoadingEvent, options)
             }
             case "N": {
                return createPages({
                   type: "progress",
                   fetch: event.fetch,
                   value: event.value,
-                  state: { ...state, isProgress: true, data: event.value, state: "progress" }
+                  state: { ...state, isProgress: true, isPreviousData: false, data: event.value, state: "progress" }
                } as ProgressEvent, options)
             }
             case "E": {
@@ -282,14 +288,14 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
                   type: "error",
                   fetch: event.fetch,
                   error: event.error,
-                  state: { ...state, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
+                  state: { ...state, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
                } as ErrorEvent, options)
             }
             case "C": {
                return createPages({
                   type: "success",
                   fetch: event.fetch,
-                  state: { ...state, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
+                  state: { ...state, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
                } as SuccessEvent, options)
             }
          }
@@ -321,11 +327,12 @@ function createQuery(queryKey: string, store: QueryStore, options: QueryOptions)
    return { fetch, result }
 }
 
-function keepPreviousData({ state, options: { keepPreviousData }}: QueryClient, event: QueryEvent) {
-   if (event.type === "fetch") {
+function keepPreviousData({ value, options: { keepPreviousData }}: QueryClient, event: QueryEvent) {
+   if (event.type === "loading") {
       const previousData = keepPreviousData && {
-         data: state.data,
-         pages: state.pages
+         isPreviousData: true,
+         data: value.data,
+         pages: value.pages
       }
       return {
          ...event,
@@ -353,20 +360,53 @@ class QueryClient extends Observable<QueryClient> {
    createQuery
    sub = Subscription.EMPTY
 
+   get isFetching() {
+      // todo: implement network mode
+      return this.state === "loading"
+   }
+
+   get isLoading() {
+      return this.state === "loading"
+   }
+
+   get isRefetching() {
+      return this.isFetching && !this.isInitialLoading
+   }
+
+   get isProgress() {
+      return this.state === "progress"
+   }
+
+   get isSuccess() {
+      return this.state === "success"
+   }
+
+   get hasError() {
+      return this.state === "error"
+   }
+
+   get isInitialLoading() {
+      return this.isFetching && this.value.isInitial
+   }
+
    get isSettled() {
-      return this.state.isSuccess || this.state.hasError || this.isInitial
+      return this.value.isSuccess || this.value.hasError || this.isInitial
+   }
+
+   get isPreviousData() {
+      return this.value.isPreviousData
    }
 
    get isInitial() {
-      return this.state === INITIAL_STATE
-   }
-
-   get state() {
-      return this.event.state
+      return this.state === "initial"
    }
 
    get value() {
-      return this.state
+      return this.event.state
+   }
+
+   get state() {
+      return this.event.type
    }
 
    get isInfinite() {
@@ -374,23 +414,23 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    get pages() {
-      return this.state.pages
+      return this.value.pages
    }
 
    get last() {
-      return this.state.pages[this.state.pages.length - 1]
+      return this.value.pages[this.value.pages.length - 1]
    }
 
    get first() {
-      return this.state.pages[0]
+      return this.value.pages[0]
    }
 
    get hasNextPage() {
-      return this.last && this.last.nextPage !== NO_PAGE
+      return !!(this.last && this.last.nextPage !== NO_PAGE)
    }
 
    get hasPreviousPage() {
-      return this.first && this.first.previousPage !== NO_PAGE
+      return !!(this.first && this.first.previousPage !== NO_PAGE)
    }
 
    next(event: QueryEvent) {
@@ -457,7 +497,7 @@ class QueryClient extends Observable<QueryClient> {
 
    fetchPreviousPage() {
       if (this.hasPreviousPage) {
-         this.fetch(this.last.previousPage, ...this.params.slice(1))
+         this.fetch(this.first.previousPage, ...this.params.slice(1))
       }
    }
 
@@ -553,7 +593,7 @@ describe("Query", () => {
    it("should emit events", fakeAsync(() => {
       const expectedEvents = [
          { type: "initial" },
-         { type: "fetch" },
+         { type: "loading" },
          { type: "progress", value: 0 },
          { type: "progress", value: 1 },
          { type: "progress", value: 2 },
@@ -597,18 +637,18 @@ describe("Query", () => {
       subscribeSpyTo(query2.fetch())
       tick(1000)
 
-      expect(query.state.data).toBe(0)
-      expect(query2.state.data).toBe(query.state.data)
+      expect(query.value.data).toBe(0)
+      expect(query2.value.data).toBe(query.value.data)
 
       tick(1000)
 
-      expect(query.state.data).toBe(1)
-      expect(query2.state).toBe(query.state)
+      expect(query.value.data).toBe(1)
+      expect(query2.value).toBe(query.value)
 
       tick(1000)
 
-      expect(query.state.data).toBe(2)
-      expect(query2.state).toBe(query.state)
+      expect(query.value.data).toBe(2)
+      expect(query2.value).toBe(query.value)
    }))
 
    it("should dedupe new fetch when an existing fetch is in flight", fakeAsync(() => {
@@ -667,7 +707,7 @@ describe("Query", () => {
       const fetch = (page: number) => {
          return of({
             data: { page },
-            nextCursor: ++cursor
+            nextCursor: page + 1
          })
       }
       const query = new QueryClient({
@@ -695,6 +735,44 @@ describe("Query", () => {
          { data: { page: 1 }},
          { data: { page: 2 }}
       ]))
+   })
+
+   it("should fetch previous and next pages", () => {
+      let cursor = 0
+      const expectedPages = [
+         { data: { page: -2 }, nextPage: -1, previousPage: -3 },
+         { data: { page: -1 }, nextPage: 0, previousPage: -2 },
+         { data: { page: 0 }, nextPage: 1, previousPage: -1 },
+         { data: { page: 1 }, nextPage: 2, previousPage: 0 },
+         { data: { page: 2 }, nextPage: 3, previousPage: 1 },
+      ]
+      const fetch = (page: number) => {
+         return of({
+            data: { page },
+            nextCursor: page + 1,
+            previousCursor: page - 1
+         })
+      }
+      const query = new QueryClient({
+         key: "todos",
+         fetch,
+         nextPage: result => result.nextCursor,
+         previousPage: result => result.previousCursor,
+         select: result => result.data
+      })
+
+      subscribeSpyTo(query.fetch(cursor))
+
+      query.fetchNextPage()
+      query.fetchPreviousPage()
+      query.fetchNextPage()
+      query.fetchPreviousPage()
+
+      expect(query.pages).toEqual(arrayContaining(expectedPages))
+
+      query.refetch()
+
+      expect(query.pages).toEqual(arrayContaining(expectedPages))
    })
 
    it("should refresh infinite query", () => {
@@ -757,14 +835,16 @@ describe("Query", () => {
       subscribeSpyTo(query.fetch(1))
       tick(1000)
 
-      expect(query.state.data).toBe(1)
+      expect(query.value.data).toBe(1)
 
       query.fetch(2)
 
-      expect(query.state.data).withContext('previous data').toBe(1)
+      expect(query.isPreviousData).toBeTrue()
+      expect(query.value.data).withContext('previous data').toBe(1)
 
       tick(1000)
-      expect(query.state.data).toBe(2)
+      expect(query.isPreviousData).toBeFalse()
+      expect(query.value.data).toBe(2)
    }))
 
    it("should clear cache when there are no observers after a period of time", fakeAsync(() => {
@@ -778,18 +858,18 @@ describe("Query", () => {
 
       subscription = subscribeSpyTo(query.fetch(10))
 
-      expect(query.state.data).toBe(null)
+      expect(query.value.data).toBe(null)
 
       tick(1000)
 
-      expect(query.state.data).toBe(10)
+      expect(query.value.data).toBe(10)
       subscription.unsubscribe()
 
       tick(10000)
 
       subscribeSpyTo(query.fetch(10))
 
-      expect(query.state.data).toBe(null)
+      expect(query.value.data).toBe(null)
       discardPeriodicTasks()
    }))
 
@@ -817,28 +897,28 @@ describe("Query", () => {
 
       tick(1000)
 
-      expect(query.state.data).toBe(0)
-      expect(query2.state.data).toBe(0)
+      expect(query.value.data).toBe(0)
+      expect(query2.value.data).toBe(0)
 
       tick(11000)
 
-      expect(query.state.data).toBe(1)
-      expect(query2.state.data).toBe(0)
+      expect(query.value.data).toBe(1)
+      expect(query2.value.data).toBe(0)
 
       tick(11000)
 
-      expect(query.state.data).toBe(2)
-      expect(query2.state.data).toBe(0)
+      expect(query.value.data).toBe(2)
+      expect(query2.value.data).toBe(0)
 
       tick(11000)
 
-      expect(query.state.data).toBe(3)
-      expect(query2.state.data).toBe(3)
+      expect(query.value.data).toBe(3)
+      expect(query2.value.data).toBe(3)
 
       tick(5000)
 
-      expect(query.state.data).toBe(3)
-      expect(query2.state.data).toBe(3)
+      expect(query.value.data).toBe(3)
+      expect(query2.value.data).toBe(3)
 
       discardPeriodicTasks()
    }))
@@ -862,23 +942,93 @@ describe("Query", () => {
       tick(500)
       subscribeSpyTo(query2.fetch())
 
-      expect(query.state.data).toBe(0)
-      expect(query2.state.data).toBe(1)
+      expect(query.value.data).toBe(0)
+      expect(query2.value.data).toBe(1)
 
       tick(500)
 
-      expect(query.state.data).toBe(2)
-      expect(query2.state.data).toBe(3)
+      expect(query.value.data).toBe(2)
+      expect(query2.value.data).toBe(3)
 
       tick(500)
 
-      expect(query.state.data).toBe(2)
-      expect(query2.state.data).toBe(3)
+      expect(query.value.data).toBe(2)
+      expect(query2.value.data).toBe(3)
 
       tick(500)
 
-      expect(query.state.data).toBe(4)
-      expect(query2.state.data).toBe(5)
+      expect(query.value.data).toBe(4)
+      expect(query2.value.data).toBe(5)
+
+      discardPeriodicTasks()
+   }))
+
+   it("should not have pages", () => {
+      const query = new QueryClient({
+         key: "todos",
+         fetch: () => of(1)
+      })
+
+      subscribeSpyTo(query.fetch())
+
+      expect(query.hasPreviousPage).toBe(false)
+      expect(query.hasNextPage).toBe(false)
+      expect(query.pages).toEqual([])
+   })
+
+   it("should have transition states", fakeAsync(() => {
+      const query = new QueryClient({
+         key: "todos",
+         fetch: () => interval(1000).pipe(take(3))
+      })
+
+      expect(query.isSettled).toBeTrue()
+      expect(query.isInitial).toBeTrue()
+      expect(query.isRefetching).toBeFalse()
+      expect(query.isLoading).toBeFalse()
+      expect(query.isFetching).toBeFalse()
+      expect(query.isInitialLoading).toBeFalse()
+      expect(query.isProgress).toBeFalse()
+      expect(query.isSuccess).toBeFalse()
+
+      subscribeSpyTo(query.fetch())
+
+      expect(query.isSettled).toBeFalse()
+      expect(query.isInitial).toBeFalse()
+      expect(query.isRefetching).toBeFalse()
+      expect(query.isFetching).toBeTrue()
+      expect(query.isInitialLoading).toBeTrue()
+      expect(query.isProgress).toBeFalse()
+      expect(query.isSuccess).toBeFalse()
+
+      tick(1000)
+
+      expect(query.isSettled).toBeFalse()
+      expect(query.isInitial).toBeFalse()
+      expect(query.isFetching).toBeFalse()
+      expect(query.isLoading).toBeFalse()
+      expect(query.isRefetching).toBeFalse()
+      expect(query.isInitialLoading).toBeFalse()
+      expect(query.isProgress).toBeTrue()
+      expect(query.isSuccess).toBeFalse()
+
+      tick(2000)
+
+      expect(query.isSettled).toBeTrue()
+      expect(query.isInitial).toBeFalse()
+      expect(query.isFetching).toBeFalse()
+      expect(query.isLoading).toBeFalse()
+      expect(query.isRefetching).toBeFalse()
+      expect(query.isInitialLoading).toBeFalse()
+      expect(query.isProgress).toBeFalse()
+      expect(query.isSuccess).toBeTrue()
+
+      query.fetch()
+
+      expect(query.isFetching).toBeTrue()
+      expect(query.isLoading).toBeTrue()
+      expect(query.isRefetching).toBeTrue()
+      expect(query.isInitialLoading).toBeFalse()
 
       discardPeriodicTasks()
    }))
