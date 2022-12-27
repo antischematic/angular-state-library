@@ -26,7 +26,7 @@ import {
    switchMap,
    switchScan,
    take,
-   tap,
+   tap, throwError,
    timer
 } from "rxjs";
 import {arrayContaining} from "./utils/event-matcher";
@@ -37,6 +37,7 @@ import {pretty} from "./utils/pretty";
 
 interface QueryState {
    data: unknown
+   updatedAt: number
    isInitial: boolean
    isFetching: boolean
    isProgress: boolean
@@ -114,6 +115,7 @@ interface QueryOptions {
    nextPage?: (result: any) => any
    select?: (result: any) => any
    keepPreviousData?: boolean
+   staleTime?: number
 }
 
 const INITIAL_STATE: QueryState = Object.freeze({
@@ -125,7 +127,8 @@ const INITIAL_STATE: QueryState = Object.freeze({
    data: null,
    hasError: false,
    error: null,
-   pages: []
+   pages: [],
+   updatedAt: 0
 })
 
 const getInitialEvent = (): InitialEvent => Object.freeze({
@@ -267,12 +270,13 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
       }),
       scan(({ state }, event) => {
          const { options } = event.fetch
+         const updatedAt = Date.now()
          switch (event.kind) {
             case "F": {
                return createPages({
                   type: "loading",
                   fetch: event.fetch,
-                  state: { ...state, isFetching: true, isPreviousData: false, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
+                  state: { ...state, updatedAt, isFetching: true, isPreviousData: false, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
                } as LoadingEvent, options)
             }
             case "N": {
@@ -280,7 +284,7 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
                   type: "progress",
                   fetch: event.fetch,
                   value: event.value,
-                  state: { ...state, isProgress: true, isPreviousData: false, data: event.value, state: "progress" }
+                  state: { ...state, updatedAt, isProgress: true, isPreviousData: false, data: event.value, state: "progress" }
                } as ProgressEvent, options)
             }
             case "E": {
@@ -288,14 +292,14 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
                   type: "error",
                   fetch: event.fetch,
                   error: event.error,
-                  state: { ...state, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
+                  state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
                } as ErrorEvent, options)
             }
             case "C": {
                return createPages({
                   type: "success",
                   fetch: event.fetch,
-                  state: { ...state, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
+                  state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
                } as SuccessEvent, options)
             }
          }
@@ -347,9 +351,71 @@ function keepPreviousData({ value, options: { keepPreviousData }}: QueryClient, 
 
 const globalStore: QueryStore = new Map()
 
+const queries = new Set<QueryClient>()
+
+function stableHash(obj: any) {
+   let hash = ""
+   const keys: any[] = Object.keys(obj).sort()
+   for (const key of keys) {
+      const value = obj[key]
+      if (typeof value === "object" && value !== null) {
+         hash += key + ":" + stableHash(value)
+      }
+      if (typeof value !== "function") {
+         hash += key + ":" + value
+      }
+   }
+   return hash
+}
+
+
+
+interface Query {
+   queryKey: any[]
+}
+
+interface PartialQueryFilter {
+   params: any[]
+   exact?: boolean
+}
+
+interface QueryFilterPredicate {
+   (query: Query): boolean
+}
+
+type QueryFilter =
+   | PartialQueryFilter
+   | QueryFilterPredicate
+
+function invalidateQueries(filter: QueryFilter = { params: [] }) {
+   if (typeof filter === "function") {
+      throw new Error("Not implemented")
+   } else {
+      const { params, exact } = filter
+      for (const query of Array.from(queries)) {
+         let invalidate = params.length === 0
+         if (params.length > query.params.length) {
+            continue
+         }
+         for (const [index, param] of query.params.entries()) {
+            if (Object.is(params[index], param)) {
+               invalidate = true
+               if (!exact) {
+                  break
+               }
+            }
+         }
+         if (invalidate) {
+            query.refetch()
+         }
+      }
+   }
+}
+
 class QueryClient extends Observable<QueryClient> {
+   key = ""
    params = [] as any[]
-   query = new BehaviorSubject<Observable<QueryEvent>>(EMPTY)
+   query = new ReplaySubject<Observable<QueryEvent>>(1)
    connections = 0
    emitter = new BehaviorSubject(this)
    subscription = Subscription.EMPTY
@@ -359,6 +425,10 @@ class QueryClient extends Observable<QueryClient> {
    window = false
    createQuery
    sub = Subscription.EMPTY
+
+   get data() {
+      return this.value.data
+   }
 
    get isFetching() {
       // todo: implement network mode
@@ -385,6 +455,10 @@ class QueryClient extends Observable<QueryClient> {
       return this.state === "error"
    }
 
+   get thrownError() {
+      return this.value.error
+   }
+
    get isInitialLoading() {
       return this.isFetching && this.value.isInitial
    }
@@ -399,6 +473,13 @@ class QueryClient extends Observable<QueryClient> {
 
    get isInitial() {
       return this.state === "initial"
+   }
+
+   get isStale() {
+      const { staleTime = 0 } = this.options
+      return staleTime > 0
+         ? (Date.now() - this.value.updatedAt) >= staleTime
+         : true
    }
 
    get value() {
@@ -451,6 +532,7 @@ class QueryClient extends Observable<QueryClient> {
 
    connect() {
       if (!this.connections++) {
+         queries.add(this)
          this.subscription = this.query.pipe(
             distinctUntilChanged(),
             switchAll(),
@@ -460,6 +542,7 @@ class QueryClient extends Observable<QueryClient> {
 
    disconnect() {
       if (!--this.connections) {
+         queries.delete(this)
          this.sub.unsubscribe()
          this.subscription.unsubscribe()
       }
@@ -471,8 +554,9 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    fetchInternal(queryParams: any[], { refresh = false } = {}) {
+      this.key = this.getQueryKey(queryParams.slice(+this.isInfinite))
       const { fetch, result } = this.createQuery(
-         this.getQueryKey(queryParams),
+         this.key,
          this.store,
          this.options,
       )
@@ -483,7 +567,7 @@ class QueryClient extends Observable<QueryClient> {
       } else {
          this.query.next(result)
       }
-      if (this.isSettled) {
+      if (this.isSettled && this.isStale) {
          this.window = true
          fetch.next({ queryFn: this.options.fetch, queryParams, refresh, pages: this.pages, options: this.options })
       }
@@ -502,12 +586,9 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    getQueryKey(params: any[]) {
-      if (this.isInfinite) {
-         params = params.slice(1)
-      }
       const { key, cacheTime = 300_000 } = this.options
       const segments = typeof key === "string" ? [key, ...params] : key(params)
-      return JSON.stringify([segments, cacheTime])
+      return stableHash([segments, cacheTime])
    }
 
    refetch() {
@@ -1029,6 +1110,90 @@ describe("Query", () => {
       expect(query.isLoading).toBeTrue()
       expect(query.isRefetching).toBeTrue()
       expect(query.isInitialLoading).toBeFalse()
+
+      discardPeriodicTasks()
+   }))
+
+   it("should have error state", () => {
+      const query = new QueryClient({
+         key: "todos",
+         fetch: () => throwError(() => new Error("BOGUS"))
+      })
+
+      subscribeSpyTo(query.fetch())
+
+      expect(query.hasError).toBeTrue()
+      expect(query.thrownError).toEqual(new Error("BOGUS"))
+   })
+
+   it("should continue after errors", () => {
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (shouldThrow: boolean) => shouldThrow ? throwError(() => new Error("BOGUS")) : of(0)
+      })
+
+      subscribeSpyTo(query.fetch(true))
+
+      expect(query.hasError).toBeTrue()
+      expect(query.thrownError).toEqual(new Error("BOGUS"))
+
+      query.fetch(false)
+
+      expect(query.hasError).toBeFalse()
+      expect(query.thrownError).toBeNull()
+      expect(query.isSuccess).toBeTrue()
+      expect(query.data).toBe(0)
+   })
+
+   it("should invalidate queries", () => {
+      const spy = createSpy()
+      const spy2 = createSpy()
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (value: number) => of(value).pipe(tap({ subscribe: spy }))
+      })
+      const query2 = new QueryClient({
+         key: "todos",
+         fetch: (value: number) => of(value).pipe(tap({ subscribe: spy2 }))
+      })
+
+      subscribeSpyTo(query.fetch(1))
+      subscribeSpyTo(query2.fetch(2))
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy2).toHaveBeenCalledTimes(1)
+
+      invalidateQueries({ params: [2] })
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(spy2).toHaveBeenCalledTimes(2)
+
+      invalidateQueries()
+
+      expect(spy).toHaveBeenCalledTimes(2)
+      expect(spy2).toHaveBeenCalledTimes(3)
+   })
+
+   it("should refresh stale query", fakeAsync(() => {
+      const spy = createSpy()
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (value: number) => of(value).pipe(tap({ subscribe: spy })),
+         staleTime: 10000,
+         refreshInterval: 5000,
+      })
+
+      subscribeSpyTo(query.fetch())
+
+      expect(spy).toHaveBeenCalledTimes(1)
+
+      tick(5000)
+
+      expect(spy).toHaveBeenCalledTimes(1)
+
+      tick(5000)
+
+      expect(spy).toHaveBeenCalledTimes(2)
 
       discardPeriodicTasks()
    }))
