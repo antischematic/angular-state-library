@@ -1,21 +1,19 @@
-import {inject, InjectionToken} from "@angular/core";
+import {InjectionToken} from "@angular/core";
 import {discardPeriodicTasks, fakeAsync, tick} from "@angular/core/testing";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {
-   audit,
-   BehaviorSubject, defer,
+   BehaviorSubject,
    delay,
    distinctUntilChanged,
    EMPTY,
    expand,
-   filter, ignoreElements,
+   filter,
    interval,
    last,
    map,
    materialize,
-   merge,
    mergeWith,
-   MonoTypeOperatorFunction, NEVER,
+   MonoTypeOperatorFunction,
    Observable,
    of,
    ReplaySubject,
@@ -27,7 +25,7 @@ import {
    switchAll,
    switchMap,
    switchScan,
-   take, takeWhile,
+   take,
    tap,
    timer
 } from "rxjs";
@@ -137,10 +135,29 @@ const getInitialEvent = (): InitialEvent => Object.freeze({
    state: INITIAL_STATE
 })
 
+const timers = new Map<number, Observable<number>>()
+
+function getTimer(ms: number) {
+   if (!ms) return EMPTY
+   if (timers.has(ms)) {
+      return timers.get(ms)!
+   }
+   const refresh = interval(ms).pipe(
+      share({
+         resetOnRefCountZero: () => {
+            timers.delete(ms)
+            return of(0)
+         }
+      })
+   )
+   timers.set(ms, refresh)
+   return refresh
+}
+
 function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
    if (options.refreshInterval) {
       invalidate = invalidate.pipe(
-         mergeWith(timer(options.refreshInterval))
+         mergeWith(getTimer(options.refreshInterval))
       )
    }
    return invalidate
@@ -186,12 +203,6 @@ function createPages(event: QueryEvent, options: QueryOptions) {
    }
 }
 
-function withInvalidation(client: QueryClient) {
-   return (source: Observable<QueryEvent>) => source.pipe(
-      filter(() => client.window)
-   )
-}
-
 function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
    return (source: Observable<FetchParams>) => source.pipe(
       createResult(),
@@ -227,7 +238,7 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
                createResult(event)
             )
       }, getInitialEvent() as QueryEvent),
-      shareCache(options)
+      shareCache(store, queryKey, options)
    )
    const result: Observable<QueryEvent> = pages
 
@@ -286,10 +297,14 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
    )
 }
 
-function shareCache<T>(options: QueryOptions): MonoTypeOperatorFunction<T> {
+function shareCache<T>(store: QueryStore, queryKey: string, options: QueryOptions): MonoTypeOperatorFunction<T> {
    return share({
       connector: () => new ReplaySubject(1),
-      resetOnRefCountZero: () => options.cacheTime ? timer(options.cacheTime) : of(0)
+      resetOnRefCountZero: () => {
+         return (options.cacheTime ? timer(options.cacheTime) : of(0)).pipe(
+            tap(() => store.delete(queryKey))
+         )
+      }
    })
 }
 
@@ -300,7 +315,7 @@ function createQuery(queryKey: string, store: QueryStore, options: QueryOptions)
    const fetch = new ReplaySubject<FetchParams>(1)
    const result = fetch.pipe(
       createResult(),
-      shareCache(options)
+      shareCache(store, queryKey, options)
    )
    store.set(queryKey, { fetch, result })
    return { fetch, result }
@@ -322,6 +337,8 @@ function keepPreviousData({ state, options: { keepPreviousData }}: QueryClient, 
    }
    return event
 }
+
+const globalStore: QueryStore = new Map()
 
 class QueryClient extends Observable<QueryClient> {
    params = [] as any[]
@@ -383,6 +400,7 @@ class QueryClient extends Observable<QueryClient> {
          this.emitter.next(this)
          if (event.type === "success") {
             this.sub = getInvalidators(this.invalidator, this.options).subscribe(() => {
+               this.sub.unsubscribe()
                this.fetchInternal(this.params, {refresh: true})
             })
          } else {
@@ -402,6 +420,7 @@ class QueryClient extends Observable<QueryClient> {
 
    disconnect() {
       if (!--this.connections) {
+         this.sub.unsubscribe()
          this.subscription.unsubscribe()
       }
    }
@@ -463,7 +482,7 @@ class QueryClient extends Observable<QueryClient> {
          return observer
       })
 
-      this.store = options.store ?? inject(QueryStore)
+      this.store = options.store ?? globalStore
       this.createQuery = this.isInfinite ? createInfiniteQuery : createQuery
    }
 }
@@ -471,21 +490,14 @@ class QueryClient extends Observable<QueryClient> {
 const noop = () => EMPTY
 
 const QueryStore = new InjectionToken<QueryStore>("QueryStore", {
-   factory: () => new Map()
+   factory: () => globalStore
 })
-
-interface Query {
-   result: Observable<any>
-   invalidate(): void
-}
 
 describe("Query", () => {
    it("should create", () => {
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: noop,
-         store
       })
 
       expect(query).toBeInstanceOf(QueryClient)
@@ -493,11 +505,9 @@ describe("Query", () => {
 
    it("should fetch data", () => {
       const expected = 0
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: (value: number) => of(value + 1),
-         store
       })
 
       const result = subscribeSpyTo(query.fetch(expected))
@@ -506,11 +516,9 @@ describe("Query", () => {
    })
 
    it("should emit the current value on subscribe", () => {
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: noop,
-         store
       })
 
       const result = subscribeSpyTo(query)
@@ -521,11 +529,9 @@ describe("Query", () => {
 
    it("should unsubscribe from the source when there are no more observers", () => {
       const spy = createSpy()
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: () => interval(0).pipe(tap({ unsubscribe: spy })),
-         store,
          cacheTime: 0
       })
       const result = query.subscribe()
@@ -553,11 +559,9 @@ describe("Query", () => {
          { type: "progress", value: 2 },
          { type: "success" }
       ]
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: () => interval(1000).pipe(take(3)),
-         store
       })
       const result = subscribeSpyTo(query.pipe(map(q => q.event)))
 
@@ -568,11 +572,9 @@ describe("Query", () => {
    }))
 
    it("should return initial state", () => {
-      const store = new Map()
       const query = new QueryClient({
          key: "query",
          fetch: noop,
-         store
       })
 
       const result = query.value
@@ -582,16 +584,13 @@ describe("Query", () => {
 
    it("should sync queries by their query key", fakeAsync(() => {
       const fetch = () => interval(1000).pipe(take(3))
-      const store = new Map()
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
       })
       const query2 = new QueryClient({
          key: "todos",
          fetch,
-         store,
       })
 
       subscribeSpyTo(query.fetch())
@@ -615,11 +614,9 @@ describe("Query", () => {
    it("should dedupe new fetch when an existing fetch is in flight", fakeAsync(() => {
       const spy = createSpy()
       const fetch = () => interval(1000).pipe(tap({ subscribe: spy }), take(1))
-      const store = new Map()
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
       })
 
       subscribeSpyTo(query.fetch())
@@ -640,12 +637,10 @@ describe("Query", () => {
 
    it("should periodically refresh data after each successful fetch", fakeAsync(() => {
       const spy = createSpy()
-      const store = new Map()
       const fetch = () => timer(1000).pipe(tap({ subscribe: spy }))
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
          refreshInterval: 1000,
       })
 
@@ -669,7 +664,6 @@ describe("Query", () => {
 
    it("should fetch next page", () => {
       let cursor = 0
-      const store = new Map()
       const fetch = (page: number) => {
          return of({
             data: { page },
@@ -679,7 +673,6 @@ describe("Query", () => {
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
          nextPage: result => result.nextCursor,
          select: result => result.data
       })
@@ -706,7 +699,6 @@ describe("Query", () => {
 
    it("should refresh infinite query", () => {
       let cursor = 0
-      const store = new Map()
       const fetch = (page: number) => {
          return of({
             data: { page },
@@ -716,7 +708,6 @@ describe("Query", () => {
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
          nextPage: result => result.nextCursor,
          select: result => result.data
       })
@@ -742,11 +733,9 @@ describe("Query", () => {
 
    it("should refresh query", () => {
       const spy = createSpy()
-      const store = new Map()
       const query = new QueryClient({
          key: "todos",
          fetch: () => of(0).pipe(tap({ subscribe: spy })),
-         store
       })
 
       subscribeSpyTo(query.fetch())
@@ -759,11 +748,9 @@ describe("Query", () => {
    })
 
    it("should keep previous data", fakeAsync(() => {
-      const store = new Map()
       const query = new QueryClient({
          key: "todos",
          fetch: (value: number) => of(value).pipe(delay(1000)),
-         store,
          keepPreviousData: true
       })
 
@@ -782,12 +769,10 @@ describe("Query", () => {
 
    it("should clear cache when there are no observers after a period of time", fakeAsync(() => {
       let subscription
-      const store = new Map()
       const fetch = (value: number) => of(value).pipe(delay(1000))
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
          cacheTime: 10000
       })
 
@@ -810,20 +795,17 @@ describe("Query", () => {
 
    it("should fetch independently of other queries with the same query key", fakeAsync(() => {
       let count = 0
-      const store = new Map()
       const fetch = () => {
          return of(count++).pipe(delay(1000))
       }
       const query = new QueryClient({
          key: "todos",
          fetch,
-         store,
          refreshInterval: 10000
       })
       const query2 = new QueryClient({
          key: "todos",
          fetch,
-         store,
          refreshInterval: 33000
       })
 
@@ -857,6 +839,46 @@ describe("Query", () => {
 
       expect(query.state.data).toBe(3)
       expect(query2.state.data).toBe(3)
+
+      discardPeriodicTasks()
+   }))
+
+   it("should synchronize refresh timers", fakeAsync(() => {
+      let count = 0
+      const fetch = () => of(count++)
+      const query = new QueryClient({
+         key: "todos",
+         fetch,
+         refreshInterval: 1000
+      })
+
+      const query2 = new QueryClient({
+         key: "todos2",
+         fetch,
+         refreshInterval: 1000
+      })
+
+      subscribeSpyTo(query.fetch())
+      tick(500)
+      subscribeSpyTo(query2.fetch())
+
+      expect(query.state.data).toBe(0)
+      expect(query2.state.data).toBe(1)
+
+      tick(500)
+
+      expect(query.state.data).toBe(2)
+      expect(query2.state.data).toBe(3)
+
+      tick(500)
+
+      expect(query.state.data).toBe(2)
+      expect(query2.state.data).toBe(3)
+
+      tick(500)
+
+      expect(query.state.data).toBe(4)
+      expect(query2.state.data).toBe(5)
 
       discardPeriodicTasks()
    }))

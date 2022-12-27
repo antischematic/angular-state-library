@@ -10,6 +10,7 @@ import {
 import {initStoreTestEnvironment} from "../testing/init-store-test-environment";
 // @ts-ignore
 import JasmineDOM from '@testing-library/jasmine-dom';
+import {autoUnsubscribe} from "@hirez_io/observer-spy";
 
 beforeAll(() => {
    jasmine.addMatchers(JasmineDOM);
@@ -20,4 +21,5 @@ getTestBed().initTestEnvironment(
   BrowserDynamicTestingModule,
   platformBrowserDynamicTesting(),
 );
+autoUnsubscribe()
 initStoreTestEnvironment()
