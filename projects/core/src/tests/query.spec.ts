@@ -11,11 +11,11 @@ import {
    interval,
    last,
    map,
-   materialize,
+   materialize, mergeAll,
    mergeWith,
    MonoTypeOperatorFunction,
    Observable,
-   of,
+   of, pipe,
    ReplaySubject,
    scan,
    share,
@@ -51,7 +51,7 @@ interface QueryState {
 interface FetchParams {
    queryFn: (...params: any[]) => Observable<any>
    queryParams: any[]
-   options: QueryOptions
+   options?: QueryOptions
    refresh?: boolean
    pages?: Page[]
 }
@@ -172,8 +172,6 @@ function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
    return invalidate
 }
 
-const NO_PAGE = Symbol("No page")
-
 function upsertPage(state: any, cursor: any, pages: Page[], replace: number) {
    const newPages = pages.slice()
    for (const [index, page] of pages.entries()) {
@@ -189,8 +187,9 @@ function upsertPage(state: any, cursor: any, pages: Page[], replace: number) {
    return [state]
 }
 
-function createPages(event: QueryEvent, options: QueryOptions) {
-   if (!options.previousPage && !options.nextPage) {
+function createPages(event: QueryEvent) {
+   const { options } = event.fetch
+   if (!options?.previousPage && !options?.nextPage) {
       return event
    }
    const { type, fetch: { queryParams: [pageIndex, ...params] } } = event
@@ -199,8 +198,8 @@ function createPages(event: QueryEvent, options: QueryOptions) {
 
    if (type === "success") {
       page.data = options.select?.(event.state.data) ?? event.state.data
-      page.previousPage = options.previousPage?.(event.state.data) ?? NO_PAGE
-      page.nextPage = options.nextPage?.(event.state.data) ?? NO_PAGE
+      page.previousPage = options.previousPage?.(event.state.data)
+      page.nextPage = options.nextPage?.(event.state.data)
    }
 
    return {
@@ -214,13 +213,13 @@ function createPages(event: QueryEvent, options: QueryOptions) {
 
 function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
    return (source: Observable<FetchParams>) => source.pipe(
-      createResult(),
+      createInfiniteResult(),
       filter(event => event.type === "success"),
       expand((event, index) => {
          const current: Page = event.state.pages[index]
-         if (current.nextPage !== NO_PAGE) {
+         if (current.nextPage !== void 0) {
             return of({ queryFn: event.fetch.queryFn, queryParams: [current.nextPage, ...current.params], options }).pipe(
-               createResult(event),
+               createInfiniteResult(event),
                filter(event => event.type === "success"),
             )
          }
@@ -244,7 +243,7 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
                refreshInfiniteData(options, fetch.pages)
             )
             : of(fetch).pipe(
-               createResult(event)
+               createInfiniteResult(event)
             )
       }, getInitialEvent() as QueryEvent),
       shareCache(store, queryKey, options)
@@ -256,7 +255,13 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
    return { fetch, result }
 }
 
-function createResult(initialEvent: QueryEvent = getInitialEvent()) {
+function createInfiniteResult(initialEvent: QueryEvent = getInitialEvent()) {
+   return pipe(
+      createResult(initialEvent, createPages),
+   )
+}
+
+function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: any = (event: any) => event) {
    return (source: Observable<FetchParams>) => source.pipe(
       switchMap((fetch) => {
          const queryParams = fetch.refresh && fetch.pages?.length ? [fetch.pages[0].currentPage, ...fetch.queryParams.slice(1)] : fetch.queryParams
@@ -269,41 +274,40 @@ function createResult(initialEvent: QueryEvent = getInitialEvent()) {
          )
       }),
       scan(({ state }, event) => {
-         const { options } = event.fetch
          const updatedAt = Date.now()
          switch (event.kind) {
             case "F": {
-               return createPages({
+               return mapResult({
                   type: "loading",
                   fetch: event.fetch,
                   state: { ...state, updatedAt, isFetching: true, isPreviousData: false, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
-               } as LoadingEvent, options)
+               } as LoadingEvent)
             }
             case "N": {
-               return createPages({
+               return mapResult({
                   type: "progress",
                   fetch: event.fetch,
                   value: event.value,
                   state: { ...state, updatedAt, isProgress: true, isPreviousData: false, data: event.value, state: "progress" }
-               } as ProgressEvent, options)
+               }) as ProgressEvent
             }
             case "E": {
-               return createPages({
+               return mapResult({
                   type: "error",
                   fetch: event.fetch,
                   error: event.error,
                   state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
-               } as ErrorEvent, options)
+               }) as ErrorEvent
             }
             case "C": {
-               return createPages({
+               return mapResult({
                   type: "success",
                   fetch: event.fetch,
                   state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
-               } as SuccessEvent, options)
+               }) as SuccessEvent
             }
          }
-      }, initialEvent)
+      }, initialEvent),
    )
 }
 
@@ -507,11 +511,11 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    get hasNextPage() {
-      return !!(this.last && this.last.nextPage !== NO_PAGE)
+      return !!this.last?.nextPage
    }
 
    get hasPreviousPage() {
-      return !!(this.first && this.first.previousPage !== NO_PAGE)
+      return !!this.first?.previousPage
    }
 
    next(event: QueryEvent) {
@@ -541,7 +545,7 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    disconnect() {
-      if (!--this.connections) {
+      if (this.connections && !--this.connections) {
          queries.delete(this)
          this.sub.unsubscribe()
          this.subscription.unsubscribe()
@@ -612,6 +616,122 @@ const noop = () => EMPTY
 
 const QueryStore = new InjectionToken<QueryStore>("QueryStore", {
    factory: () => globalStore
+})
+
+interface MutationOptions {
+   mutate: (...params: any[]) => Observable<any>
+}
+
+class MutationClient extends Observable<MutationClient> {
+   connections = 0
+   mutation = new ReplaySubject<Observable<QueryEvent>>(1)
+   emitter = new BehaviorSubject<MutationClient>(this)
+   event: QueryEvent = getInitialEvent()
+   subscription = Subscription.EMPTY
+
+   get data() {
+      return this.value.data
+   }
+
+   get isFetching() {
+      // todo: implement network mode
+      return this.state === "loading"
+   }
+
+   get isLoading() {
+      return this.state === "loading"
+   }
+
+   get isProgress() {
+      return this.state === "progress"
+   }
+
+   get isSuccess() {
+      return this.state === "success"
+   }
+
+   get hasError() {
+      return this.state === "error"
+   }
+
+   get thrownError() {
+      return this.value.error
+   }
+
+   get isSettled() {
+      return this.value.isSuccess || this.value.hasError
+   }
+
+   get value() {
+      return this.event.state
+   }
+
+   get state() {
+      return this.event.type
+   }
+
+   next(event: QueryEvent) {
+      this.event = event
+      this.emitter.next(this)
+   }
+
+   connect() {
+      if (!this.connections++) {
+         this.subscription = this.mutation.pipe(
+            mergeAll()
+         ).subscribe(this)
+      }
+   }
+
+   disconnect() {
+      if (this.connections && !--this.connections) {
+         this.subscription.unsubscribe()
+      }
+   }
+
+   mutate(...params: any[]) {
+      const result = of({ queryFn: this.options.mutate, queryParams: params }).pipe(
+         createResult()
+      )
+      this.mutation.next(result)
+      return this
+   }
+
+   reset() {
+      this.event = getInitialEvent()
+   }
+
+   constructor(public options: MutationOptions) {
+      super((subscriber => {
+         this.connect()
+         subscriber.add(this.emitter.subscribe(subscriber))
+         subscriber.add(() => this.disconnect())
+      }));
+   }
+}
+
+describe("Mutation", () => {
+   it("should create", () => {
+      const mutation = new MutationClient({
+         mutate: () => of(0)
+      })
+
+      expect(mutation).toBeInstanceOf(MutationClient)
+   })
+
+   it("should mutate data", () => {
+      const mutation = new MutationClient({
+         mutate: () => of(0)
+      })
+
+      subscribeSpyTo(mutation.mutate())
+
+      expect(mutation.data).toBe(0)
+   })
+
+   it("should have transition states", () => {
+      
+   })
 })
 
 describe("Query", () => {
