@@ -2,20 +2,23 @@ import {InjectionToken} from "@angular/core";
 import {discardPeriodicTasks, fakeAsync, tick} from "@angular/core/testing";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {
-   BehaviorSubject,
+   BehaviorSubject, concatAll,
    delay,
    distinctUntilChanged,
    EMPTY,
    expand,
-   filter,
+   filter, from,
    interval,
    last,
    map,
-   materialize, mergeAll,
+   materialize,
+   merge,
+   mergeAll,
    mergeWith,
    MonoTypeOperatorFunction,
    Observable,
-   of, pipe,
+   of,
+   pipe,
    ReplaySubject,
    scan,
    share,
@@ -26,24 +29,18 @@ import {
    switchMap,
    switchScan,
    take,
-   tap, throwError,
+   tap,
+   throwError,
    timer
 } from "rxjs";
 import {arrayContaining} from "./utils/event-matcher";
 import createSpy = jasmine.createSpy;
-import {subscribe} from "../select";
-import {pretty} from "./utils/pretty";
 
 
 interface QueryState {
    data: unknown
    updatedAt: number
    isInitial: boolean
-   isFetching: boolean
-   isProgress: boolean
-   isSuccess: boolean
-   isPreviousData: boolean
-   hasError: boolean
    error: unknown
    pages: Page[]
 }
@@ -236,7 +233,7 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
    }
 
    const fetch = new ReplaySubject<FetchParams>(1)
-   const pages = fetch.pipe(
+   const result: Observable<QueryEvent> = fetch.pipe(
       switchScan((event, fetch) => {
          return fetch.refresh
             ? of(fetch).pipe(
@@ -248,7 +245,6 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
       }, getInitialEvent() as QueryEvent),
       shareCache(store, queryKey, options)
    )
-   const result: Observable<QueryEvent> = pages
 
    store.set(queryKey, { fetch, result })
 
@@ -280,7 +276,7 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                return mapResult({
                   type: "loading",
                   fetch: event.fetch,
-                  state: { ...state, updatedAt, isFetching: true, isPreviousData: false, isProgress: false, isSuccess: false, hasError: false, error: null, state: "fetch" },
+                  state: { ...state, updatedAt, hasError: false, error: null, state: "fetch" },
                } as LoadingEvent)
             }
             case "N": {
@@ -288,7 +284,7 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                   type: "progress",
                   fetch: event.fetch,
                   value: event.value,
-                  state: { ...state, updatedAt, isProgress: true, isPreviousData: false, data: event.value, state: "progress" }
+                  state: { ...state, updatedAt, data: event.value, state: "progress" }
                }) as ProgressEvent
             }
             case "E": {
@@ -296,14 +292,14 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                   type: "error",
                   fetch: event.fetch,
                   error: event.error,
-                  state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: false, hasError: true, error: event.error, state: "error" }
+                  state: { ...state, updatedAt, isInitial: false, error: event.error, state: "error" }
                }) as ErrorEvent
             }
             case "C": {
                return mapResult({
                   type: "success",
                   fetch: event.fetch,
-                  state: { ...state, updatedAt, isInitial: false, isPreviousData: false, isFetching: false, isProgress: false, isSuccess: true, hasError: false, error: null, state: "success" }
+                  state: { ...state, updatedAt, isInitial: false, state: "success" }
                }) as SuccessEvent
             }
          }
@@ -335,24 +331,6 @@ function createQuery(queryKey: string, store: QueryStore, options: QueryOptions)
    return { fetch, result }
 }
 
-function keepPreviousData({ value, options: { keepPreviousData }}: QueryClient, event: QueryEvent) {
-   if (event.type === "loading") {
-      const previousData = keepPreviousData && {
-         isPreviousData: true,
-         data: value.data,
-         pages: value.pages
-      }
-      return {
-         ...event,
-         state: {
-            ...event.state,
-            ...previousData
-         }
-      }
-   }
-   return event
-}
-
 const globalStore: QueryStore = new Map()
 
 const queries = new Set<QueryClient>()
@@ -372,8 +350,6 @@ function stableHash(obj: any) {
    return hash
 }
 
-
-
 interface Query {
    queryKey: any[]
 }
@@ -391,7 +367,7 @@ type QueryFilter =
    | PartialQueryFilter
    | QueryFilterPredicate
 
-function invalidateQueries(filter: QueryFilter = { params: [] }) {
+function invalidateQueries(filter: QueryFilter = { params: [] }, options: { force?: boolean } = { force: true }) {
    if (typeof filter === "function") {
       throw new Error("Not implemented")
    } else {
@@ -410,7 +386,7 @@ function invalidateQueries(filter: QueryFilter = { params: [] }) {
             }
          }
          if (invalidate) {
-            query.refetch()
+            query.refetch(options)
          }
       }
    }
@@ -425,13 +401,14 @@ class QueryClient extends Observable<QueryClient> {
    subscription = Subscription.EMPTY
    store: QueryStore
    event: QueryEvent = getInitialEvent()
-   invalidator = new Subject<void>()
+   invalidator = new Subject<{ force?: boolean } | void>()
    window = false
    createQuery
    sub = Subscription.EMPTY
+   previousState?: QueryState
 
    get data() {
-      return this.value.data
+      return this.isPreviousData ? this.previousState!.data : this.value.data
    }
 
    get isFetching() {
@@ -468,11 +445,7 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    get isSettled() {
-      return this.value.isSuccess || this.value.hasError || this.isInitial
-   }
-
-   get isPreviousData() {
-      return this.value.isPreviousData
+      return this.isSuccess || this.hasError || this.isInitial
    }
 
    get isInitial() {
@@ -499,15 +472,15 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    get pages() {
-      return this.value.pages
+      return this.isPreviousData ? this.previousState!.pages : this.value.pages
    }
 
    get last() {
-      return this.value.pages[this.value.pages.length - 1]
+      return this.pages[this.value.pages.length - 1]
    }
 
    get first() {
-      return this.value.pages[0]
+      return this.pages[0]
    }
 
    get hasNextPage() {
@@ -518,19 +491,26 @@ class QueryClient extends Observable<QueryClient> {
       return !!this.first?.previousPage
    }
 
+   get isPreviousData() {
+      return this.previousState !== void 0
+   }
+
    next(event: QueryEvent) {
       if (this.window) {
-         this.window = event.type !== "success" && event.type !== "error"
-         this.event = keepPreviousData(this, event)
-         this.emitter.next(this)
+         this.previousState = event.type === "loading" && !!this.options.keepPreviousData
+            ? this.event.state
+            : void 0
          if (event.type === "success") {
-            this.sub = getInvalidators(this.invalidator, this.options).subscribe(() => {
+            this.sub = getInvalidators(this.invalidator, this.options).subscribe(({ force = false } = {}) => {
                this.sub.unsubscribe()
-               this.fetchInternal(this.params, {refresh: true})
+               this.fetchInternal(this.params, {refresh: true, force})
             })
          } else {
             this.sub.unsubscribe()
          }
+         this.window = event.type !== "success" && event.type !== "error"
+         this.event = event
+         this.emitter.next(this)
       }
    }
 
@@ -557,7 +537,7 @@ class QueryClient extends Observable<QueryClient> {
       return this
    }
 
-   fetchInternal(queryParams: any[], { refresh = false } = {}) {
+   fetchInternal(queryParams: any[], { refresh = false, force = false } = {}) {
       this.key = this.getQueryKey(queryParams.slice(+this.isInfinite))
       const { fetch, result } = this.createQuery(
          this.key,
@@ -571,7 +551,7 @@ class QueryClient extends Observable<QueryClient> {
       } else {
          this.query.next(result)
       }
-      if (this.isSettled && this.isStale) {
+      if (this.isSettled && this.isStale || force) {
          this.window = true
          fetch.next({ queryFn: this.options.fetch, queryParams, refresh, pages: this.pages, options: this.options })
       }
@@ -595,8 +575,9 @@ class QueryClient extends Observable<QueryClient> {
       return stableHash([segments, cacheTime])
    }
 
-   refetch() {
-      this.invalidator.next()
+   refetch(options: { force?: boolean } = {}) {
+      this.invalidator.next(options)
+      return this
    }
 
    constructor(public options: QueryOptions) {
@@ -624,7 +605,7 @@ interface MutationOptions {
 
 class MutationClient extends Observable<MutationClient> {
    connections = 0
-   mutation = new ReplaySubject<Observable<QueryEvent>>(1)
+   mutation = new Subject<Observable<QueryEvent>>()
    emitter = new BehaviorSubject<MutationClient>(this)
    event: QueryEvent = getInitialEvent()
    subscription = Subscription.EMPTY
@@ -659,7 +640,7 @@ class MutationClient extends Observable<MutationClient> {
    }
 
    get isSettled() {
-      return this.value.isSuccess || this.value.hasError
+      return this.isSuccess || this.hasError
    }
 
    get value() {
@@ -723,14 +704,15 @@ describe("Mutation", () => {
       const mutation = new MutationClient({
          mutate: () => of(0)
       })
+      subscribeSpyTo(mutation)
 
-      subscribeSpyTo(mutation.mutate())
+      mutation.mutate()
 
       expect(mutation.data).toBe(0)
    })
 
    it("should have transition states", () => {
-      
+
    })
 })
 
@@ -1036,16 +1018,16 @@ describe("Query", () => {
       subscribeSpyTo(query.fetch(1))
       tick(1000)
 
-      expect(query.value.data).toBe(1)
+      expect(query.data).toBe(1)
 
       query.fetch(2)
 
       expect(query.isPreviousData).toBeTrue()
-      expect(query.value.data).withContext('previous data').toBe(1)
+      expect(query.data).withContext('previous data').toBe(1)
 
       tick(1000)
       expect(query.isPreviousData).toBeFalse()
-      expect(query.value.data).toBe(2)
+      expect(query.data).toBe(2)
    }))
 
    it("should clear cache when there are no observers after a period of time", fakeAsync(() => {
@@ -1077,7 +1059,7 @@ describe("Query", () => {
    it("should fetch independently of other queries with the same query key", fakeAsync(() => {
       let count = 0
       const fetch = () => {
-         return of(count++).pipe(delay(1000))
+         return from([count++, count++, count++]).pipe(map((value) => of(value).pipe(delay(1000))), concatAll())
       }
       const query = new QueryClient({
          key: "todos",
@@ -1087,7 +1069,7 @@ describe("Query", () => {
       const query2 = new QueryClient({
          key: "todos",
          fetch,
-         refreshInterval: 33000
+         refreshInterval: 39000
       })
 
       subscribeSpyTo(query)
@@ -1096,30 +1078,30 @@ describe("Query", () => {
       query.fetch()
       query2.fetch()
 
-      tick(1000)
-
-      expect(query.value.data).toBe(0)
-      expect(query2.value.data).toBe(0)
-
-      tick(11000)
-
-      expect(query.value.data).toBe(1)
-      expect(query2.value.data).toBe(0)
-
-      tick(11000)
+      tick(3000)
 
       expect(query.value.data).toBe(2)
-      expect(query2.value.data).toBe(0)
+      expect(query2.value.data).toBe(2)
 
-      tick(11000)
+      tick(13000)
 
-      expect(query.value.data).toBe(3)
-      expect(query2.value.data).toBe(3)
+      expect(query.value.data).toBe(5)
+      expect(query2.value.data).toBe(2)
 
-      tick(5000)
+      tick(13000)
 
-      expect(query.value.data).toBe(3)
-      expect(query2.value.data).toBe(3)
+      expect(query.value.data).toBe(8)
+      expect(query2.value.data).toBe(2)
+
+      tick(13000)
+
+      expect(query.value.data).toBe(11)
+      expect(query2.value.data).toBe(11)
+
+      tick(13000)
+
+      expect(query.value.data).toBe(14)
+      expect(query2.value.data).toBe(11)
 
       discardPeriodicTasks()
    }))
@@ -1317,4 +1299,21 @@ describe("Query", () => {
 
       discardPeriodicTasks()
    }))
+
+   it("should force refresh query", () => {
+      const spy = createSpy()
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (value: number) => of(value).pipe(tap({ subscribe: spy })),
+         staleTime: 10000,
+      })
+
+      subscribeSpyTo(query.fetch())
+
+      expect(spy).toHaveBeenCalledTimes(1)
+
+      query.refetch({ force: true })
+
+      expect(spy).toHaveBeenCalledTimes(2)
+   })
 })
