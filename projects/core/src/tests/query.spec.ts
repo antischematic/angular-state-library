@@ -640,7 +640,7 @@ class MutationClient extends Observable<MutationClient> {
    }
 
    get isSettled() {
-      return this.isSuccess || this.hasError
+      return !this.isFetching && !this.isProgress
    }
 
    get value() {
@@ -711,9 +711,43 @@ describe("Mutation", () => {
       expect(mutation.data).toBe(0)
    })
 
-   it("should have transition states", () => {
+   it("should have transition states", fakeAsync(() => {
+      const mutation = new MutationClient({
+         mutate: () => interval(1000).pipe(take(3))
+      })
 
-   })
+      expect(mutation.isSettled).toBeTrue()
+      expect(mutation.isLoading).toBeFalse()
+      expect(mutation.isFetching).toBeFalse()
+      expect(mutation.isProgress).toBeFalse()
+      expect(mutation.isSuccess).toBeFalse()
+
+      mutation.connect()
+      mutation.mutate()
+
+      expect(mutation.isSettled).toBeFalse()
+      expect(mutation.isFetching).toBeTrue()
+      expect(mutation.isProgress).toBeFalse()
+      expect(mutation.isSuccess).toBeFalse()
+
+      tick(1000)
+
+      expect(mutation.isSettled).toBeFalse()
+      expect(mutation.isFetching).toBeFalse()
+      expect(mutation.isLoading).toBeFalse()
+      expect(mutation.isProgress).toBeTrue()
+      expect(mutation.isSuccess).toBeFalse()
+
+      tick(2000)
+
+      expect(mutation.isSettled).toBeTrue()
+      expect(mutation.isFetching).toBeFalse()
+      expect(mutation.isLoading).toBeFalse()
+      expect(mutation.isProgress).toBeFalse()
+      expect(mutation.isSuccess).toBeTrue()
+
+      mutation.disconnect()
+   }))
 })
 
 describe("Query", () => {
