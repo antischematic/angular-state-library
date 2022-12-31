@@ -31,6 +31,7 @@ module.exports = function (config) {
         { type: 'text-summary' }
       ],
        include: [
+          "projects/core/data/src/**.ts",
           "projects/core/src/**.ts",
           "!projects/core/src/tests/**.ts"
        ]
@@ -42,7 +43,7 @@ module.exports = function (config) {
     colors: true,
     logLevel: config.LOG_INFO,
     autoWatch: true,
-    browsers: ['ChromeHeadless'],
+    browsers: ['EdgeHeadless'],
     singleRun: false,
     restartOnFileChange: true
   });

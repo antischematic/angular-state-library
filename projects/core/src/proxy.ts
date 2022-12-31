@@ -51,6 +51,13 @@ function createObjectProxy(object: object) {
    return new Proxy(object, {
       get(target: object, p: string | symbol): any {
          const value = Reflect.get(target, p)
+         if (typeof value === "function") {
+            return new Proxy(value, {
+               apply(target: any, thisArg: any, argArray: any[]): any {
+                  return Reflect.apply(target, object, argArray)
+               }
+            })
+         }
          addDep(target, p, value)
          return value
       },

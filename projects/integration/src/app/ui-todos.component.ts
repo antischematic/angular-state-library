@@ -22,26 +22,19 @@ import {
    TransitionToken,
    useInputs,
    useMerge,
-   useMutation,
-   useQuery,
    useTransition,
    withState,
    next,
    inputs,
    set
 } from '@antischematic/angular-state-library';
+import {MutationClient, QueryClient} from "@antischematic/angular-state-library/data"
 import {Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
 import {UITheme} from "./ui-theme";
 import {UITodo} from './ui-todo.component';
-
-const Todos = new Selector("Todos", () => {
-   return withState([], {
-      from: next(UITodos, "loadTodos")
-   })
-})
 
 @Store()
 @Component({
@@ -50,7 +43,6 @@ const Todos = new Selector("Todos", () => {
    standalone: true,
    changeDetection: ChangeDetectionStrategy.OnPush,
    templateUrl: './ui-todos.component.html',
-   providers: [Todos]
 })
 export class UITodos {
    @Input() userId!: string;
@@ -59,19 +51,31 @@ export class UITodos {
 
    @ViewChildren(UITodo) uiTodos!: QueryList<UITodos>;
 
-   @Select(Todos) todos = get(Todos)
+   @Select() todos = new QueryClient({
+      key: "todos",
+      fetch: loadTodos,
+      keepPreviousData: true,
+      staleTime: 10000
+   })
+
+   @Select() createTodo = new MutationClient({
+      mutate: createTodo,
+      onSettled: () => {
+         this.todos.refetch({ force: true })
+      }
+   })
 
    @Select() get remaining() {
       // Use "$" to track nested objects or array mutations
-      return $(this.todos).filter((todo) => !todo.completed) ?? [];
+      return $(this.todos.data)?.filter((todo) => !todo.completed) ?? [];
    }
 
    @Select() get completed() {
-      return $(this.todos).filter((todo) => todo.completed) ?? [];
+      return $(this.todos.data)?.filter((todo) => todo.completed) ?? [];
    }
 
-   @Action() setTodos(value: Todo[]) {
-      set(Todos, value)
+   @Action() setTodos(data: Todo[]) {
+      this.todos.setValue({ data })
    }
 
    @Action() signal!: Action
@@ -79,7 +83,7 @@ export class UITodos {
    @Invoke() loadTodos() {
       this.signal() // test empty action
       // Invoke, Before and Layout react to changes on "this"
-      return dispatch(loadTodos(this.userId));
+      return dispatch(this.todos.fetch(this.userId));
    }
 
    @Layout() countElements() {
@@ -89,10 +93,6 @@ export class UITodos {
             length === 1 ? '' : 's'
          } on the page`
       );
-   }
-
-   @Action() createTodo(todo: Todo) {
-      return dispatch(createTodo(this.userId, todo.title));
    }
 
    @Action() updateTodo(todo: Todo) {
@@ -136,7 +136,7 @@ export class UITodos {
       return value.id;
    }
 
-   shuffle(array = this.todos) {
+   shuffle(array = this.todos.data ?? []) {
       for (let i = array.length - 1; i > 0; i--) {
          const j = Math.floor(Math.random() * (i + 1));
          [array[i], array[j]] = [array[j], array[i]];
@@ -154,20 +154,11 @@ function loadTodos(userId: string): Observable<Todo[]> {
    const loading = inject(Loading)
    return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
       useTransition(loading, {emit: true}),
-      useQuery({
-         key: [endpoint, userId],
-         // refreshInterval: 5000,
-         // refreshOnFocus: true,
-         // staleTime: 4950,
-      }),
    )
 }
 
 function createTodo(userId: string, title: string): Observable<Todo> {
-   useMerge()
-   return inject(HttpClient).post<Todo>(endpoint, {userId, title}).pipe(
-      useMutation({invalidate: [endpoint, userId]})
-   )
+   return inject(HttpClient).post<Todo>(endpoint, {userId, title})
 }
 
 const toggleAll = loadEffect(() => import("./effects/toggle-all"))

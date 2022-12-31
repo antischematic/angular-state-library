@@ -3,7 +3,7 @@
 </div>
 
 <h2>Add todo</h2>
-<ui-todo (save)="createTodo($event)"></ui-todo>
+<ui-todo (save)="createTodo.mutate(userId, $event.title)"></ui-todo>
 
 <h2>{{ remaining.length }} todos remaining</h2>
 
@@ -23,7 +23,7 @@
 
 </fieldset>
 
-<h2>{{ completed.length }} of {{ todos.length }} todos completed</h2>
+<h2>{{ completed.length }} of {{ todos.data?.length ?? 0 }} todos completed</h2>
 
 <fieldset [disabled]="transition.unstable">
    <ui-todo

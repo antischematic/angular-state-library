@@ -8,6 +8,9 @@
       ],
       "@antischematic/angular-state-library/testing": [
         "projects/core/testing/public-api.ts"
+      ],
+      "@antischematic/angular-state-library/data": [
+        "projects/core/data/src/public-api.ts"
       ]
     },
     "baseUrl": "./",
