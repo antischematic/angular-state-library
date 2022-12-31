@@ -38,92 +38,92 @@ import createSpy = jasmine.createSpy;
 import objectContaining = jasmine.objectContaining;
 
 
-interface QueryState {
-   data: unknown
+interface QueryState<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
+   data: TData | null
    updatedAt: number
    isInitial: boolean
    error: unknown
-   pages: Page[]
+   pages: Page<TParams, TResult, TData, TPageParam>[]
 }
 
-interface FetchParams {
-   queryFn: (...params: any[]) => Observable<any>
-   queryParams: any[]
-   options?: QueryOptions
+interface FetchParams<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
+   queryFn: (...params: unknown extends TPageParam ? TParams : [TPageParam, ...TParams]) => Observable<any>
+   queryParams: TParams
+   options?: QueryOptions<TParams, TResult, TData, TPageParam>
    refresh?: boolean
-   pages?: Page[]
+   pages?: Page<TParams, TData, TParams>[]
 }
 
-interface LoadingEvent {
+interface LoadingEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "loading"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-interface SuccessEvent {
+interface SuccessEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "success"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-interface ProgressEvent {
+interface ProgressEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "progress"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-interface ErrorEvent {
+interface ErrorEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "error"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-interface InitialEvent {
+interface InitialEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "initial"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-interface MutationEvent {
+interface MutationEvent<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
    readonly type: "mutation"
-   readonly fetch: FetchParams
-   readonly state: QueryState
+   readonly fetch: FetchParams<TParams, TResult, TData, TPageParam>
+   readonly state: QueryState<TParams, TResult, TData, TPageParam>
 }
 
-type QueryEvent =
-   | InitialEvent
-   | LoadingEvent
-   | SuccessEvent
-   | ProgressEvent
-   | ErrorEvent
-   | MutationEvent
+type QueryEvent<TParams extends any[] = unknown[], TResult = unknown, TData = TResult, TPageParam = unknown> =
+   | InitialEvent<TParams, TResult, TData, TPageParam>
+   | LoadingEvent<TParams, TResult, TData, TPageParam>
+   | SuccessEvent<TParams, TResult, TData, TPageParam>
+   | ProgressEvent<TParams, TResult, TData, TPageParam>
+   | ErrorEvent<TParams, TResult, TData, TPageParam>
+   | MutationEvent<TParams, TResult, TData, TPageParam>
 
-interface Page extends QueryState {
-   params: any[]
-   currentPage: any,
-   nextPage?: any
-   previousPage?: any
+interface Page<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> extends QueryState<TParams, TResult, TData, TPageParam> {
+   params: TParams
+   currentPage: TPageParam,
+   nextPage?: TPageParam
+   previousPage?: TPageParam
 }
 
 type QueryStore = Map<string, {
-   fetch: Subject<FetchParams>
+   fetch: Subject<FetchParams<unknown[], unknown>>
    result: Observable<QueryEvent>
 }>
 
-interface QueryOptions {
-   key: string | ((params: any[]) => unknown[])
-   fetch: (...params: any[]) => Observable<unknown>
+interface QueryOptions<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
+   key: string | ((params: TParams) => any)
+   fetch: (...params: TParams) => Observable<TResult>
    cacheTime?: number
    store?: QueryStore
    refreshInterval?: number
-   previousPage?: (result: any) => any
-   nextPage?: (result: any) => any
-   select?: (result: any) => any
+   previousPage?: (result: TResult) => TPageParam | undefined
+   nextPage?: (result: TResult) => TPageParam | undefined
+   select?: (result: TResult) => TData
    keepPreviousData?: boolean
    staleTime?: number
 }
 
-const INITIAL_STATE: QueryState = Object.freeze({
+const INITIAL_STATE: QueryState<any, any, any, any> = Object.freeze({
    isInitial: true,
    isFetching: false,
    isProgress: false,
@@ -136,7 +136,7 @@ const INITIAL_STATE: QueryState = Object.freeze({
    updatedAt: 0
 })
 
-const getInitialEvent = (): InitialEvent => Object.freeze({
+const getInitialEvent = (): InitialEvent<any, any, any, any> => Object.freeze({
    type: "initial",
    fetch: {
       queryFn: noop,
@@ -168,7 +168,7 @@ function getTimer(ms: number) {
    return refresh
 }
 
-function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
+function getInvalidators(invalidate: Observable<any>, options: QueryOptions<any, any, any, any>) {
    if (options.refreshInterval) {
       invalidate = invalidate.pipe(
          mergeWith(getTimer(options.refreshInterval))
@@ -177,7 +177,7 @@ function getInvalidators(invalidate: Observable<any>, options: QueryOptions) {
    return invalidate
 }
 
-function upsertPage(state: any, cursor: any, pages: Page[], replace: number) {
+function upsertPage(state: any, cursor: any, pages: Page<any[], any>[], replace: number) {
    const newPages = pages.slice()
    for (const [index, page] of pages.entries()) {
       if (page.previousPage === cursor) {
@@ -199,7 +199,7 @@ function createPages(event: QueryEvent) {
    }
    const { type, fetch: { queryParams: [pageIndex, ...params] } } = event
    const previousPage = event.state.pages.find(page => page.currentPage === pageIndex)
-   const page = { ...previousPage, currentPage: pageIndex, params } as Page
+   const page = { ...previousPage, currentPage: pageIndex, params } as Page<any[], any>
 
    if (type === "success") {
       page.data = options.select?.(event.state.data) ?? event.state.data
@@ -216,12 +216,12 @@ function createPages(event: QueryEvent) {
    }
 }
 
-function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
-   return (source: Observable<FetchParams>) => source.pipe(
+function refreshInfiniteData(options: QueryOptions<any[], any>, pages: Page<any[], any>[] = []) {
+   return (source: Observable<FetchParams<any[], any>>) => source.pipe(
       createInfiniteResult(),
       filter(event => event.type === "success"),
       expand((event, index) => {
-         const current: Page = event.state.pages[index]
+         const current: Page<any[], any> = event.state.pages[index]
          if (current.nextPage !== void 0) {
             return of({ queryFn: event.fetch.queryFn, queryParams: [current.nextPage, ...current.params], options }).pipe(
                createInfiniteResult(event),
@@ -235,12 +235,12 @@ function refreshInfiniteData(options: QueryOptions, pages: Page[] = []) {
    )
 }
 
-function createInfiniteQuery(queryKey: string, store: QueryStore, options: QueryOptions) {
+function createInfiniteQuery(queryKey: string, store: QueryStore, options: QueryOptions<any, any, any, any>) {
    if (store.has(queryKey)) {
       return store.get(queryKey)!
    }
 
-   const fetch = new ReplaySubject<FetchParams>(1)
+   const fetch = new ReplaySubject<FetchParams<any[], any>>(1)
    const result: Observable<QueryEvent> = fetch.pipe(
       switchScan((event, fetch) => {
          return fetch.refresh
@@ -267,7 +267,7 @@ function createInfiniteResult(initialEvent: QueryEvent = getInitialEvent()) {
 }
 
 function createFetch<T>(operator: MonoTypeOperatorFunction<T> = (source: any) => source) {
-   return (source: Observable<FetchParams>) => source.pipe(
+   return (source: Observable<FetchParams<any[], any>>) => source.pipe(
       switchMap((fetch) => {
          const queryParams = fetch.refresh && fetch.pages?.length ? [fetch.pages[0].currentPage, ...fetch.queryParams.slice(1)] : fetch.queryParams
          return fetch.queryFn(...queryParams).pipe(
@@ -283,7 +283,7 @@ function createFetch<T>(operator: MonoTypeOperatorFunction<T> = (source: any) =>
 }
 
 function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: any = (event: any) => event) {
-   return (source: Observable<(ObservableNotification<any> | { kind: "F" }) & { fetch: FetchParams }>) => source.pipe(
+   return (source: Observable<(ObservableNotification<any> | { kind: "F" }) & { fetch: FetchParams<any[], any> }>) => source.pipe(
       scan(({ state }, event) => {
          const updatedAt = Date.now()
          switch (event.kind) {
@@ -292,7 +292,7 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                   type: "loading",
                   fetch: event.fetch,
                   state: { ...state, updatedAt, hasError: false, error: null, state: "fetch" },
-               } as LoadingEvent)
+               } as LoadingEvent<any[], any>)
             }
             case "N": {
                return mapResult({
@@ -300,7 +300,7 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                   fetch: event.fetch,
                   value: event.value,
                   state: { ...state, updatedAt, data: event.value, state: "progress" }
-               }) as ProgressEvent
+               }) as ProgressEvent<any[], any>
             }
             case "E": {
                return mapResult({
@@ -308,21 +308,21 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
                   fetch: event.fetch,
                   error: event.error,
                   state: { ...state, updatedAt, isInitial: false, error: event.error, state: "error" }
-               }) as ErrorEvent
+               }) as ErrorEvent<any[], any>
             }
             case "C": {
                return mapResult({
                   type: "success",
                   fetch: event.fetch,
                   state: { ...state, updatedAt, isInitial: false, state: "success" }
-               }) as SuccessEvent
+               }) as SuccessEvent<any[], any>
             }
          }
       }, initialEvent),
    )
 }
 
-function shareCache<T>(store: QueryStore, queryKey: string, options: QueryOptions): MonoTypeOperatorFunction<T> {
+function shareCache<T>(store: QueryStore, queryKey: string, options: QueryOptions<any[], any>): MonoTypeOperatorFunction<T> {
    return share({
       connector: () => new ReplaySubject(1),
       resetOnRefCountZero: () => {
@@ -333,11 +333,11 @@ function shareCache<T>(store: QueryStore, queryKey: string, options: QueryOption
    })
 }
 
-function createQuery(queryKey: string, store: QueryStore, options: QueryOptions) {
+function createQuery(queryKey: string, store: QueryStore, options: QueryOptions<any, any, any, any>) {
    if (store.has(queryKey)) {
       return store.get(queryKey)!
    }
-   const fetch = new ReplaySubject<FetchParams>(1)
+   const fetch = new ReplaySubject<FetchParams<any[], any>>(1)
    const result = fetch.pipe(
       createFetch(),
       createResult(),
@@ -349,7 +349,7 @@ function createQuery(queryKey: string, store: QueryStore, options: QueryOptions)
 
 const globalStore: QueryStore = new Map()
 
-const queries = new Set<QueryClient>()
+const queries = new Set<QueryClient<any, any, any, any>>()
 
 function stableHash(obj: any) {
    let hash = ""
@@ -410,21 +410,21 @@ function invalidateQueries(filter: QueryFilter = { params: [] }, options: { forc
    }
 }
 
-class QueryClient extends Observable<QueryClient> {
+class QueryClient<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> extends Observable<QueryClient<TParams, TResult, TData, TPageParam>> {
    key = ""
-   params = [] as any[]
-   query = new ReplaySubject<Observable<QueryEvent>>(1)
+   params: TPageParam extends unknown ? TParams : [TPageParam, ...TParams] = [] as any
+   query = new ReplaySubject<Observable<QueryEvent<TParams, TResult, TData, TPageParam>>>(1)
    connections = 0
    failureCount = 0
    emitter = new BehaviorSubject(this)
    subscription = Subscription.EMPTY
    store: QueryStore
-   event: QueryEvent = getInitialEvent()
+   event = getInitialEvent() as QueryEvent<TParams, TResult, TData, TPageParam>
    invalidator = new Subject<{ force?: boolean } | void>()
    window = false
    createQuery
    sub = Subscription.EMPTY
-   previousState?: QueryState
+   previousState?: QueryState<TParams, TResult, TData, TPageParam>
 
    get data() {
       return this.isPreviousData ? this.previousState!.data : this.value.data
@@ -514,7 +514,7 @@ class QueryClient extends Observable<QueryClient> {
       return this.previousState !== void 0
    }
 
-   next(event: QueryEvent) {
+   next(event: QueryEvent<TParams, TResult, TData, TPageParam>) {
       const mutation = event.type === "mutation"
       if (this.window || mutation) {
          this.previousState = event.type === "loading" && !!this.options.keepPreviousData
@@ -527,7 +527,7 @@ class QueryClient extends Observable<QueryClient> {
             this.failureCount = 0
             this.sub = getInvalidators(this.invalidator, this.options).subscribe(({ force = false } = {}) => {
                this.sub.unsubscribe()
-               this.fetchInternal(this.params, {refresh: true, force})
+               this.fetchInternal(this.params as any, {refresh: true, force})
             })
          } else if (!mutation) {
             this.sub.unsubscribe()
@@ -556,12 +556,12 @@ class QueryClient extends Observable<QueryClient> {
       }
    }
 
-   fetch(...queryParams: any[]) {
+   fetch(...queryParams: TPageParam extends unknown ? TParams : [TPageParam, ...TParams]) {
       this.fetchInternal(queryParams)
       return this
    }
 
-   fetchInternal(queryParams: any[], { refresh = false, force = false } = {}) {
+   fetchInternal(queryParams: TPageParam extends unknown ? TParams : [TPageParam, ...TParams], { refresh = false, force = false } = {}) {
       this.key = this.getQueryKey(queryParams.slice(+this.isInfinite))
       const { fetch, result } = this.createQuery(
          this.key,
@@ -571,33 +571,35 @@ class QueryClient extends Observable<QueryClient> {
       this.params = queryParams
       this.window = true
       if (refresh) {
-         result.pipe(take(1)).subscribe(this).unsubscribe()
+         result.pipe(take(1)).subscribe(this as any).unsubscribe()
       } else {
-         this.query.next(result)
+         this.query.next(result as any)
       }
       if (this.isSettled && this.isStale || force) {
          this.window = true
-         fetch.next({ queryFn: this.options.fetch, queryParams, refresh, pages: this.pages, options: this.options })
+         fetch.next({ queryFn: this.options.fetch as any, queryParams, refresh, pages: this.pages as any, options: this.options as any })
       }
    }
 
    fetchNextPage() {
       if (this.hasNextPage) {
-         return this.fetch(this.last.nextPage, ...this.params.slice(1))
+         const params = [this.last.nextPage!, ...this.params.slice(1)] as any
+         return this.fetch(...params)
       }
       return EMPTY
    }
 
    fetchPreviousPage() {
       if (this.hasPreviousPage) {
-         return this.fetch(this.first.previousPage, ...this.params.slice(1))
+         const params = [this.first.previousPage!, ...this.params.slice(1)] as any
+         return this.fetch(...params)
       }
       return EMPTY
    }
 
    getQueryKey(params: any[]) {
       const { key, cacheTime = 300_000 } = this.options
-      const [actualKey, ...rest] = typeof key === "string" ? [key, ...params] : key(params)
+      const [actualKey, ...rest] = typeof key === "string" ? [key, ...params] : key(params as TParams)
       return actualKey + stableHash([...rest, cacheTime])
    }
 
@@ -606,7 +608,7 @@ class QueryClient extends Observable<QueryClient> {
       return this
    }
 
-   setValue(value: Partial<QueryState>) {
+   setValue(value: Partial<QueryState<TParams, TResult, TData, TPageParam>>) {
       const { fetch, state } = this.event
       this.next({
          type: "mutation",
@@ -618,7 +620,7 @@ class QueryClient extends Observable<QueryClient> {
       })
    }
 
-   constructor(public options: QueryOptions) {
+   constructor(public options: QueryOptions<TParams, TResult, TData, TPageParam>) {
       super((observer) => {
          this.connect()
          observer.add(this.emitter.subscribe(observer))
@@ -1223,6 +1225,9 @@ describe("Query", () => {
          select: result => result.data
       })
 
+      query.pages[0].currentPage
+      query.event.fetch.queryParams
+
       subscribeSpyTo(query.fetch(cursor))
 
       query.fetchNextPage()
@@ -1535,7 +1540,7 @@ describe("Query", () => {
          refreshInterval: 5000,
       })
 
-      subscribeSpyTo(query.fetch())
+      subscribeSpyTo(query.fetch(10))
 
       expect(spy).toHaveBeenCalledTimes(1)
 
@@ -1558,7 +1563,7 @@ describe("Query", () => {
          staleTime: 10000,
       })
 
-      subscribeSpyTo(query.fetch())
+      subscribeSpyTo(query.fetch(10))
 
       expect(spy).toHaveBeenCalledTimes(1)
 
