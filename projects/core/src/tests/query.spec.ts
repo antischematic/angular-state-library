@@ -3,7 +3,7 @@ import {discardPeriodicTasks, fakeAsync, tick} from "@angular/core/testing";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
 import {
    BehaviorSubject, concatAll,
-   delay,
+   delay, dematerialize,
    distinctUntilChanged,
    EMPTY,
    expand,
@@ -16,11 +16,11 @@ import {
    mergeAll,
    mergeWith,
    MonoTypeOperatorFunction,
-   Observable,
+   Observable, ObservableNotification,
    of,
-   pipe,
+   pipe, queueScheduler,
    ReplaySubject,
-   scan,
+   scan, scheduled,
    share,
    startWith,
    Subject,
@@ -28,13 +28,14 @@ import {
    switchAll,
    switchMap,
    switchScan,
-   take,
+   take, takeWhile,
    tap,
    throwError,
    timer
 } from "rxjs";
 import {arrayContaining} from "./utils/event-matcher";
 import createSpy = jasmine.createSpy;
+import objectContaining = jasmine.objectContaining;
 
 
 interface QueryState {
@@ -83,12 +84,19 @@ interface InitialEvent {
    readonly state: QueryState
 }
 
+interface MutationEvent {
+   readonly type: "mutation"
+   readonly fetch: FetchParams
+   readonly state: QueryState
+}
+
 type QueryEvent =
    | InitialEvent
    | LoadingEvent
    | SuccessEvent
    | ProgressEvent
    | ErrorEvent
+   | MutationEvent
 
 interface Page extends QueryState {
    params: any[]
@@ -253,15 +261,17 @@ function createInfiniteQuery(queryKey: string, store: QueryStore, options: Query
 
 function createInfiniteResult(initialEvent: QueryEvent = getInitialEvent()) {
    return pipe(
+      createFetch(),
       createResult(initialEvent, createPages),
    )
 }
 
-function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: any = (event: any) => event) {
+function createFetch<T>(operator: MonoTypeOperatorFunction<T> = (source: any) => source) {
    return (source: Observable<FetchParams>) => source.pipe(
       switchMap((fetch) => {
          const queryParams = fetch.refresh && fetch.pages?.length ? [fetch.pages[0].currentPage, ...fetch.queryParams.slice(1)] : fetch.queryParams
          return fetch.queryFn(...queryParams).pipe(
+            operator,
             materialize(),
             startWith({kind: "F"} as const),
             map(result => {
@@ -269,6 +279,11 @@ function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: a
             })
          )
       }),
+   )
+}
+
+function createResult(initialEvent: QueryEvent = getInitialEvent(), mapResult: any = (event: any) => event) {
+   return (source: Observable<(ObservableNotification<any> | { kind: "F" }) & { fetch: FetchParams }>) => source.pipe(
       scan(({ state }, event) => {
          const updatedAt = Date.now()
          switch (event.kind) {
@@ -324,11 +339,12 @@ function createQuery(queryKey: string, store: QueryStore, options: QueryOptions)
    }
    const fetch = new ReplaySubject<FetchParams>(1)
    const result = fetch.pipe(
+      createFetch(),
       createResult(),
       shareCache(store, queryKey, options)
    )
    store.set(queryKey, { fetch, result })
-   return { fetch, result }
+   return { fetch, result  }
 }
 
 const globalStore: QueryStore = new Map()
@@ -355,7 +371,8 @@ interface Query {
 }
 
 interface PartialQueryFilter {
-   params: any[]
+   name?: string
+   params?: any[]
    exact?: boolean
 }
 
@@ -371,9 +388,10 @@ function invalidateQueries(filter: QueryFilter = { params: [] }, options: { forc
    if (typeof filter === "function") {
       throw new Error("Not implemented")
    } else {
-      const { params, exact } = filter
+      const { name = "", params = [], exact } = filter
       for (const query of Array.from(queries)) {
-         let invalidate = params.length === 0
+         const keyMatch = exact ? query.key === name : query.key.startsWith(name)
+         let invalidate = params.length === 0 && keyMatch
          if (params.length > query.params.length) {
             continue
          }
@@ -496,7 +514,8 @@ class QueryClient extends Observable<QueryClient> {
    }
 
    next(event: QueryEvent) {
-      if (this.window) {
+      const mutation = event.type === "mutation"
+      if (this.window || mutation) {
          this.previousState = event.type === "loading" && !!this.options.keepPreviousData
             ? this.event.state
             : void 0
@@ -505,10 +524,10 @@ class QueryClient extends Observable<QueryClient> {
                this.sub.unsubscribe()
                this.fetchInternal(this.params, {refresh: true, force})
             })
-         } else {
+         } else if (!mutation) {
             this.sub.unsubscribe()
          }
-         this.window = event.type !== "success" && event.type !== "error"
+         this.window = event.type !== "success" && event.type !== "error" && !mutation
          this.event = event
          this.emitter.next(this)
       }
@@ -559,25 +578,39 @@ class QueryClient extends Observable<QueryClient> {
 
    fetchNextPage() {
       if (this.hasNextPage) {
-         this.fetch(this.last.nextPage, ...this.params.slice(1))
+         return this.fetch(this.last.nextPage, ...this.params.slice(1))
       }
+      return EMPTY
    }
 
    fetchPreviousPage() {
       if (this.hasPreviousPage) {
-         this.fetch(this.first.previousPage, ...this.params.slice(1))
+         return this.fetch(this.first.previousPage, ...this.params.slice(1))
       }
+      return EMPTY
    }
 
    getQueryKey(params: any[]) {
       const { key, cacheTime = 300_000 } = this.options
-      const segments = typeof key === "string" ? [key, ...params] : key(params)
-      return stableHash([segments, cacheTime])
+      const [actualKey, ...rest] = typeof key === "string" ? [key, ...params] : key(params)
+      return actualKey + stableHash([...rest, cacheTime])
    }
 
    refetch(options: { force?: boolean } = {}) {
       this.invalidator.next(options)
       return this
+   }
+
+   setValue(value: Partial<QueryState>) {
+      const { fetch, state } = this.event
+      this.next({
+         type: "mutation",
+         fetch,
+         state: {
+            ...state,
+            ...value
+         }
+      })
    }
 
    constructor(public options: QueryOptions) {
@@ -601,6 +634,54 @@ const QueryStore = new InjectionToken<QueryStore>("QueryStore", {
 
 interface MutationOptions {
    mutate: (...params: any[]) => Observable<any>
+   onSettled?: (context: MutationContext) => void
+   onError?: (context: MutationContext) => void
+   onProgress?: (context: MutationContext) => void
+   onSuccess?: (context: MutationContext) => void
+   onMutate?: (context: MutationContext) => void
+}
+
+interface MutationContext {
+   params: unknown[]
+   error: unknown
+   value: unknown
+   values: unknown[]
+}
+
+class MutationObserver {
+   context: MutationContext
+
+   subscribe() {
+      this.context = this.options.onMutate?.(this.context) ?? this.context
+   }
+
+   next(value: any) {
+      this.context.value = value
+      this.context.values = [...this.context.values, value]
+      this.context = this.options.onProgress?.(this.context) ?? this.context
+   }
+
+   error(error: unknown) {
+      this.context.error = error
+      this.context = this.options.onError?.(this.context) ?? this.context
+   }
+
+   complete() {
+      this.context = this.options.onSuccess?.(this.context) ?? this.context
+   }
+
+   finalize() {
+      this.options.onSettled?.(this.context)
+   }
+
+   constructor(params: any[], private options: MutationOptions) {
+      this.context = {
+         error: null,
+         value: undefined,
+         values: [],
+         params
+      }
+   }
 }
 
 class MutationClient extends Observable<MutationClient> {
@@ -671,11 +752,20 @@ class MutationClient extends Observable<MutationClient> {
    }
 
    mutate(...params: any[]) {
-      const result = of({ queryFn: this.options.mutate, queryParams: params }).pipe(
-         createResult()
+      const fetch = of({ queryFn: this.options.mutate, queryParams: params }).pipe(
+         createFetch(tap(new MutationObserver(params, this.options))),
+         share({
+            connector: () => new ReplaySubject(),
+            resetOnComplete: false,
+            resetOnRefCountZero: true
+         })
       )
+      const result = fetch.pipe(createResult())
       this.mutation.next(result)
-      return this
+      return fetch.pipe(
+         filter((event): event is any => event.kind !== "F"),
+         dematerialize()
+      )
    }
 
    reset() {
@@ -748,6 +838,96 @@ describe("Mutation", () => {
 
       mutation.disconnect()
    }))
+
+   it("should return the mutation result", () => {
+      let result
+      const spy = createSpy()
+      const mutation = new MutationClient({
+         mutate: () => from([0, 1, 2]).pipe(tap({ subscribe: spy }))
+      })
+
+      mutation.connect()
+      result = subscribeSpyTo(mutation.mutate())
+
+      expect(spy).toHaveBeenCalledTimes(1)
+      expect(result.getValues()).toEqual([0, 1, 2])
+
+      mutation.disconnect()
+   })
+
+   it("should invalidate queries", () => {
+      let count = 0
+      const spy = createSpy()
+      const query = new QueryClient({
+         key: "todos",
+         fetch: () => of(count++).pipe(tap({ subscribe: spy }))
+      })
+      const mutation = new MutationClient({
+         mutate: () => of(0),
+         onSettled() {
+            invalidateQueries({ name: "todos" })
+         }
+      })
+
+      query.connect()
+      mutation.connect()
+
+      query.fetch()
+      mutation.mutate()
+
+      expect(spy).toHaveBeenCalledTimes(2)
+      expect(query.data).toBe(1)
+
+      query.disconnect()
+      mutation.disconnect()
+   })
+
+   it("should call error handler", () => {
+      const onError = createSpy()
+      const onSettled = createSpy()
+      const mutation = new MutationClient({
+         mutate: () => throwError(() => new Error("BOGUS")),
+         onError,
+         onSettled
+      })
+
+      mutation.connect()
+
+      mutation.mutate()
+
+      expect(onError).toHaveBeenCalledOnceWith(objectContaining({ error: new Error("BOGUS") }))
+      expect(onSettled).toHaveBeenCalledOnceWith(objectContaining({ error: new Error("BOGUS") }))
+
+      mutation.disconnect()
+   })
+
+   it("should call side effects", () => {
+      const value = 10
+      const onMutate = createSpy()
+      const onProgress = createSpy()
+      const onSuccess = createSpy()
+      const onSettled = createSpy()
+      const mutation = new MutationClient({
+         mutate: (value: number) => from([value + 1, value + 2, value + 3]),
+         onMutate: (context) => onMutate({...context}),
+         onProgress: (context) => onProgress({...context}),
+         onSuccess: (context) => onSuccess({...context}),
+         onSettled: (context) => onSettled({...context}),
+      })
+
+      mutation.connect()
+
+      mutation.mutate(value)
+
+      expect(onMutate).toHaveBeenCalledOnceWith({ error: null, params: [value], value: void 0, values: [] })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 1, values: [value + 1] })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 2, values: [value + 1, value + 2] })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
+      expect(onSuccess).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
+      expect(onSettled).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
+
+      mutation.disconnect()
+   })
 })
 
 describe("Query", () => {
@@ -1349,5 +1529,21 @@ describe("Query", () => {
       query.refetch({ force: true })
 
       expect(spy).toHaveBeenCalledTimes(2)
+   })
+
+   it("should manually set query data",() => {
+      const expected = 10
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (value: number) => of(0)
+      })
+
+      query.connect()
+
+      query.setValue({ data: expected })
+
+      expect(query.data).toBe(expected)
+
+      query.disconnect()
    })
 })
