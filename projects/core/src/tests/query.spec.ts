@@ -415,6 +415,7 @@ class QueryClient extends Observable<QueryClient> {
    params = [] as any[]
    query = new ReplaySubject<Observable<QueryEvent>>(1)
    connections = 0
+   failureCount = 0
    emitter = new BehaviorSubject(this)
    subscription = Subscription.EMPTY
    store: QueryStore
@@ -519,7 +520,11 @@ class QueryClient extends Observable<QueryClient> {
          this.previousState = event.type === "loading" && !!this.options.keepPreviousData
             ? this.event.state
             : void 0
+         if (event.type === "error") {
+            this.failureCount++
+         }
          if (event.type === "success") {
+            this.failureCount = 0
             this.sub = getInvalidators(this.invalidator, this.options).subscribe(({ force = false } = {}) => {
                this.sub.unsubscribe()
                this.fetchInternal(this.params, {refresh: true, force})
@@ -690,6 +695,7 @@ class MutationClient extends Observable<MutationClient> {
    emitter = new BehaviorSubject<MutationClient>(this)
    event: QueryEvent = getInitialEvent()
    subscription = Subscription.EMPTY
+   failureCount = 0
 
    get data() {
       return this.value.data
@@ -733,6 +739,12 @@ class MutationClient extends Observable<MutationClient> {
    }
 
    next(event: QueryEvent) {
+      if (event.type === "error") {
+         this.failureCount++
+      }
+      if (event.type === "success") {
+         this.failureCount = 0
+      }
       this.event = event
       this.emitter.next(this)
    }
@@ -769,6 +781,7 @@ class MutationClient extends Observable<MutationClient> {
    }
 
    reset() {
+      this.failureCount = 0
       this.event = getInitialEvent()
    }
 
@@ -864,8 +877,8 @@ describe("Mutation", () => {
       })
       const mutation = new MutationClient({
          mutate: () => of(0),
-         onSettled() {
-            invalidateQueries({ name: "todos" })
+         onSettled: () => {
+            query.refetch()
          }
       })
 
@@ -925,6 +938,29 @@ describe("Mutation", () => {
       expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
       expect(onSuccess).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
       expect(onSettled).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
+
+      mutation.disconnect()
+   })
+
+   it("should count errors", () => {
+      const mutation = new MutationClient({
+         mutate: (shouldThrow: boolean) => shouldThrow ? throwError(() => new Error("BOGUS")) : of(0)
+      })
+
+      mutation.connect()
+
+      mutation.mutate(true)
+
+      expect(mutation.failureCount).toBe(1)
+
+      mutation.mutate(true)
+      mutation.mutate(true)
+
+      expect(mutation.failureCount).toBe(3)
+
+      mutation.mutate(false)
+
+      expect(mutation.failureCount).toBe(0)
 
       mutation.disconnect()
    })
@@ -1543,6 +1579,30 @@ describe("Query", () => {
       query.setValue({ data: expected })
 
       expect(query.data).toBe(expected)
+
+      query.disconnect()
+   })
+
+   it("should count errors", () => {
+      const query = new QueryClient({
+         key: "todos",
+         fetch: (shouldThrow: boolean) => shouldThrow ? throwError(() => new Error("BOGUS")) : of(0)
+      })
+
+      query.connect()
+
+      query.fetch(true)
+
+      expect(query.failureCount).toBe(1)
+
+      query.fetch(true)
+      query.fetch(true)
+
+      expect(query.failureCount).toBe(3)
+
+      query.fetch(false)
+
+      expect(query.failureCount).toBe(0)
 
       query.disconnect()
    })
