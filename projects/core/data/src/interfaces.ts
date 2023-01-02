@@ -1,5 +1,5 @@
 import {Observable, Subject} from "rxjs";
-import {EnvironmentInjector, Injector} from "@angular/core";
+import {Injector} from "@angular/core";
 
 export interface Query {
    queryKey: any[]
@@ -19,21 +19,26 @@ export type QueryFilter =
    | PartialQueryFilter
    | QueryFilterPredicate
 
-export interface MutationOptions {
-   mutate: (...params: any[]) => Observable<any>
-   onSettled?: (context: MutationContext) => void
-   onError?: (context: MutationContext) => void
-   onProgress?: (context: MutationContext) => void
-   onSuccess?: (context: MutationContext) => void
-   onMutate?: (context: MutationContext) => void
+export interface MutationOptions<TParams extends any[], TResult> {
+   mutate: (...params: TParams) => Observable<TResult>
+   onSettled?: (context: MutationContext<TParams, TResult>) => void
+   onError?: (context: MutationContext<TParams, TResult>) => void
+   onProgress?: (context: MutationContext<TParams, TResult>) => void
+   onSuccess?: (context: MutationContext<TParams, TResult>) => void
+   onMutate?: (context: MutationContext<TParams, TResult>) => void
    injector?: Injector
 }
 
-export interface MutationContext {
-   params: unknown[]
+export interface InvalidateOptions {
+   force?: boolean
+}
+
+export interface MutationContext<TParams extends any[] = unknown[], TResult = unknown> {
+   params: TParams
    error: unknown
-   value: unknown
-   values: unknown[]
+   value?: TResult
+   values: TResult[]
+   invalidateQueries: (filter: QueryFilter, options?: InvalidateOptions) => boolean
 }
 
 export interface QueryState<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {
@@ -104,8 +109,8 @@ export interface Page<TParams extends any[], TResult, TData = TResult, TPagePara
 }
 
 export type QueryStore = Map<string, {
-   fetch: Subject<FetchParams<unknown[], unknown>>
-   result: Observable<QueryEvent>
+   fetch: Subject<FetchParams<any, any, any, any>>
+   result: Observable<QueryEvent<any, any, any, any>>
 }>
 
 export interface QueryOptions<TParams extends any[], TResult, TData = TResult, TPageParam = unknown> {

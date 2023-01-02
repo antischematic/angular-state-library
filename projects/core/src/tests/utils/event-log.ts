@@ -29,12 +29,6 @@ export class EventLog {
       return TestBed.inject(EventLog).events
    }
 
-   static findEvents({ name = "[^\s]*", type = "[^\s]*" }: EventMatcher) {
-      const nameMatch = new RegExp(name)
-      const typeMatch = new RegExp(type)
-      return TestBed.inject(EventLog).events.filter(event => nameMatch.test(event.name) && typeMatch.test(event.type))
-   }
-
    static monitor(fixture: ComponentFixture<any>) {
       TestBed.inject(EventLog).monitor(fixture.componentInstance)
    }

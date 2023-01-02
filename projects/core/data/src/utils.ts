@@ -50,7 +50,7 @@ export const createInitialEvent = (): InitialEvent<any, any, any, any> => Object
 })
 
 export function createFetch<T>(environmentInjector: EnvironmentInjector, operator: MonoTypeOperatorFunction<T> = (source: any) => source) {
-   return (source: Observable<FetchParams<any[], any>>) => source.pipe(
+   return (source: Observable<FetchParams<any, any, any, any>>) => source.pipe(
       switchMap((fetch) => {
          const queryParams = fetch.refresh && fetch.pages?.length ? [fetch.pages[0].currentPage, ...fetch.queryParams.slice(1)] : fetch.queryParams
          return environmentInjector.runInContext(() => fetch.queryFn(...queryParams)).pipe(
@@ -65,8 +65,8 @@ export function createFetch<T>(environmentInjector: EnvironmentInjector, operato
    )
 }
 
-export function createResult(initialEvent: QueryEvent = createInitialEvent(), mapResult: any = (event: any) => event) {
-   return (source: Observable<(ObservableNotification<any> | { kind: "F" }) & { fetch: FetchParams<any[], any> }>) => source.pipe(
+export function createResult(initialEvent: QueryEvent<any, any, any, any> = createInitialEvent(), mapResult: any = (event: any) => event) {
+   return (source: Observable<(ObservableNotification<any> | { kind: "F" }) & { fetch: FetchParams<any, any, any, any> }>) => source.pipe(
       scan(({ state }, event) => {
          const updatedAt = Date.now()
          switch (event.kind) {
@@ -75,7 +75,7 @@ export function createResult(initialEvent: QueryEvent = createInitialEvent(), ma
                   type: "loading",
                   fetch: event.fetch,
                   state: { ...state, updatedAt: 0, hasError: false, error: null, state: "fetch" },
-               } as LoadingEvent<any[], any>)
+               } as LoadingEvent<any, any, any, any>)
             }
             case "N": {
                return mapResult({
@@ -83,7 +83,7 @@ export function createResult(initialEvent: QueryEvent = createInitialEvent(), ma
                   fetch: event.fetch,
                   value: event.value,
                   state: { ...state, updatedAt: 0, data: event.value, state: "progress" }
-               }) as ProgressEvent<any[], any>
+               }) as ProgressEvent<any, any, any, any>
             }
             case "E": {
                return mapResult({
@@ -91,14 +91,14 @@ export function createResult(initialEvent: QueryEvent = createInitialEvent(), ma
                   fetch: event.fetch,
                   error: event.error,
                   state: { ...state, updatedAt, isInitial: false, error: event.error, state: "error" }
-               }) as ErrorEvent<any[], any>
+               }) as ErrorEvent<any, any, any, any>
             }
             case "C": {
                return mapResult({
                   type: "success",
                   fetch: event.fetch,
                   state: { ...state, updatedAt, isInitial: false, state: "success" }
-               }) as SuccessEvent<any[], any>
+               }) as SuccessEvent<any, any, any, any>
             }
          }
       }, initialEvent)

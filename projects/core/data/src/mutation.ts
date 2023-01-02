@@ -10,13 +10,14 @@ import {
    Subscription,
    tap
 } from "rxjs";
+import {QUERY_CONFIG} from "./providers";
+import {invalidateQueries} from "./query";
 import {createFetch, createResult, createInitialEvent} from "./utils";
-import {MutationContext, MutationOptions, QueryEvent} from "./interfaces";
+import {MutationContext, MutationOptions, QueryEvent, QueryFilter} from "./interfaces";
 import {EnvironmentInjector, inject, INJECTOR, Injector} from "@angular/core";
-import {nullInjector} from "./providers";
 
-class MutationObserver {
-   context: MutationContext
+class MutationObserver<TParams extends any[], TResult> {
+   context: MutationContext<TParams, TResult>
 
    subscribe() {
       this.context = this.options.onMutate?.(this.context) ?? this.context
@@ -41,28 +42,29 @@ class MutationObserver {
       this.options.onSettled?.(this.context)
    }
 
-   constructor(params: any[], private options: MutationOptions) {
+   constructor(client: MutationClient<any, any>, params: TParams, private options: MutationOptions<TParams, TResult>) {
       this.context = {
          error: null,
          value: undefined,
          values: [],
-         params
+         params,
+         invalidateQueries: (...params) => client.invalidateQueries(...params)
       }
    }
 }
 
-export class MutationClient extends Observable<MutationClient> {
+export class MutationClient<TParams extends any[], TResult> extends Observable<MutationClient<TParams, TResult>> {
    connections = 0
-   mutation = new Subject<Observable<QueryEvent>>()
-   emitter = new BehaviorSubject<MutationClient>(this)
-   event: QueryEvent = createInitialEvent()
+   mutation = new Subject<Observable<QueryEvent<TParams, TResult>>>()
+   emitter = new BehaviorSubject<MutationClient<TParams, TResult>>(this)
+   event: QueryEvent<TParams, TResult> = createInitialEvent()
    subscription = Subscription.EMPTY
    failureCount = 0
    injector: Injector
    environmentalInjector: EnvironmentInjector
 
    get data() {
-      return this.value.data
+      return this.value.data ?? null
    }
 
    get isFetching() {
@@ -102,7 +104,7 @@ export class MutationClient extends Observable<MutationClient> {
       return this.event.type
    }
 
-   next(event: QueryEvent) {
+   next(event: QueryEvent<TParams, TResult>) {
       if (event.type === "error") {
          this.failureCount++
       }
@@ -127,9 +129,9 @@ export class MutationClient extends Observable<MutationClient> {
       }
    }
 
-   mutate(...params: any[]) {
+   mutate(...params: TParams): Observable<TResult> {
       const fetch = of({ queryFn: this.options.mutate, queryParams: params }).pipe(
-         createFetch(this.environmentalInjector, tap(new MutationObserver(params, this.options))),
+         createFetch(this.environmentalInjector, tap(new MutationObserver<TParams, TResult>(this, params, this.options))),
          share({
             connector: () => new ReplaySubject(),
             resetOnComplete: false,
@@ -141,7 +143,7 @@ export class MutationClient extends Observable<MutationClient> {
       return fetch.pipe(
          filter((event): event is any => event.kind !== "F"),
          dematerialize()
-      )
+      ) as Observable<TResult>
    }
 
    reset() {
@@ -149,7 +151,12 @@ export class MutationClient extends Observable<MutationClient> {
       this.event = createInitialEvent()
    }
 
-   constructor(public options: MutationOptions) {
+   invalidateQueries(filter: QueryFilter, options?: { force?: boolean }) {
+      const { clients } = this.injector.get(QUERY_CONFIG)
+      return invalidateQueries(clients, filter, options)
+   }
+
+   constructor(public options: MutationOptions<TParams, TResult>) {
       super((subscriber => {
          this.connect()
          subscriber.add(this.emitter.subscribe(subscriber))

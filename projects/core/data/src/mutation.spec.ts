@@ -1,6 +1,7 @@
+import {INJECTOR} from "@angular/core";
 import {from, interval, of, take, tap, throwError} from "rxjs";
 import {subscribeSpyTo} from "@hirez_io/observer-spy";
-import {fakeAsync, tick} from "@angular/core/testing";
+import {fakeAsync, TestBed, tick} from "@angular/core/testing";
 import {MutationClient} from "./mutation";
 import createSpy = jasmine.createSpy;
 import objectContaining = jasmine.objectContaining;
@@ -9,7 +10,8 @@ import {QueryClient} from "./query";
 describe("Mutation", () => {
    it("should create", () => {
       const mutation = new MutationClient({
-         mutate: () => of(0)
+         mutate: () => of(0),
+         injector: TestBed.inject(INJECTOR)
       })
 
       expect(mutation).toBeInstanceOf(MutationClient)
@@ -17,7 +19,8 @@ describe("Mutation", () => {
 
    it("should mutate data", () => {
       const mutation = new MutationClient({
-         mutate: () => of(0)
+         mutate: () => of(0),
+         injector: TestBed.inject(INJECTOR)
       })
       subscribeSpyTo(mutation)
 
@@ -28,7 +31,8 @@ describe("Mutation", () => {
 
    it("should have transition states", fakeAsync(() => {
       const mutation = new MutationClient({
-         mutate: () => interval(1000).pipe(take(3))
+         mutate: () => interval(1000).pipe(take(3)),
+         injector: TestBed.inject(INJECTOR)
       })
 
       expect(mutation.isSettled).toBeTrue()
@@ -68,7 +72,8 @@ describe("Mutation", () => {
       let result
       const spy = createSpy()
       const mutation = new MutationClient({
-         mutate: () => from([0, 1, 2]).pipe(tap({ subscribe: spy }))
+         mutate: () => from([0, 1, 2]).pipe(tap({ subscribe: spy })),
+         injector: TestBed.inject(INJECTOR)
       })
 
       mutation.connect()
@@ -85,13 +90,15 @@ describe("Mutation", () => {
       const spy = createSpy()
       const query = new QueryClient({
          key: "todos",
-         fetch: () => of(count++).pipe(tap({ subscribe: spy }))
+         fetch: () => of(count++).pipe(tap({ subscribe: spy })),
+         injector: TestBed.inject(INJECTOR)
       })
       const mutation = new MutationClient({
          mutate: () => of(0),
          onSettled: () => {
             query.refetch()
-         }
+         },
+         injector: TestBed.inject(INJECTOR)
       })
 
       query.connect()
@@ -113,7 +120,8 @@ describe("Mutation", () => {
       const mutation = new MutationClient({
          mutate: () => throwError(() => new Error("BOGUS")),
          onError,
-         onSettled
+         onSettled,
+         injector: TestBed.inject(INJECTOR)
       })
 
       mutation.connect()
@@ -138,25 +146,27 @@ describe("Mutation", () => {
          onProgress: (context) => onProgress({...context}),
          onSuccess: (context) => onSuccess({...context}),
          onSettled: (context) => onSettled({...context}),
+         injector: TestBed.inject(INJECTOR)
       })
 
       mutation.connect()
 
       mutation.mutate(value)
 
-      expect(onMutate).toHaveBeenCalledOnceWith({ error: null, params: [value], value: void 0, values: [] })
-      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 1, values: [value + 1] })
-      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 2, values: [value + 1, value + 2] })
-      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
-      expect(onSuccess).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
-      expect(onSettled).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3] })
+      expect(onMutate).toHaveBeenCalledOnceWith({ error: null, params: [value], value: void 0, values: [], invalidateQueries: jasmine.any(Function) })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 1, values: [value + 1], invalidateQueries: jasmine.any(Function) })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 2, values: [value + 1, value + 2], invalidateQueries: jasmine.any(Function) })
+      expect(onProgress).toHaveBeenCalledWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3], invalidateQueries: jasmine.any(Function) })
+      expect(onSuccess).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3], invalidateQueries: jasmine.any(Function) })
+      expect(onSettled).toHaveBeenCalledOnceWith({ error: null, params: [value], value: value + 3, values: [value + 1, value + 2, value + 3], invalidateQueries: jasmine.any(Function) })
 
       mutation.disconnect()
    })
 
    it("should count errors", () => {
       const mutation = new MutationClient({
-         mutate: (shouldThrow: boolean) => shouldThrow ? throwError(() => new Error("BOGUS")) : of(0)
+         mutate: (shouldThrow: boolean) => shouldThrow ? throwError(() => new Error("BOGUS")) : of(0),
+         injector: TestBed.inject(INJECTOR)
       })
 
       mutation.connect()

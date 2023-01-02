@@ -13,23 +13,19 @@ import {
    Action,
    Caught,
    dispatch,
-   events, get,
+   events,
+   inputs,
    Invoke,
    Layout,
    loadEffect,
-   Select, Selector,
+   Select,
    Store,
    TransitionToken,
    useInputs,
-   useMerge,
-   useTransition,
-   withState,
-   next,
-   inputs,
-   set
+   useTransition
 } from '@antischematic/angular-state-library';
 import {MutationClient, QueryClient} from "@antischematic/angular-state-library/data"
-import {Observable, timer} from 'rxjs';
+import {delay, Observable, timer} from 'rxjs';
 import updateTodo from './effects/update-todo';
 import {Todo} from './interfaces';
 import {UISpinner} from './spinner.component';
@@ -146,13 +142,12 @@ export class UITodos {
 
 const endpoint = `https://jsonplaceholder.typicode.com/todos`
 
-const Loading = new TransitionToken<Todo[]>("loading", {
-   cancelPrevious: true,
-})
+const Loading = new TransitionToken<Todo[]>("loading")
 
 function loadTodos(userId: string): Observable<Todo[]> {
    const loading = inject(Loading)
    return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
+      delay(1000),
       useTransition(loading, {emit: true}),
    )
 }

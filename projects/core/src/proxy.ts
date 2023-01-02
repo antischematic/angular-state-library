@@ -54,7 +54,7 @@ function createObjectProxy(object: object) {
          if (typeof value === "function") {
             return new Proxy(value, {
                apply(target: any, thisArg: any, argArray: any[]): any {
-                  return Reflect.apply(target, object, argArray)
+                  return Reflect.apply(target, untrack(thisArg), argArray)
                }
             })
          }

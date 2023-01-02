@@ -116,7 +116,9 @@ export class TransitionSpec implements ZoneSpec {
 
    cancelTasks() {
       for (const task of this.tasks) {
-         task.zone.cancelTask(task)
+         if (task.type !== "eventTask") {
+            task.zone.cancelTask(task)
+         }
       }
    }
 
@@ -184,10 +186,10 @@ export class Transition<T = unknown> implements OnSelect {
       if (Zone.current.get("id") === this.spec.properties.id) {
          return fn.apply(this, applyArgs)
       } else {
-         const zone = Zone.current.fork(this.spec)
          if (this.options.cancelPrevious) {
             this.cancel()
          }
+         const zone = Zone.current.fork(this.spec)
          return zone.runGuarded(fn, applyThis, applyArgs)
       }
    }

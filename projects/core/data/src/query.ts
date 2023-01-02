@@ -115,8 +115,8 @@ function createInfiniteQuery(environmentInjector: EnvironmentInjector, queryKey:
       return store.get(queryKey)!
    }
 
-   const fetch = new ReplaySubject<FetchParams<any[], any>>(1)
-   const result: Observable<QueryEvent> = fetch.pipe(
+   const fetch = new ReplaySubject<FetchParams<any, any, any, any>>(1)
+   const result: Observable<QueryEvent<any, any, any, any>> = fetch.pipe(
       switchScan((event, fetch) => {
          return fetch.refresh
             ? of(fetch).pipe(
@@ -125,7 +125,7 @@ function createInfiniteQuery(environmentInjector: EnvironmentInjector, queryKey:
             : of(fetch).pipe(
                createInfiniteResult(environmentInjector, event)
             )
-      }, createInitialEvent() as QueryEvent),
+      }, createInitialEvent() as QueryEvent<any, any, any, any>),
       shareCache(store, queryKey, options)
    )
 
@@ -156,7 +156,7 @@ function createQuery(environmentInjector: EnvironmentInjector, queryKey: string,
    if (store.has(queryKey)) {
       return store.get(queryKey)!
    }
-   const fetch = new ReplaySubject<FetchParams<any[], any>>(1)
+   const fetch = new ReplaySubject<FetchParams<any, any, any, any>>(1)
    const result = fetch.pipe(
       createFetch(environmentInjector),
       createResult(),
@@ -291,15 +291,17 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
       const mutation = event.type === "mutation"
       const params = event.fetch.queryParams
       if (this.window || mutation) {
-         if ((event.type === "initial") && !!this.options.keepPreviousData && !this.previousState) {
-            this.previousState = this.event.state
+         if ((event.type === "initial") && !!this.options.keepPreviousData) {
+            if (!this.isPreviousData) {
+               this.previousState = this.event.state
+            }
+         } else if (event.type !== "loading") {
+            this.previousState = void 0
          }
          if (event.type === "error") {
-            this.previousState = void 0
             this.failureCount++
          }
          if (event.type === "success") {
-            this.previousState = void 0
             this.failureCount = 0
          }
          if (!mutation) {
@@ -401,6 +403,11 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
       })
    }
 
+   invalidateQueries(filter: QueryFilter, options?: { force?: boolean }) {
+      const { clients } = this.injector.get(QUERY_CONFIG)
+      return invalidateQueries(clients, filter, options)
+   }
+
    constructor(public options: QueryOptions<TParams, TResult, TData, TPageParam>) {
       super((observer) => {
          this.connect()
@@ -416,7 +423,9 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
    }
 }
 
+// todo: fix this so it actually works
 export function invalidateQueries(queries: Set<QueryClient<any, any, any, any>>, filter: QueryFilter = {params: []}, options: { force?: boolean } = {force: true}) {
+   let didInvalidate = false
    if (typeof filter === "function") {
       throw new Error("Not implemented")
    } else {
@@ -438,6 +447,8 @@ export function invalidateQueries(queries: Set<QueryClient<any, any, any, any>>,
          if (invalidate) {
             query.refetch(options)
          }
+         didInvalidate ||= invalidate
       }
+      return didInvalidate
    }
 }

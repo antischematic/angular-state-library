@@ -22,7 +22,4 @@ export {EVENTS, ACTION} from "./providers";
 export {configureStore, events, get, set, actionEvent, action, errorEvent, error, completeEvent, complete, nextEvent, next, observeInZone} from "./utils";
 export {Store, Caught, Select, Layout, Before, Invoke, Action} from "./decorators";
 export {slice, store, Selector, OnSelect, WithState, withState, WithStateOptions, inputs} from "./select"
-export {
-   useMutation, useQuery, ResourceManager, MutateOptions, QueryOptions, QueryError
-} from "./data"
 export { EventType, StoreEvent, TypedChanges, TypedChange, CompleteEvent, DispatchEvent, ErrorEvent, NextEvent, ZoneCompatible, StoreConfig, DispatchObserver, EventData, UnknownEvent } from "./interfaces"
