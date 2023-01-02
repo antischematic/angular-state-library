@@ -1,3 +1,4 @@
+import {observeInZone, ZoneCompatible} from "@antischematic/angular-state-library";
 import {
    BehaviorSubject,
    distinctUntilChanged,
@@ -21,17 +22,17 @@ import {
    tap,
    timer
 } from "rxjs";
-import {EnvironmentInjector, inject, Injector, INJECTOR} from "@angular/core";
+import {EnvironmentInjector, inject, Injector, INJECTOR, NgZone} from "@angular/core";
 import {FetchParams, Page, QueryEvent, QueryFilter, QueryOptions, QueryState, QueryStore} from "./interfaces";
 import {createFetch, createInitialEvent, createResult} from "./utils";
 import {QUERY_CONFIG} from "./providers";
 
-function getTimer(timers: Map<number, Observable<number>>, ms: number) {
+function getTimer(timers: Map<number, Observable<number>>, ms: number, zone: ZoneCompatible) {
    if (!ms) return EMPTY
    if (timers.has(ms)) {
       return timers.get(ms)!
    }
-   const refresh = interval(ms).pipe(
+   const refresh = observeInZone(interval(ms), zone).pipe(
       share({
          resetOnRefCountZero: () => {
             timers.delete(ms)
@@ -43,10 +44,10 @@ function getTimer(timers: Map<number, Observable<number>>, ms: number) {
    return refresh
 }
 
-function getInvalidators(timers: Map<number, Observable<number>>, invalidate: Observable<any>, options: QueryOptions<any, any, any, any>) {
+function getInvalidators(timers: Map<number, Observable<number>>, invalidate: Observable<any>, options: QueryOptions<any, any, any, any>, zone: ZoneCompatible) {
    if (options.refreshInterval) {
       invalidate = invalidate.pipe(
-         mergeWith(getTimer(timers, options.refreshInterval))
+         mergeWith(getTimer(timers, options.refreshInterval, zone))
       )
    }
    return invalidate
@@ -198,6 +199,7 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
    injector: Injector
    environmentInjector: EnvironmentInjector
    config
+   zone
 
    get data() {
       return this.isPreviousData ? this.previousState!.data : this.value.data
@@ -304,12 +306,9 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
          if (event.type === "success") {
             this.failureCount = 0
          }
-         if (!mutation) {
-            this.sub.unsubscribe()
-         }
          if (event.type === "success") {
             this.sub.unsubscribe()
-            this.sub = getInvalidators(this.config.timers, this.invalidator, this.options).subscribe(({ force = false } = {}) => {
+            this.sub = getInvalidators(this.config.timers, this.invalidator, this.options, this.zone).subscribe(({ force = false } = {}) => {
                this.sub.unsubscribe()
                this.fetchInternal(params as any, {refresh: true, force})
             })
@@ -325,6 +324,7 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
          this.config.clients.add(this)
          this.subscription = this.query.pipe(
             distinctUntilChanged(),
+            tap(() => this.sub.unsubscribe()),
             switchAll(),
          ).subscribe(this)
       }
@@ -420,6 +420,7 @@ export class QueryClient<TParams extends any[], TResult, TData = TResult, TPageP
       this.environmentInjector = this.injector.get(EnvironmentInjector)
       this.config = this.injector.get(QUERY_CONFIG)
       this.createQuery = this.isInfinite ? createInfiniteQuery : createQuery
+      this.zone = this.injector.get(NgZone)
    }
 }
 

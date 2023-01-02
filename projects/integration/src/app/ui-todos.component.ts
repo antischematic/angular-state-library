@@ -51,7 +51,8 @@ export class UITodos {
       key: "todos",
       fetch: loadTodos,
       keepPreviousData: true,
-      staleTime: 10000
+      staleTime: 5000,
+      refreshInterval: 10000
    })
 
    @Select() createTodo = new MutationClient({
@@ -147,7 +148,7 @@ const Loading = new TransitionToken<Todo[]>("loading")
 function loadTodos(userId: string): Observable<Todo[]> {
    const loading = inject(Loading)
    return inject(HttpClient).get<Todo[]>(endpoint, {params: {userId}}).pipe(
-      delay(1000),
+      // delay(1000),
       useTransition(loading, {emit: true}),
    )
 }
